@@ -1,0 +1,11 @@
+.gradle/
+build/
+*.log
+.idea/
+*.iml
+.kotlin/
+.DS_Store
+.env
+*.env
+__pycache__/
+*.pyc

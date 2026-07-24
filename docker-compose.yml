@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: beertool-db
+    environment:
+      POSTGRES_DB: beertool
+      POSTGRES_USER: beertool
+      POSTGRES_PASSWORD: beertool
+    ports:
+      - "5432:5432"
+    volumes:
+      - beertool-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beertool"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  beertool-pgdata:

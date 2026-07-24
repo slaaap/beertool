@@ -1,0 +1,31 @@
+package uk.beertool.recipe
+
+const val DEFAULT_POST_BOIL_VOLUME_L = 22.0
+
+const val KETTLE_RETENTION_L = 3.0
+
+const val BOIL_OFF_L = 5.0
+
+const val DEFAULT_PRE_BOIL_VOLUME_L = DEFAULT_POST_BOIL_VOLUME_L + BOIL_OFF_L
+
+const val DEFAULT_FERMENTER_VOLUME_L = DEFAULT_POST_BOIL_VOLUME_L - KETTLE_RETENTION_L
+
+const val DEFAULT_EFFICIENCY = 0.75
+
+const val DEFAULT_BOIL_TIME_MIN = 60
+
+const val DEFAULT_ATTENUATION = 0.75
+
+const val MAX_UNMALTED_FRACTION = 0.40
+
+val DEFAULT_MASH_STEPS = listOf(
+    MashStep(tempC = 62.0, timeMin = 40),
+    MashStep(tempC = 72.0, timeMin = 20),
+)
+
+const val MIN_ATTENUATION = 0.40
+const val MAX_ATTENUATION = 0.95
+
+const val DEFAULT_MASH_THICKNESS_L_PER_KG = 3.0
+const val DEFAULT_GRAIN_ABSORPTION_L_PER_KG = 1.0
+const val DEFAULT_GRAIN_TEMP_C = 20.0
