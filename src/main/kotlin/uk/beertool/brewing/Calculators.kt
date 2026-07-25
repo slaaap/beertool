@@ -211,7 +211,7 @@ object Calculators {
     )
 
     // Beta-amylase: makes maltose (fermentable), works cool, denatures early.
-    private val BETA = Enzyme(optimumC = 63.0, widthC = 6.0, denaturesFromC = 63.0, decayPerC = 0.55)
+    private val BETA = Enzyme(optimumC = 62.0, widthC = 6.0, denaturesFromC = 63.0, decayPerC = 0.55)
 
     // Alpha-amylase: makes larger, less fermentable sugars, works hotter, hardier.
     private val ALPHA = Enzyme(optimumC = 72.0, widthC = 7.0, denaturesFromC = 73.0, decayPerC = 0.60)

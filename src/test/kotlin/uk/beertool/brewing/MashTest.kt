@@ -25,8 +25,8 @@ class MashTest {
         val low = Calculators.mashAttenuationShift(listOf(MashRest(63.0, 60)))!!
         val high = Calculators.mashAttenuationShift(listOf(MashRest(72.0, 60)))!!
 
-        low shouldBe (0.05 plusOrMinus 0.005)
-        high shouldBe (-0.08 plusOrMinus 0.005)
+        low shouldBe (0.059 plusOrMinus 0.005)
+        high shouldBe (-0.074 plusOrMinus 0.005)
     }
 
     @Test
