@@ -10,7 +10,7 @@ import uk.beertool.recipe.RecipeStats
 import uk.beertool.user.User
 import java.time.LocalDate
 
-internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boolean, canWrite: Boolean) {
+internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boolean) {
     scrollTable {
         thead {
             tr {
@@ -20,7 +20,6 @@ internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boole
                 th(classes = "num") { +"OG" }
                 th(classes = "num") { +"FG" }
                 th(classes = "num") { +"ABV" }
-                if (canWrite) th(classes = "right") { }
             }
         }
         tbody {
@@ -36,10 +35,6 @@ internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boole
                     numCell(b.measuredOg, 3)
                     numCell(b.measuredFg, 3)
                     numCell(b.stats().abv, 1)
-                    if (canWrite) td("right") {
-                        btnLink("/recipes/${brew.recipeNo}/batches/${b.no}/edit", "Edit", Icon.EDIT)
-                        deleteButton("/recipes/${brew.recipeNo}/batches/${b.no}/delete", "Delete this brew?")
-                    }
                 }
             }
         }
@@ -53,7 +48,7 @@ fun HTML.batchLogPage(user: User, brews: Page<BatchSummary>) {
             div("empty") { +"Nothing brewed yet — open a recipe and log a brew." }
             actionBar { btnLink("/recipes", "Go to recipes", Icon.BACK) }
         } else {
-            batchTable(brews.items, showRecipe = true, canWrite = user.canWrite)
+            batchTable(brews.items, showRecipe = true)
             pager(brews) { p -> "/batches?page=$p" }
         }
     }

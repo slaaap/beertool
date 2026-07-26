@@ -43,7 +43,6 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
                     th(classes = "num") { +"EBC" }
                     th(classes = "num hide-sm") { +"Batch" }
                     th(classes = "hide-sm") { +"Brewed" }
-                    if (user.canWrite) th(classes = "right") { }
                 }
             }
             tbody {
@@ -59,10 +58,6 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
                         td("num") { +fmt(r.stats.colourEbc, 0) }
                         td("num hide-sm") { +"${fmt(r.fermenterVolumeL, 0)} L" }
                         td("tnum hide-sm") { brewedCell(brewed) }
-                        if (user.canWrite) td("right") {
-                            btnLink("/recipes/${r.no}/edit", "Edit", Icon.EDIT)
-                            deleteButton("/recipes/${r.no}/delete", "Delete “${r.name}” and all its brews?")
-                        }
                     }
                 }
             }
@@ -175,6 +170,6 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
             if (user.canWrite) btnLink("/recipes/${recipe.no}/batches/new", "Log a brew", Icon.BREW)
         }
         if (brews.isEmpty()) div("empty") { +"Not brewed yet." }
-        else batchTable(brews, showRecipe = false, canWrite = user.canWrite)
+        else batchTable(brews, showRecipe = false)
     }
 }
