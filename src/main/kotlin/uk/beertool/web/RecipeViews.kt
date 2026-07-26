@@ -14,7 +14,7 @@ import uk.beertool.user.User
 
 fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Long, BrewInfo>, term: String) {
     page("Recipes", user) {
-        if (user.canWrite) pageHead("Recipes") { btnLink("/recipes/new", "New recipe", Icon.PLUS, primary = true) }
+        if (user.canWrite) pageHead("Recipes") { btnLink("/recipes/new", "New recipe", Icon.PLUS, style = ButtonStyle.PRIMARY) }
         else h1 { +"Recipes" }
 
         form(action = "/recipes", method = FormMethod.get, classes = "search") {
@@ -104,8 +104,8 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
         }
 
         if (user.canWrite) actionBar {
-            if (activeBrewDay != null) btnLink("/recipes/${recipe.no}/batches/${activeBrewDay.no}/brew", "Resume brew day", Icon.BREW, primary = true)
-            else btnPost("/recipes/${recipe.no}/brew-day", "Start brew day", Icon.BREW, primary = true)
+            if (activeBrewDay != null) btnLink("/recipes/${recipe.no}/batches/${activeBrewDay.no}/brew", "Resume brew day", Icon.BREW, style = ButtonStyle.PRIMARY)
+            else btnPost("/recipes/${recipe.no}/brew-day", "Start brew day", Icon.BREW, style = ButtonStyle.PRIMARY)
             btnLink("/recipes/${recipe.no}/edit", "Edit recipe", Icon.EDIT)
             deleteButton("/recipes/${recipe.no}/delete", "Delete “${recipe.name}” and all its brews?")
         }

@@ -160,10 +160,10 @@ private fun TBODY.mashStepRow(i: Int, m: MashStep?) {
     fun field(name: String) = rowField("mashSteps", i, name)
     tr {
         stepNumberCell()
-        td("num") { numberInput(name = field("tempC")) { value = m?.tempC?.toString() ?: ""; numAttrs("0.5") } }
+        numInput(field("tempC"), m?.tempC?.toString(), "0.5")
         emptyCell()
         emptyCell()
-        td("num") { numberInput(name = field("timeMin")) { value = m?.timeMin?.toString() ?: ""; numAttrs("1") } }
+        numInput(field("timeMin"), m?.timeMin?.toString(), "1")
         emptyCell()
         td("right") { removeButton() }
     }
@@ -173,7 +173,7 @@ private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?) {
     fun field(name: String) = rowField("fermentables", i, name)
     tr {
         td { textInput(name = field("name")) { value = f?.name ?: "" } }
-        td("num") { numberInput(name = field("amountKg")) { value = f?.amountKg?.toString() ?: ""; numAttrs("0.01") } }
+        numInput(field("amountKg"), f?.amountKg?.toString(), "0.01")
         td { select { name = field("type"); enumOptions(f?.type, FermentableType) } }
         td {
             select {
@@ -183,15 +183,9 @@ private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?) {
                 }
             }
         }
-        td("num") { numberInput(name = field("boilTimeMin")) { value = f?.boilTimeMin?.toString() ?: ""; numAttrs("1") } }
-        td("num") { numberInput(name = field("colourEbc")) { value = f?.colourEbc?.toString() ?: ""; numAttrs("1") } }
-        td("num") {
-            numberInput(name = field("extractPercent")) {
-                value = f?.extractPercent?.toString() ?: ""
-                placeholder = "auto"
-                numAttrs("0.1")
-            }
-        }
+        numInput(field("boilTimeMin"), f?.boilTimeMin?.toString(), "1")
+        numInput(field("colourEbc"), f?.colourEbc?.toString(), "1")
+        numInput(field("extractPercent"), f?.extractPercent?.toString(), "0.1", placeholder = "auto")
         td("right") { removeButton() }
     }
 }
@@ -200,11 +194,11 @@ private fun TBODY.hopRow(i: Int, h: RecipeHop?) {
     fun field(name: String) = rowField("hops", i, name)
     tr {
         td { textInput(name = field("name")) { value = h?.name ?: "" } }
-        td("num") { numberInput(name = field("amountG")) { value = h?.amountG?.toString() ?: ""; numAttrs("1") } }
+        numInput(field("amountG"), h?.amountG?.toString(), "1")
         emptyCell()
         td { select { name = field("usage"); enumOptions(h?.usage, HopUsage) { u -> usageAttrs(u) } } }
-        td("num") { numberInput(name = field("boilTimeMin")) { value = h?.boilTimeMin?.toString() ?: ""; numAttrs("1") } }
-        td("num") { numberInput(name = field("alphaAcid")) { value = h?.alphaAcid?.toString() ?: ""; numAttrs("0.1") } }
+        numInput(field("boilTimeMin"), h?.boilTimeMin?.toString(), "1")
+        numInput(field("alphaAcid"), h?.alphaAcid?.toString(), "0.1")
         td("right") { removeButton() }
     }
 }
@@ -217,12 +211,7 @@ private fun TBODY.yeastRow(i: Int, y: RecipeYeast?) {
         emptyCell()
         td { select { name = field("usage"); enumOptions(y?.usage, YeastUsage) } }
         emptyCell()
-        td("num") {
-            numberInput(name = field("attenuation")) {
-                value = fmt((y?.attenuation ?: DEFAULT_ATTENUATION).asPercent(), 0)
-                numAttrs("1", max = "100")
-            }
-        }
+        numInput(field("attenuation"), fmt((y?.attenuation ?: DEFAULT_ATTENUATION).asPercent(), 0), "1", max = "100")
         td("right") { removeButton() }
     }
 }
@@ -231,10 +220,10 @@ private fun TBODY.extraRow(i: Int, e: RecipeExtra?) {
     fun field(name: String) = rowField("extras", i, name)
     tr {
         td { textInput(name = field("name")) { value = e?.name ?: "" } }
-        td("num") { numberInput(name = field("amount")) { value = e?.amount?.toString() ?: ""; numAttrs("0.1") } }
+        numInput(field("amount"), e?.amount?.toString(), "0.1")
         td { select { name = field("unit"); enumOptions(e?.unit, AmountUnit) { it.code } } }
         td { select { name = field("usage"); enumOptions(e?.usage, ExtraUsage) { u -> usageAttrs(u) } } }
-        td("num") { numberInput(name = field("boilTimeMin")) { value = e?.boilTimeMin?.toString() ?: ""; numAttrs("1") } }
+        numInput(field("boilTimeMin"), e?.boilTimeMin?.toString(), "1")
         emptyCell()
         td("right") { removeButton() }
     }

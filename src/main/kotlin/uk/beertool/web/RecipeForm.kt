@@ -81,9 +81,7 @@ data class ExtraRow(
 ) : FormRow
 
 fun RecipeForm.toNewRecipe(prefs: BrewerPreferences = BrewerPreferences()): NewRecipe {
-
     val boilTime = boilTimeMin ?: prefs.boilTimeMin
-
     return NewRecipe(
         name = name.trim(),
         style = style.trim().ifBlank { null },
@@ -93,7 +91,6 @@ fun RecipeForm.toNewRecipe(prefs: BrewerPreferences = BrewerPreferences()): NewR
         fermenterVolumeL = fermenterVolumeL ?: prefs.fermenterVolumeL,
         efficiency = efficiency?.let(::percentToFraction) ?: prefs.efficiency,
         boilTimeMin = boilTime,
-
         mashSteps = mashSteps.mapNotNull { row ->
             MashStep(tempC = row.tempC ?: return@mapNotNull null, timeMin = row.timeMin ?: return@mapNotNull null)
         },

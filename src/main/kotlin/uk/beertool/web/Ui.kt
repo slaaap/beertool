@@ -18,8 +18,12 @@ private fun FlowContent.iconSvg(icon: Icon) = span("ico") { unsafe { +icon.marku
 
 fun FlowContent.js(file: String) = script(src = "/static/js/$file") {}
 
-fun FlowContent.btnLink(href: String, label: String, icon: Icon, primary: Boolean = false) {
-    a(href = href, classes = if (primary) "btn primary" else "btn") {
+enum class ButtonStyle(val css: String?) { DEFAULT(null), PRIMARY("primary"), DANGER("danger") }
+
+private fun cssClasses(vararg names: String?) = names.filterNotNull().joinToString(" ")
+
+fun FlowContent.btnLink(href: String, label: String, icon: Icon, style: ButtonStyle = ButtonStyle.DEFAULT) {
+    a(href = href, classes = cssClasses("btn", style.css)) {
         iconSvg(icon)
         span { +label }
     }
@@ -29,20 +33,13 @@ fun FlowContent.btnPost(
     action: String,
     label: String,
     icon: Icon,
-    primary: Boolean = false,
-    danger: Boolean = false,
+    style: ButtonStyle = ButtonStyle.DEFAULT,
     iconOnly: Boolean = false,
     confirm: String? = null,
 ) {
     form(action = action, method = FormMethod.post, classes = "inline") {
         confirm?.let { onSubmit = "return confirm('${it.replace("'", "\\'")}')" }
-        val classes = buildString {
-            append("btn")
-            if (primary) append(" primary")
-            if (danger) append(" danger")
-            if (iconOnly) append(" icon-only")
-        }
-        button(type = ButtonType.submit, classes = classes) {
+        button(type = ButtonType.submit, classes = cssClasses("btn", style.css, if (iconOnly) "icon-only" else null)) {
             title = label
             attributes["aria-label"] = label
             iconSvg(icon)
@@ -52,7 +49,7 @@ fun FlowContent.btnPost(
 }
 
 fun FlowContent.deleteButton(action: String, confirm: String) =
-    btnPost(action, "Delete", Icon.TRASH, danger = true, iconOnly = true, confirm = confirm)
+    btnPost(action, "Delete", Icon.TRASH, style = ButtonStyle.DANGER, iconOnly = true, confirm = confirm)
 
 fun FlowContent.rowRemoveButton(onClick: String, label: String) {
     button(type = ButtonType.button, classes = "btn danger icon-only") {
@@ -88,7 +85,6 @@ fun FlowContent.field(text: String, hint: String? = null, block: DIV.() -> Unit)
 }
 
 fun FlowContent.fieldGrid(columns: Int = 2, block: DIV.() -> Unit) = div("grid g$columns") { block() }
-
 
 fun FlowContent.scrollTable(tableClass: String? = null, block: TABLE.() -> Unit) =
     div("table-scroll") { table(tableClass) { block() } }

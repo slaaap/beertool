@@ -148,7 +148,6 @@ object RecipeRepository {
     )
 
     private fun insertLines(recipeId: Long, draft: NewRecipe) {
-
         draft.mashSteps.forEach { m ->
             RecipeMashSteps.insert {
                 it[RecipeMashSteps.recipeId] = recipeId

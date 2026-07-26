@@ -89,6 +89,15 @@ internal fun TR.numCell(v: Double?, decimals: Int) = td("num") { +fmt(v, decimal
 
 internal fun TR.numCell(v: Int?) = td("num") { +(v?.toString() ?: MISSING) }
 
+internal fun TR.numInput(name: String, value: String?, step: String, max: String? = null, placeholder: String? = null) =
+    td("num") {
+        numberInput(name = name) {
+            this.value = value ?: ""
+            placeholder?.let { this.placeholder = it }
+            numAttrs(step, max)
+        }
+    }
+
 internal fun INPUT.numAttrs(step: String, max: String? = null) {
     attributes["step"] = step
     attributes["min"] = "0"

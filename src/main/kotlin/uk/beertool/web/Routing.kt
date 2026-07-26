@@ -31,7 +31,7 @@ private fun FlowContent.welcomeBody() {
         h1 { +"Brew it. Log it. Brew it better." }
         p("lede") { +"Write beer recipes, see the numbers as you go, and keep a log of every brew you pull off." }
         actionBar {
-            if (!SingleUser.enabled) btnLink("/register", "Create an account", Icon.PLUS, primary = true)
+            if (!SingleUser.enabled) btnLink("/register", "Create an account", Icon.PLUS, style = ButtonStyle.PRIMARY)
             btnLink("/login", "Log in", Icon.BACK)
         }
     }

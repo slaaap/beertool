@@ -72,9 +72,9 @@ fun HTML.batchViewPage(user: User, batch: Batch, recipe: Recipe, estimate: Recip
                 val live = batch.packagedDate == null
                 val onBrewDay = live && batch.measuredOg == null
                 if (onBrewDay) {
-                    btnLink("$base/brew", "Brew day", Icon.BREW, primary = true)
+                    btnLink("$base/brew", "Brew day", Icon.BREW, style = ButtonStyle.PRIMARY)
                 } else {
-                    btnLink("$base/edit", "Edit brew", Icon.EDIT, primary = true)
+                    btnLink("$base/edit", "Edit brew", Icon.EDIT, style = ButtonStyle.PRIMARY)
                 }
                 if (live && !onBrewDay) btnPost("$base/packaged", "Packaged today", Icon.PACKAGE)
             }
