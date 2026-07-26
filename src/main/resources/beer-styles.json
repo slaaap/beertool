@@ -152,8 +152,8 @@
     "url": "https://www.bjcp.org/style/2021/32/32A/classic-style-smoked-beer/"
   },
   {
-    "name": "Clone Beer",
-    "url": "https://www.bjcp.org/style/2021/34/34A/clone-beer/"
+    "name": "Commercial Specialty Beer",
+    "url": "https://www.bjcp.org/style/2021/34/34A/commercial-specialty-beer/"
   },
   {
     "name": "Cream Ale",
@@ -272,6 +272,42 @@
     "url": "https://www.bjcp.org/style/2021/4/4C/helles-bock/"
   },
   {
+    "name": "Historical Beer: Kellerbier",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-kellerbier/"
+  },
+  {
+    "name": "Historical Beer: Kentucky Common",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-kentucky-common/"
+  },
+  {
+    "name": "Historical Beer: Lichtenhainer",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-lichtenhainer/"
+  },
+  {
+    "name": "Historical Beer: London Brown Ale",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-london-brown-ale/"
+  },
+  {
+    "name": "Historical Beer: Piwo Grodziskie",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-piwo-grodziskie/"
+  },
+  {
+    "name": "Historical Beer: Pre-Prohibition Lager",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-pre-prohibition-lager/"
+  },
+  {
+    "name": "Historical Beer: Pre-Prohibition Porter",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-pre-prohibition-porter/"
+  },
+  {
+    "name": "Historical Beer: Roggenbier",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-roggenbier/"
+  },
+  {
+    "name": "Historical Beer: Sahti",
+    "url": "https://www.bjcp.org/style/2021/27/27A/historical-beer-sahti/"
+  },
+  {
     "name": "Imperial Stout",
     "url": "https://www.bjcp.org/style/2021/20/20C/imperial-stout/"
   },
@@ -298,10 +334,6 @@
   {
     "name": "Irish Stout",
     "url": "https://www.bjcp.org/style/2021/15/15B/irish-stout/"
-  },
-  {
-    "name": "Kellerbier",
-    "url": "https://www.bjcp.org/style/2021/7/7C/kellerbier/"
   },
   {
     "name": "Kölsch",
