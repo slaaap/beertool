@@ -14,8 +14,8 @@ internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boole
     scrollTable {
         thead {
             tr {
-                th { +"Brewed" }
-                if (showRecipe) th { +"Recipe" }
+                th(classes = if (showRecipe) null else "col-grow") { +"Brewed" }
+                if (showRecipe) th(classes = "col-grow") { +"Recipe" }
                 th(classes = "hide-sm") { +"Packaged" }
                 th(classes = "num") { +"OG" }
                 th(classes = "num") { +"FG" }
@@ -26,8 +26,8 @@ internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boole
             brews.forEach { brew ->
                 val b = brew.batch
                 tr {
-                    td("tnum") { a(href = "/recipes/${brew.recipeNo}/batches/${b.no}", classes = "row-name") { +fmt(b.brewDate) } }
-                    if (showRecipe) td {
+                    td(if (showRecipe) "tnum" else "tnum col-grow") { a(href = "/recipes/${brew.recipeNo}/batches/${b.no}", classes = "row-name") { +fmt(b.brewDate) } }
+                    if (showRecipe) td("col-grow") {
                         +brew.recipeName
                         span("muted") { +" #${b.no}" }
                     }

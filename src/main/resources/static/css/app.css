@@ -99,6 +99,7 @@ table.mash tbody { counter-reset:step; }
 table.mash td.c-name { color:var(--muted); font-family:var(--font-mono); }
 table.mash td.c-name::before { counter-increment:step; content:counter(step) "."; }
 
+th.col-grow, td.col-grow { width:100%; }
 th.right, td.right { text-align:right; padding-right:0; white-space:nowrap; }
 td.right .inline { display:inline-block; }
 .row-name { font-weight:600; }

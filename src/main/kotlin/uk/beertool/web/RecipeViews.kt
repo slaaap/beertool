@@ -37,7 +37,7 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
         scrollTable {
             thead {
                 tr {
-                    th { +"Recipe" }
+                    th(classes = "col-grow") { +"Recipe" }
                     th(classes = "num") { +"ABV" }
                     th(classes = "num") { +"IBU" }
                     th(classes = "num") { +"EBC" }
@@ -49,7 +49,7 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
                 recipes.items.forEach { r ->
                     val brewed = brews[r.id]
                     tr {
-                        td {
+                        td("col-grow") {
                             a(href = "/recipes/${r.no}", classes = "row-name") { +r.name }
                             span("row-sub") { +(r.style ?: "No style") }
                         }
