@@ -272,16 +272,8 @@
     "url": "https://www.bjcp.org/style/2021/4/4C/helles-bock/"
   },
   {
-    "name": "Imperial Pilsner",
-    "url": null
-  },
-  {
     "name": "Imperial Stout",
     "url": "https://www.bjcp.org/style/2021/20/20C/imperial-stout/"
-  },
-  {
-    "name": "India Pale Lager",
-    "url": null
   },
   {
     "name": "International Amber Lager",
@@ -310,10 +302,6 @@
   {
     "name": "Kellerbier",
     "url": "https://www.bjcp.org/style/2021/7/7C/kellerbier/"
-  },
-  {
-    "name": "Kuit",
-    "url": null
   },
   {
     "name": "Kölsch",
@@ -392,10 +380,6 @@
     "url": "https://www.bjcp.org/style/2021/14/14A/scottish-light/"
   },
   {
-    "name": "Session IPA",
-    "url": null
-  },
-  {
     "name": "Specialty Fruit Beer",
     "url": "https://www.bjcp.org/style/2021/29/29C/specialty-fruit-beer/"
   },
@@ -450,10 +434,6 @@
   {
     "name": "Weizenbock",
     "url": "https://www.bjcp.org/style/2021/10/10C/weizenbock/"
-  },
-  {
-    "name": "Wheat IPA",
-    "url": null
   },
   {
     "name": "Wheatwine",
