@@ -41,7 +41,6 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
                     th(classes = "num") { +"ABV" }
                     th(classes = "num") { +"IBU" }
                     th(classes = "num") { +"EBC" }
-                    th(classes = "num hide-sm") { +"Batch" }
                     th(classes = "hide-sm") { +"Brewed" }
                 }
             }
@@ -56,7 +55,6 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
                         td("num") { +fmt(r.stats.abv, 1) }
                         td("num") { +fmt(r.stats.ibu, 0) }
                         td("num") { +fmt(r.stats.colourEbc, 0) }
-                        td("num hide-sm") { +"${fmt(r.fermenterVolumeL, 0)} L" }
                         td("tnum hide-sm") { brewedCell(brewed) }
                     }
                 }
