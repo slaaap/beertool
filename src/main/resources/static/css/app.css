@@ -221,6 +221,7 @@ li { margin:3px 0; }
 
   .table-scroll table { min-width:520px; }
   .table-scroll table.bill { min-width:620px; }
+  .table-scroll table.fit { min-width:0; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
 

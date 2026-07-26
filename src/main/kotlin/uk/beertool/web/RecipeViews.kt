@@ -34,7 +34,7 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
             }
             return@page
         }
-        scrollTable {
+        scrollTable("fit") {
             thead {
                 tr {
                     th(classes = "col-grow") { +"Recipe" }

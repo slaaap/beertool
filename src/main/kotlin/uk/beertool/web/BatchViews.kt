@@ -11,7 +11,7 @@ import uk.beertool.user.User
 import java.time.LocalDate
 
 internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boolean) {
-    scrollTable {
+    scrollTable(if (showRecipe) null else "fit") {
         thead {
             tr {
                 th(classes = if (showRecipe) null else "col-grow") { +"Brewed" }
