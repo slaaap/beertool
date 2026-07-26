@@ -102,7 +102,13 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
     page(recipe.name, user) {
         h1 { +recipe.name }
 
-        p("lede") { +(recipe.style ?: "No style") }
+        p("lede") {
+            +(recipe.style ?: "No style")
+            BeerStyles.urlFor(recipe.style)?.let { url ->
+                +" "
+                a(href = url, classes = "bjcp-link") { target = "_blank"; attributes["rel"] = "noopener"; +"↗ BJCP" }
+            }
+        }
 
         if (user.canWrite) actionBar {
             if (activeBrewDay != null) btnLink("/recipes/${recipe.no}/batches/${activeBrewDay.no}/brew", "Resume brew day", Icon.BREW, primary = true)

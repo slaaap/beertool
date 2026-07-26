@@ -37,7 +37,21 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
 
             fieldGrid(columns = 2) {
                 field("Name") { textInput(name = "name") { value = recipe?.name ?: ""; required = true } }
-                field("Style") { textInput(name = "style") { value = recipe?.style ?: "" } }
+                field("Style") {
+                    textInput(name = "style") {
+                        value = recipe?.style ?: ""
+                        attributes["list"] = "beer-styles"
+                        attributes["autocomplete"] = "off"
+                    }
+                    a(classes = "bjcp-link") {
+                        id = "style-bjcp"; target = "_blank"; attributes["rel"] = "noopener"; hidden = true
+                        +"View on BJCP ↗"
+                    }
+                }
+            }
+            dataList {
+                id = "beer-styles"
+                BeerStyles.all.forEach { s -> option { value = s.name } }
             }
             fieldGrid(columns = 1) {
                 field("Description") { textArea { name = "description"; +(recipe?.description ?: "") } }
@@ -103,6 +117,8 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
         prototypeRow(EXTRAS) { extraRow(0, null) }
 
         js("recipe-form.js")
+        script(type = "application/json") { id = "bjcp-map"; unsafe { +BeerStyles.nameToUrlJson } }
+        js("style-link.js")
     }
 }
 

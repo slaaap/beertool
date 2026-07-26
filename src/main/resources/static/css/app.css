@@ -53,6 +53,7 @@ h2 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0
   color:var(--muted); margin:0; }
 p { margin:10px 0; }
 .lede { color:var(--muted); margin:0 0 4px; }
+.bjcp-link { font-size:12px; font-weight:600; letter-spacing:.02em; margin-left:8px; white-space:nowrap; }
 h1 .title-num { color:var(--muted); font-weight:400; }
 .muted { color:var(--muted); }
 

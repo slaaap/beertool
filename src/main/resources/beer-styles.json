@@ -1,0 +1,482 @@
+[
+  {
+    "name": "Altbier",
+    "url": "https://www.bjcp.org/style/2021/7/7B/altbier/"
+  },
+  {
+    "name": "Alternative Grain Beer",
+    "url": "https://www.bjcp.org/style/2021/31/31A/alternative-grain-beer/"
+  },
+  {
+    "name": "Alternative Sugar Beer",
+    "url": "https://www.bjcp.org/style/2021/31/31B/alternative-sugar-beer/"
+  },
+  {
+    "name": "American Amber Ale",
+    "url": "https://www.bjcp.org/style/2021/19/19A/american-amber-ale/"
+  },
+  {
+    "name": "American Barleywine",
+    "url": "https://www.bjcp.org/style/2021/22/22C/american-barleywine/"
+  },
+  {
+    "name": "American Brown Ale",
+    "url": "https://www.bjcp.org/style/2021/19/19C/american-brown-ale/"
+  },
+  {
+    "name": "American IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21A/american-ipa/"
+  },
+  {
+    "name": "American Lager",
+    "url": "https://www.bjcp.org/style/2021/1/1B/american-lager/"
+  },
+  {
+    "name": "American Light Lager",
+    "url": "https://www.bjcp.org/style/2021/1/1A/american-light-lager/"
+  },
+  {
+    "name": "American Pale Ale",
+    "url": "https://www.bjcp.org/style/2021/18/18B/american-pale-ale/"
+  },
+  {
+    "name": "American Porter",
+    "url": "https://www.bjcp.org/style/2021/20/20A/american-porter/"
+  },
+  {
+    "name": "American Stout",
+    "url": "https://www.bjcp.org/style/2021/20/20B/american-stout/"
+  },
+  {
+    "name": "American Strong Ale",
+    "url": "https://www.bjcp.org/style/2021/22/22B/american-strong-ale/"
+  },
+  {
+    "name": "American Wheat Beer",
+    "url": "https://www.bjcp.org/style/2021/1/1D/american-wheat-beer/"
+  },
+  {
+    "name": "Australian Sparkling Ale",
+    "url": "https://www.bjcp.org/style/2021/12/12B/australian-sparkling-ale/"
+  },
+  {
+    "name": "Autumn Seasonal Beer",
+    "url": "https://www.bjcp.org/style/2021/30/30B/autumn-seasonal-beer/"
+  },
+  {
+    "name": "Baltic Porter",
+    "url": "https://www.bjcp.org/style/2021/9/9C/baltic-porter/"
+  },
+  {
+    "name": "Belgian Blond Ale",
+    "url": "https://www.bjcp.org/style/2021/25/25A/belgian-blond-ale/"
+  },
+  {
+    "name": "Belgian Dark Strong Ale",
+    "url": "https://www.bjcp.org/style/2021/26/26D/belgian-dark-strong-ale/"
+  },
+  {
+    "name": "Belgian Dubbel",
+    "url": "https://www.bjcp.org/style/2021/26/26B/belgian-dubbel/"
+  },
+  {
+    "name": "Belgian Golden Strong Ale",
+    "url": "https://www.bjcp.org/style/2021/25/25C/belgian-golden-strong-ale/"
+  },
+  {
+    "name": "Belgian IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Belgian Pale Ale",
+    "url": "https://www.bjcp.org/style/2021/24/24B/belgian-pale-ale/"
+  },
+  {
+    "name": "Belgian Single",
+    "url": "https://www.bjcp.org/style/2021/26/26A/belgian-single/"
+  },
+  {
+    "name": "Belgian Tripel",
+    "url": "https://www.bjcp.org/style/2021/26/26C/belgian-tripel/"
+  },
+  {
+    "name": "Berliner Weisse",
+    "url": "https://www.bjcp.org/style/2021/23/23A/berliner-weisse/"
+  },
+  {
+    "name": "Best Bitter",
+    "url": "https://www.bjcp.org/style/2021/11/11B/best-bitter/"
+  },
+  {
+    "name": "Bière de Garde",
+    "url": "https://www.bjcp.org/style/2021/24/24C/biere-de-garde/"
+  },
+  {
+    "name": "Black IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Blonde Ale",
+    "url": "https://www.bjcp.org/style/2021/18/18A/blonde-ale/"
+  },
+  {
+    "name": "Brett Beer",
+    "url": "https://www.bjcp.org/style/2021/28/28A/brett-beer/"
+  },
+  {
+    "name": "British Brown Ale",
+    "url": "https://www.bjcp.org/style/2021/13/13B/british-brown-ale/"
+  },
+  {
+    "name": "British Golden Ale",
+    "url": "https://www.bjcp.org/style/2021/12/12A/british-golden-ale/"
+  },
+  {
+    "name": "British Strong Ale",
+    "url": "https://www.bjcp.org/style/2021/17/17A/british-strong-ale/"
+  },
+  {
+    "name": "Brown IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Brut IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "California Common",
+    "url": "https://www.bjcp.org/style/2021/19/19B/california-common/"
+  },
+  {
+    "name": "Classic Style Smoked Beer",
+    "url": "https://www.bjcp.org/style/2021/32/32A/classic-style-smoked-beer/"
+  },
+  {
+    "name": "Clone Beer",
+    "url": "https://www.bjcp.org/style/2021/34/34A/clone-beer/"
+  },
+  {
+    "name": "Cream Ale",
+    "url": "https://www.bjcp.org/style/2021/1/1C/cream-ale/"
+  },
+  {
+    "name": "Czech Amber Lager",
+    "url": "https://www.bjcp.org/style/2021/3/3C/czech-amber-lager/"
+  },
+  {
+    "name": "Czech Dark Lager",
+    "url": "https://www.bjcp.org/style/2021/3/3D/czech-dark-lager/"
+  },
+  {
+    "name": "Czech Pale Lager",
+    "url": "https://www.bjcp.org/style/2021/3/3A/czech-pale-lager/"
+  },
+  {
+    "name": "Czech Premium Pale Lager",
+    "url": "https://www.bjcp.org/style/2021/3/3B/czech-premium-pale-lager/"
+  },
+  {
+    "name": "Dark Mild",
+    "url": "https://www.bjcp.org/style/2021/13/13A/dark-mild/"
+  },
+  {
+    "name": "Doppelbock",
+    "url": "https://www.bjcp.org/style/2021/9/9A/doppelbock/"
+  },
+  {
+    "name": "Double IPA",
+    "url": "https://www.bjcp.org/style/2021/22/22A/double-ipa/"
+  },
+  {
+    "name": "Dunkles Bock",
+    "url": "https://www.bjcp.org/style/2021/6/6C/dunkles-bock/"
+  },
+  {
+    "name": "Dunkles Weissbier",
+    "url": "https://www.bjcp.org/style/2021/10/10B/dunkles-weissbier/"
+  },
+  {
+    "name": "Eisbock",
+    "url": "https://www.bjcp.org/style/2021/9/9B/eisbock/"
+  },
+  {
+    "name": "English Barleywine",
+    "url": "https://www.bjcp.org/style/2021/17/17D/english-barleywine/"
+  },
+  {
+    "name": "English IPA",
+    "url": "https://www.bjcp.org/style/2021/12/12C/english-ipa/"
+  },
+  {
+    "name": "English Porter",
+    "url": "https://www.bjcp.org/style/2021/13/13C/english-porter/"
+  },
+  {
+    "name": "Experimental Beer",
+    "url": "https://www.bjcp.org/style/2021/34/34C/experimental-beer/"
+  },
+  {
+    "name": "Festbier",
+    "url": "https://www.bjcp.org/style/2021/4/4B/festbier/"
+  },
+  {
+    "name": "Flanders Red Ale",
+    "url": "https://www.bjcp.org/style/2021/23/23B/flanders-red-ale/"
+  },
+  {
+    "name": "Foreign Extra Stout",
+    "url": "https://www.bjcp.org/style/2021/16/16D/foreign-extra-stout/"
+  },
+  {
+    "name": "Fruit Beer",
+    "url": "https://www.bjcp.org/style/2021/29/29A/fruit-beer/"
+  },
+  {
+    "name": "Fruit Lambic",
+    "url": "https://www.bjcp.org/style/2021/23/23F/fruit-lambic/"
+  },
+  {
+    "name": "Fruit and Spice Beer",
+    "url": "https://www.bjcp.org/style/2021/29/29B/fruit-and-spice-beer/"
+  },
+  {
+    "name": "German Helles Exportbier",
+    "url": "https://www.bjcp.org/style/2021/5/5C/german-helles-exportbier/"
+  },
+  {
+    "name": "German Leichtbier",
+    "url": "https://www.bjcp.org/style/2021/5/5A/german-leichtbier/"
+  },
+  {
+    "name": "German Pils",
+    "url": "https://www.bjcp.org/style/2021/5/5D/german-pils/"
+  },
+  {
+    "name": "Gose",
+    "url": "https://www.bjcp.org/style/2021/23/23G/gose/"
+  },
+  {
+    "name": "Grape Ale",
+    "url": "https://www.bjcp.org/style/2021/29/29D/grape-ale/"
+  },
+  {
+    "name": "Gueuze",
+    "url": "https://www.bjcp.org/style/2021/23/23E/gueuze/"
+  },
+  {
+    "name": "Hazy IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21C/hazy-ipa/"
+  },
+  {
+    "name": "Helles Bock",
+    "url": "https://www.bjcp.org/style/2021/4/4C/helles-bock/"
+  },
+  {
+    "name": "Imperial Pilsner",
+    "url": null
+  },
+  {
+    "name": "Imperial Stout",
+    "url": "https://www.bjcp.org/style/2021/20/20C/imperial-stout/"
+  },
+  {
+    "name": "India Pale Lager",
+    "url": null
+  },
+  {
+    "name": "International Amber Lager",
+    "url": "https://www.bjcp.org/style/2021/2/2B/international-amber-lager/"
+  },
+  {
+    "name": "International Dark Lager",
+    "url": "https://www.bjcp.org/style/2021/2/2C/international-dark-lager/"
+  },
+  {
+    "name": "International Pale Lager",
+    "url": "https://www.bjcp.org/style/2021/2/2A/international-pale-lager/"
+  },
+  {
+    "name": "Irish Extra Stout",
+    "url": "https://www.bjcp.org/style/2021/15/15C/irish-extra-stout/"
+  },
+  {
+    "name": "Irish Red Ale",
+    "url": "https://www.bjcp.org/style/2021/15/15A/irish-red-ale/"
+  },
+  {
+    "name": "Irish Stout",
+    "url": "https://www.bjcp.org/style/2021/15/15B/irish-stout/"
+  },
+  {
+    "name": "Kellerbier",
+    "url": "https://www.bjcp.org/style/2021/7/7C/kellerbier/"
+  },
+  {
+    "name": "Kuit",
+    "url": null
+  },
+  {
+    "name": "Kölsch",
+    "url": "https://www.bjcp.org/style/2021/5/5B/kolsch/"
+  },
+  {
+    "name": "Lambic",
+    "url": "https://www.bjcp.org/style/2021/23/23D/lambic/"
+  },
+  {
+    "name": "Mixed-Fermentation Sour Beer",
+    "url": "https://www.bjcp.org/style/2021/28/28B/mixed-fermentation-sour-beer/"
+  },
+  {
+    "name": "Mixed-Style Beer",
+    "url": "https://www.bjcp.org/style/2021/34/34B/mixed-style-beer/"
+  },
+  {
+    "name": "Munich Dunkel",
+    "url": "https://www.bjcp.org/style/2021/8/8A/munich-dunkel/"
+  },
+  {
+    "name": "Munich Helles",
+    "url": "https://www.bjcp.org/style/2021/4/4A/munich-helles/"
+  },
+  {
+    "name": "Märzen",
+    "url": "https://www.bjcp.org/style/2021/6/6A/marzen/"
+  },
+  {
+    "name": "Oatmeal Stout",
+    "url": "https://www.bjcp.org/style/2021/16/16B/oatmeal-stout/"
+  },
+  {
+    "name": "Old Ale",
+    "url": "https://www.bjcp.org/style/2021/17/17B/old-ale/"
+  },
+  {
+    "name": "Ordinary Bitter",
+    "url": "https://www.bjcp.org/style/2021/11/11A/ordinary-bitter/"
+  },
+  {
+    "name": "Oud Bruin",
+    "url": "https://www.bjcp.org/style/2021/23/23C/oud-bruin/"
+  },
+  {
+    "name": "Rauchbier",
+    "url": "https://www.bjcp.org/style/2021/6/6B/rauchbier/"
+  },
+  {
+    "name": "Red IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Rye IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Saison",
+    "url": "https://www.bjcp.org/style/2021/25/25B/saison/"
+  },
+  {
+    "name": "Schwarzbier",
+    "url": "https://www.bjcp.org/style/2021/8/8B/schwarzbier/"
+  },
+  {
+    "name": "Scottish Export",
+    "url": "https://www.bjcp.org/style/2021/14/14C/scottish-export/"
+  },
+  {
+    "name": "Scottish Heavy",
+    "url": "https://www.bjcp.org/style/2021/14/14B/scottish-heavy/"
+  },
+  {
+    "name": "Scottish Light",
+    "url": "https://www.bjcp.org/style/2021/14/14A/scottish-light/"
+  },
+  {
+    "name": "Session IPA",
+    "url": null
+  },
+  {
+    "name": "Specialty Fruit Beer",
+    "url": "https://www.bjcp.org/style/2021/29/29C/specialty-fruit-beer/"
+  },
+  {
+    "name": "Specialty IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Specialty Smoked Beer",
+    "url": "https://www.bjcp.org/style/2021/32/32B/specialty-smoked-beer/"
+  },
+  {
+    "name": "Specialty Spice Beer",
+    "url": "https://www.bjcp.org/style/2021/30/30D/specialty-spice-beer/"
+  },
+  {
+    "name": "Specialty Wood-Aged Beer",
+    "url": "https://www.bjcp.org/style/2021/33/33B/specialty-wood-aged-beer/"
+  },
+  {
+    "name": "Spice, Herb, or Vegetable Beer",
+    "url": "https://www.bjcp.org/style/2021/30/30A/spice-herb-or-vegetable-beer/"
+  },
+  {
+    "name": "Straight Sour Beer",
+    "url": "https://www.bjcp.org/style/2021/28/28D/straight-sour-beer/"
+  },
+  {
+    "name": "Strong Bitter",
+    "url": "https://www.bjcp.org/style/2021/11/11C/strong-bitter/"
+  },
+  {
+    "name": "Sweet Stout",
+    "url": "https://www.bjcp.org/style/2021/16/16A/sweet-stout/"
+  },
+  {
+    "name": "Tropical Stout",
+    "url": "https://www.bjcp.org/style/2021/16/16C/tropical-stout/"
+  },
+  {
+    "name": "Vienna Lager",
+    "url": "https://www.bjcp.org/style/2021/7/7A/vienna-lager/"
+  },
+  {
+    "name": "Wee Heavy",
+    "url": "https://www.bjcp.org/style/2021/17/17C/wee-heavy/"
+  },
+  {
+    "name": "Weissbier",
+    "url": "https://www.bjcp.org/style/2021/10/10A/weissbier/"
+  },
+  {
+    "name": "Weizenbock",
+    "url": "https://www.bjcp.org/style/2021/10/10C/weizenbock/"
+  },
+  {
+    "name": "Wheat IPA",
+    "url": null
+  },
+  {
+    "name": "Wheatwine",
+    "url": "https://www.bjcp.org/style/2021/22/22D/wheatwine/"
+  },
+  {
+    "name": "White IPA",
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+  },
+  {
+    "name": "Wild Specialty Beer",
+    "url": "https://www.bjcp.org/style/2021/28/28C/wild-specialty-beer/"
+  },
+  {
+    "name": "Winter Seasonal Beer",
+    "url": "https://www.bjcp.org/style/2021/30/30C/winter-seasonal-beer/"
+  },
+  {
+    "name": "Witbier",
+    "url": "https://www.bjcp.org/style/2021/24/24A/witbier/"
+  },
+  {
+    "name": "Wood-Aged Beer",
+    "url": "https://www.bjcp.org/style/2021/33/33A/wood-aged-beer/"
+  }
+]
