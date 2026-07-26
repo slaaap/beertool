@@ -85,7 +85,7 @@
   },
   {
     "name": "Belgian IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-belgian-ipa/"
   },
   {
     "name": "Belgian Pale Ale",
@@ -113,7 +113,7 @@
   },
   {
     "name": "Black IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-black-ipa/"
   },
   {
     "name": "Blonde Ale",
@@ -137,11 +137,11 @@
   },
   {
     "name": "Brown IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-brown-ipa/"
   },
   {
     "name": "Brut IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-brut-ipa/"
   },
   {
     "name": "California Common",
@@ -385,11 +385,11 @@
   },
   {
     "name": "Red IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-red-ipa/"
   },
   {
     "name": "Rye IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-rye-ipa/"
   },
   {
     "name": "Saison",
@@ -473,7 +473,7 @@
   },
   {
     "name": "White IPA",
-    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa/"
+    "url": "https://www.bjcp.org/style/2021/21/21B/specialty-ipa-white-ipa/"
   },
   {
     "name": "Wild Specialty Beer",
