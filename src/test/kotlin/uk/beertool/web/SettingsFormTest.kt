@@ -2,6 +2,7 @@ package uk.beertool.web
 
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import uk.beertool.brewing.Whirlpool
 import uk.beertool.recipe.MashStep
 import uk.beertool.user.BrewerPreferences
 
@@ -16,6 +17,13 @@ class SettingsFormTest {
         merged.preBoilVolumeL shouldBe 30.0
         merged.efficiency shouldBe 0.68
         merged.boilOffL shouldBe 6.0
+    }
+
+    @Test
+    fun `should take the whirlpool temperature and cooling time as entered`() {
+        val merged = SettingsForm(whirlpoolTempC = 95.0, coolingTimeMin = 45).toPreferences(BrewerPreferences())
+
+        merged.whirlpool shouldBe Whirlpool(tempC = 95.0, coolingMinutes = 45)
     }
 
     @Test

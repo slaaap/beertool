@@ -12,6 +12,7 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import uk.beertool.brewing.Whirlpool
 import uk.beertool.db.matches
 import uk.beertool.db.recipeSearchDoc
 import uk.beertool.db.tsQuery
@@ -71,24 +72,24 @@ object RecipeRepository {
     private fun nextRecipeNo(userId: Long): Int =
         (Recipes.selectAll().where { Recipes.userId eq userId }.maxOfOrNull { it[Recipes.no] } ?: 0) + 1
 
-    fun listByUser(userId: Long): List<RecipeSummary> = transaction {
+    fun listByUser(userId: Long, whirlpool: Whirlpool = DEFAULT_WHIRLPOOL): List<RecipeSummary> = transaction {
         val rows = Recipes.selectAll()
             .where { Recipes.userId eq userId }
             .orderBy(Recipes.createdAt to SortOrder.DESC)
             .toList()
         val lines = linesFor(rows.map { it[Recipes.id].value })
-        rows.map { toRecipe(it, lines).toSummary() }
+        rows.map { toRecipe(it, lines).toSummary(whirlpool) }
     }
 
-    fun search(userId: Long, term: String): List<RecipeSummary> {
-        val query = tsQuery(toTsQuery(term) ?: return listByUser(userId))
+    fun search(userId: Long, term: String, whirlpool: Whirlpool = DEFAULT_WHIRLPOOL): List<RecipeSummary> {
+        val query = tsQuery(toTsQuery(term) ?: return listByUser(userId, whirlpool))
         return transaction {
             val ids = Recipes.select(Recipes.id)
                 .where { (Recipes.userId eq userId) and (Recipes.searchDoc matches query) }
                 .orderBy(tsRank(Recipes.searchDoc, query) to SortOrder.DESC)
                 .orderBy(Recipes.createdAt to SortOrder.DESC)
                 .map { it[Recipes.id].value }
-            summariesFor(ids)
+            summariesFor(ids, whirlpool)
         }
     }
 
@@ -123,13 +124,13 @@ object RecipeRepository {
             .joinToString(" & ") { "$it:*" }
             .ifBlank { null }
 
-    private fun summariesFor(ids: List<Long>): List<RecipeSummary> {
+    private fun summariesFor(ids: List<Long>, whirlpool: Whirlpool): List<RecipeSummary> {
         if (ids.isEmpty()) return emptyList()
         val lines = linesFor(ids)
         val byId = Recipes.selectAll()
             .where { Recipes.id inList ids }
             .associate { it[Recipes.id].value to toRecipe(it, lines) }
-        return ids.mapNotNull { byId[it]?.toSummary() }
+        return ids.mapNotNull { byId[it]?.toSummary(whirlpool) }
     }
 
     private fun refreshSearchDoc(recipeId: Long) {
@@ -138,13 +139,13 @@ object RecipeRepository {
         }
     }
 
-    private fun Recipe.toSummary() = RecipeSummary(
+    private fun Recipe.toSummary(whirlpool: Whirlpool) = RecipeSummary(
         id = id,
         no = no,
         name = name,
         style = style,
         fermenterVolumeL = fermenterVolumeL,
-        stats = stats(),
+        stats = stats(whirlpool),
     )
 
     private fun insertLines(recipeId: Long, draft: NewRecipe) {

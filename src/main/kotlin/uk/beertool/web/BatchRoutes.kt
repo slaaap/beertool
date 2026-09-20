@@ -61,7 +61,7 @@ fun Route.batchRoutes() {
 
     get<BatchRes> { res ->
         withBatch(res.recipeNo, res.no) { call, user, recipe, batch ->
-            call.respondHtml { batchViewPage(user, batch, recipe, recipe.stats()) }
+            call.respondHtml { batchViewPage(user, batch, recipe, recipe.stats(user.preferences.whirlpool)) }
         }
     }
 
@@ -89,7 +89,7 @@ fun Route.batchRoutes() {
 
     get<BatchBrewRes> { res ->
         withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
-            call.respondHtml { brewDayPage(user, batch, recipe, recipe.stats(), saved = res.saved) }
+            call.respondHtml { brewDayPage(user, batch, recipe, recipe.stats(user.preferences.whirlpool), saved = res.saved) }
         }
     }
 

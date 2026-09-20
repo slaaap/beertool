@@ -40,7 +40,7 @@ fun Route.recipeRoutes() {
             call.respondHtml {
                 recipeListPage(
                     user = user,
-                    recipes = RecipeRepository.search(user.id, term).paginate(res.page),
+                    recipes = RecipeRepository.search(user.id, term, user.preferences.whirlpool).paginate(res.page),
                     brews = BatchRepository.brewInfoByRecipe(user.id),
                     term = term,
                 )
@@ -50,7 +50,7 @@ fun Route.recipeRoutes() {
 
     get<RecipeNewRes> {
         withUser(write = true) { call, user ->
-            call.respondHtml { recipeFormPage(user, null, NewRecipe(name = "").estimatedStats()) }
+            call.respondHtml { recipeFormPage(user, null, NewRecipe(name = "").estimatedStats(user.preferences.whirlpool)) }
         }
     }
 
@@ -63,7 +63,7 @@ fun Route.recipeRoutes() {
 
     post<RecipeCalcRes> {
         withUser(write = true) { call, user ->
-            val stats = call.receiveForm<RecipeForm>().toNewRecipe(user.preferences).estimatedStats()
+            val stats = call.receiveForm<RecipeForm>().toNewRecipe(user.preferences).estimatedStats(user.preferences.whirlpool)
             call.respondText(statsFragmentHtml(stats), ContentType.Text.Html)
         }
     }
@@ -73,14 +73,14 @@ fun Route.recipeRoutes() {
             call.respondHtml {
                 val brews = BatchRepository.listByRecipe(recipe.id, user.id).map { BatchSummary(it, recipe.name, recipe.no) }
                 val active = BatchRepository.activeBrewDay(recipe.id, user.id)
-                recipeViewPage(user, recipe, recipe.stats(), brews, active)
+                recipeViewPage(user, recipe, recipe.stats(user.preferences.whirlpool), brews, active)
             }
         }
     }
 
     get<RecipeEditRes> { res ->
         withRecipe(res.no, write = true) { call, user, recipe ->
-            call.respondHtml { recipeFormPage(user, recipe, recipe.stats()) }
+            call.respondHtml { recipeFormPage(user, recipe, recipe.stats(user.preferences.whirlpool)) }
         }
     }
 

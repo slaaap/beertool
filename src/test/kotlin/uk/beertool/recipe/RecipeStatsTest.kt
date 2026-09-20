@@ -8,6 +8,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import uk.beertool.brewing.Calculators
 import uk.beertool.brewing.FermentableAddition
+import uk.beertool.brewing.Whirlpool
 import java.time.Instant
 
 class RecipeStatsTest {
@@ -153,16 +154,26 @@ class RecipeStatsTest {
     }
 
     @Test
-    fun `should count whirlpool additions towards ibu`() {
+    fun `should count a whirlpool addition towards ibu even with no stand time entered`() {
         val boilOnly = recipe(hops = listOf(hop(30.0, 5.5, 60, HopUsage.BOIL)))
         val withWhirlpool = recipe(
             hops = listOf(
                 hop(30.0, 5.5, 60, HopUsage.BOIL),
-                hop(50.0, 12.0, 20, HopUsage.WHIRLPOOL),
+                hop(50.0, 12.0, null, HopUsage.WHIRLPOOL),
             ),
         )
 
         withWhirlpool.stats().ibu shouldBeGreaterThan boilOnly.stats().ibu
+    }
+
+    @Test
+    fun `should let the brewer's whirlpool habits move the ibu of a whirlpool-hopped recipe`() {
+        val whirlpooled = recipe(hops = listOf(hop(50.0, 12.0, null, HopUsage.WHIRLPOOL)))
+
+        val at80 = whirlpooled.stats(Whirlpool(tempC = 80.0, coolingMinutes = 30)).ibu
+        val atFlameout = whirlpooled.stats(Whirlpool(tempC = 100.0, coolingMinutes = 30)).ibu
+
+        atFlameout shouldBeGreaterThan at80
     }
 
     @Test

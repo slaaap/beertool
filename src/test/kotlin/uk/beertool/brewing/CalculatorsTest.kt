@@ -83,15 +83,54 @@ class CalculatorsTest {
     }
 
     @Test
-    fun `should give a whirlpool stand fewer ibus than the same time at the boil, but more than none`() {
+    fun `should isomerise at full speed at the boil and ever slower as the wort cools`() {
+        Calculators.isomerisationRate(100.0) shouldBe (1.0 plusOrMinus 1e-9)
+        Calculators.isomerisationRate(80.0) shouldBe (0.17 plusOrMinus 0.01)
+        Calculators.isomerisationRate(80.0) shouldBeLessThan Calculators.isomerisationRate(90.0)
+        Calculators.isomerisationRate(60.0) shouldBeLessThan Calculators.isomerisationRate(70.0)
+    }
+
+    @Test
+    fun `should count a stand at the boil as boil minutes, and a chill from there as a fraction more`() {
+        val flameout = Whirlpool(tempC = 100.0, coolingMinutes = 30)
+
+        val minutes = Calculators.whirlpoolBoilMinutes(standMinutes = 10, whirlpool = flameout)
+
+        minutes shouldBeGreaterThan 10.0
+        minutes shouldBeLessThan 40.0
+    }
+
+    @Test
+    fun `should give hops dropped in at 80 degrees only a sliver of bitterness while the wort chills`() {
+        val chillFrom80 = Whirlpool(tempC = 80.0, coolingMinutes = 30)
+
+        val minutes = Calculators.whirlpoolBoilMinutes(standMinutes = 0, whirlpool = chillFrom80)
+
+        minutes shouldBeIn 0.5..1.5
+    }
+
+    @Test
+    fun `should give whirlpool hops fewer ibus than the same time at the boil, but more than none`() {
         val boiled = listOf(HopAddition(5.5, 30.0, 20))
-        val whirlpooled = listOf(HopAddition(5.5, 30.0, 20, whirlpool = true))
+        val whirlpooled = listOf(HopAddition(5.5, 30.0, 20, whirlpool = Whirlpool(tempC = 80.0, coolingMinutes = 30)))
 
         val boilIbu = Calculators.ibu(boiled, 20.0, 1.050)
         val whirlpoolIbu = Calculators.ibu(whirlpooled, 20.0, 1.050)
 
         whirlpoolIbu shouldBeGreaterThan 0.0
         whirlpoolIbu shouldBeLessThan boilIbu
+    }
+
+    @Test
+    fun `should bitter more from a hotter whirlpool and a slower chill`() {
+        val hop = { w: Whirlpool -> listOf(HopAddition(12.0, 50.0, 0, whirlpool = w)) }
+
+        val cool = Calculators.ibu(hop(Whirlpool(80.0, 30)), 20.0, 1.050)
+        val hot = Calculators.ibu(hop(Whirlpool(95.0, 30)), 20.0, 1.050)
+        val slow = Calculators.ibu(hop(Whirlpool(80.0, 60)), 20.0, 1.050)
+
+        hot shouldBeGreaterThan cool
+        slow shouldBeGreaterThan cool
     }
 
     @Test

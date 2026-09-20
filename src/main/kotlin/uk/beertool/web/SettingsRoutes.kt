@@ -19,6 +19,8 @@ data class SettingsForm(
     @Serializable(with = BlankAsNullDouble::class) val kettleRetentionL: Double? = null,
     @Serializable(with = BlankAsNullDouble::class) val efficiency: Double? = null,
     @Serializable(with = BlankAsNullInt::class) val boilTimeMin: Int? = null,
+    @Serializable(with = BlankAsNullDouble::class) val whirlpoolTempC: Double? = null,
+    @Serializable(with = BlankAsNullInt::class) val coolingTimeMin: Int? = null,
     @Serializable(with = BlankAsNullDouble::class) val mashThicknessLPerKg: Double? = null,
     @Serializable(with = BlankAsNullDouble::class) val grainAbsorptionLPerKg: Double? = null,
     val mashSteps: List<MashStepRow> = emptyList(),
@@ -30,6 +32,8 @@ fun SettingsForm.toPreferences(current: BrewerPreferences) = current.copy(
     kettleRetentionL = kettleRetentionL ?: current.kettleRetentionL,
     efficiency = efficiency?.let(::percentToFraction) ?: current.efficiency,
     boilTimeMin = boilTimeMin ?: current.boilTimeMin,
+    whirlpoolTempC = whirlpoolTempC ?: current.whirlpoolTempC,
+    coolingTimeMin = coolingTimeMin ?: current.coolingTimeMin,
     mashThicknessLPerKg = mashThicknessLPerKg ?: current.mashThicknessLPerKg,
     grainAbsorptionLPerKg = grainAbsorptionLPerKg ?: current.grainAbsorptionLPerKg,
     mashSteps = mashSteps.mapNotNull { row ->
@@ -91,6 +95,16 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
                 }
                 field("Boil (min)") {
                     numberInput(name = "boilTimeMin") { value = prefs.boilTimeMin.toString(); numAttrs("1") }
+                }
+            }
+
+            sectionHead("Whirlpool")
+            fieldGrid(columns = 2) {
+                field("Hops in at (°C)") {
+                    numberInput(name = "whirlpoolTempC") { value = fmt(prefs.whirlpoolTempC, 0); numAttrs("1", max = "100") }
+                }
+                field("Chill to pitching (min)") {
+                    numberInput(name = "coolingTimeMin") { value = prefs.coolingTimeMin.toString(); numAttrs("1") }
                 }
             }
 

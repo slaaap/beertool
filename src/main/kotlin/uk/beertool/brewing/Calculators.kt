@@ -6,9 +6,18 @@ import kotlin.math.pow
 data class HopAddition(
     val alphaAcidPercent: Double,
     val massGrams: Double,
+
+    // For a whirlpool hop: minutes it stands at the whirlpool temperature before chilling starts.
     val boilTimeMinutes: Int,
 
-    val whirlpool: Boolean = false,
+    val whirlpool: Whirlpool? = null,
+)
+
+// How the brewer whirlpools: hops go in at [tempC] and the wort chills from there to pitching
+// temperature over [coolingMinutes].
+data class Whirlpool(
+    val tempC: Double,
+    val coolingMinutes: Int,
 )
 
 data class FermentableAddition(
@@ -47,9 +56,13 @@ object Calculators {
     // ABV ≈ (OG − FG) × 131.25 — the standard hobby approximation (points of gravity drop → % alcohol).
     private const val ABV_PER_GRAVITY_POINT = 131.25
 
-    // Isomerisation continues below boiling but slows sharply as the wort cools; a hop stand at typical
-    // whirlpool temperatures (80-95 °C) reaches roughly half the utilisation of the same time at the boil.
-    private const val WHIRLPOOL_UTILISATION = 0.5
+    // Malowicki & Shellhammer's isomerisation rate constant is Arrhenius in temperature: this is its
+    // activation energy over the gas constant (K), and the boil it is measured against.
+    private const val ISOMERISATION_ACTIVATION_K = 11858.0
+    private const val BOILING_K = 373.15
+    private const val KELVIN_OFFSET = 273.15
+
+    private const val PITCHING_TEMP_C = 20.0
 
     // Ratio of grain's specific heat to water's, in the metric strike-temp balance below. Chosen so the
     // L/kg form matches the classic imperial "0.2 / (qt·lb⁻¹)" rule (0.2 × 2.086 L·kg⁻¹ per qt·lb⁻¹ ≈ 0.41).
@@ -141,17 +154,35 @@ object Calculators {
     //  - bigness (gravity factor): denser wort extracts less; 1.65 × 0.000125^(SG−1).
     //  - boil-time factor: iso-alpha rises then plateaus with time; (1 − e^(−0.04·min)) / 4.15.
     // IBU (mg/L iso-alpha) = Σ over hops of (AA% × grams × 1000 / L) × utilisation.
-    // Whirlpool hops use their stand time as the boil time, scaled by [WHIRLPOOL_UTILISATION].
+    // A whirlpool hop's time is the boil time that would isomerise as much (see [whirlpoolBoilMinutes]).
     fun ibu(hops: List<HopAddition>, volumeL: Double, boilGravity: Double): Double {
         require(volumeL > 0) { "volume must be > 0" }
         val bigness = 1.65 * 0.000125.pow(boilGravity - 1.0)
         return hops.sumOf { hop ->
-            val boilTimeFactor = (1 - exp(-0.04 * hop.boilTimeMinutes)) / 4.15
-            val stageFactor = if (hop.whirlpool) WHIRLPOOL_UTILISATION else 1.0
-            val utilisation = bigness * boilTimeFactor * stageFactor
+            val minutes = hop.whirlpool?.let { whirlpoolBoilMinutes(hop.boilTimeMinutes, it) }
+                ?: hop.boilTimeMinutes.toDouble()
+            val boilTimeFactor = (1 - exp(-0.04 * minutes)) / 4.15
+            val utilisation = bigness * boilTimeFactor
             val mgPerLitre = (hop.alphaAcidPercent / 100.0) * hop.massGrams * 1000.0 / volumeL
             mgPerLitre * utilisation
         }
+    }
+
+    // Hops keep isomerising below the boil, only slower: relative to 100 °C the rate is
+    // e^(−11858·(1/T − 1/373.15)) with T in kelvin, so ~0.42 at 90 °C, ~0.17 at 80 °C, ~0.06 at 70 °C.
+    fun isomerisationRate(tempC: Double) =
+        exp(-ISOMERISATION_ACTIVATION_K * (1.0 / (tempC + KELVIN_OFFSET) - 1.0 / BOILING_K))
+
+    // Tinseth's boil-time curve is first-order kinetics, so minutes at a lower rate fold into it as
+    // equivalent boil minutes: ∫ rate(T(t)) dt over the stand at whirlpool temperature and then the chill,
+    // taken as a linear drop to pitching temperature, integrated minute by minute at the midpoint.
+    fun whirlpoolBoilMinutes(standMinutes: Int, whirlpool: Whirlpool): Double {
+        val stand = standMinutes * isomerisationRate(whirlpool.tempC)
+        val drop = whirlpool.tempC - PITCHING_TEMP_C
+        val chill = (0 until whirlpool.coolingMinutes).sumOf { minute ->
+            isomerisationRate(whirlpool.tempC - drop * (minute + 0.5) / whirlpool.coolingMinutes)
+        }
+        return stand + chill
     }
 
     // Colour by Morey's equation. MCU = Σ(grain colour in °Lovibond × weight in lb) / volume in gal;

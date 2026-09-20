@@ -4,6 +4,7 @@ import uk.beertool.brewing.Calculators
 import uk.beertool.brewing.FermentableAddition
 import uk.beertool.brewing.HopAddition
 import uk.beertool.brewing.MashRest
+import uk.beertool.brewing.Whirlpool
 
 data class RecipeStats(
     val og: Double,
@@ -13,11 +14,13 @@ data class RecipeStats(
     val colourEbc: Double,
 )
 
-fun Recipe.stats(): RecipeStats =
-    estimate(fermentables, hops, yeasts, mashSteps, preBoilVolumeL, postBoilVolumeL, fermenterVolumeL, efficiency)
+val DEFAULT_WHIRLPOOL = Whirlpool(DEFAULT_WHIRLPOOL_TEMP_C, DEFAULT_COOLING_TIME_MIN)
 
-fun NewRecipe.estimatedStats(): RecipeStats =
-    estimate(fermentables, hops, yeasts, mashSteps, preBoilVolumeL, postBoilVolumeL, fermenterVolumeL, efficiency)
+fun Recipe.stats(whirlpool: Whirlpool = DEFAULT_WHIRLPOOL): RecipeStats =
+    estimate(fermentables, hops, yeasts, mashSteps, preBoilVolumeL, postBoilVolumeL, fermenterVolumeL, efficiency, whirlpool)
+
+fun NewRecipe.estimatedStats(whirlpool: Whirlpool = DEFAULT_WHIRLPOOL): RecipeStats =
+    estimate(fermentables, hops, yeasts, mashSteps, preBoilVolumeL, postBoilVolumeL, fermenterVolumeL, efficiency, whirlpool)
 
 fun Recipe.lateAdditionAbv(fermenterVolumeL: Double = this.fermenterVolumeL): Double =
     Calculators.lateAdditionAbv(fermentables.map { it.toCalcInput() }, fermenterVolumeL)
@@ -47,6 +50,7 @@ private fun estimate(
     postBoilVolumeL: Double,
     fermenterVolumeL: Double,
     efficiency: Double,
+    whirlpool: Whirlpool,
 ): RecipeStats {
     val bill = fermentables.map { it.toCalcInput() }
     val og = Calculators.estimateOg(bill, postBoilVolumeL, efficiency)
@@ -56,7 +60,8 @@ private fun estimate(
     val attenuation = (yeastAttenuation + mashShift).coerceIn(MIN_ATTENUATION, MAX_ATTENUATION)
 
     val fg = Calculators.estimateFg(bill, postBoilVolumeL, efficiency, attenuation)
-    val bitteringHops = hops.filter { it.usage.bitters && it.boilTimeMin != null }.map { it.toCalcInput() }
+    val bitteringHops = hops.filter { it.usage.bitters && (it.boilTimeMin != null || it.usage == HopUsage.WHIRLPOOL) }
+        .map { it.toCalcInput(whirlpool) }
     return RecipeStats(
         og = og,
         fg = fg,
@@ -75,11 +80,11 @@ private fun RecipeFermentable.toCalcInput() = FermentableAddition(
     fullyFermentable = type.isSimpleSugar,
 )
 
-private fun RecipeHop.toCalcInput() = HopAddition(
+private fun RecipeHop.toCalcInput(whirlpool: Whirlpool) = HopAddition(
     alphaAcidPercent = alphaAcid,
     massGrams = amountG,
     boilTimeMinutes = boilTimeMin ?: 0,
-    whirlpool = usage == HopUsage.WHIRLPOOL,
+    whirlpool = whirlpool.takeIf { usage == HopUsage.WHIRLPOOL },
 )
 
 private fun FermentableType.guessExtractPercent() = when (this) {
