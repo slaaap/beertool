@@ -79,6 +79,7 @@ private fun RecipeHop.toCalcInput() = HopAddition(
     alphaAcidPercent = alphaAcid,
     massGrams = amountG,
     boilTimeMinutes = boilTimeMin ?: 0,
+    whirlpool = usage == HopUsage.WHIRLPOOL,
 )
 
 private fun FermentableType.guessExtractPercent() = when (this) {

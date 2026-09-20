@@ -7,6 +7,8 @@ data class HopAddition(
     val alphaAcidPercent: Double,
     val massGrams: Double,
     val boilTimeMinutes: Int,
+
+    val whirlpool: Boolean = false,
 )
 
 data class FermentableAddition(
@@ -44,6 +46,10 @@ object Calculators {
 
     // ABV ≈ (OG − FG) × 131.25 — the standard hobby approximation (points of gravity drop → % alcohol).
     private const val ABV_PER_GRAVITY_POINT = 131.25
+
+    // Isomerisation continues below boiling but slows sharply as the wort cools; a hop stand at typical
+    // whirlpool temperatures (80-95 °C) reaches roughly half the utilisation of the same time at the boil.
+    private const val WHIRLPOOL_UTILISATION = 0.5
 
     // Ratio of grain's specific heat to water's, in the metric strike-temp balance below. Chosen so the
     // L/kg form matches the classic imperial "0.2 / (qt·lb⁻¹)" rule (0.2 × 2.086 L·kg⁻¹ per qt·lb⁻¹ ≈ 0.41).
@@ -135,12 +141,14 @@ object Calculators {
     //  - bigness (gravity factor): denser wort extracts less; 1.65 × 0.000125^(SG−1).
     //  - boil-time factor: iso-alpha rises then plateaus with time; (1 − e^(−0.04·min)) / 4.15.
     // IBU (mg/L iso-alpha) = Σ over hops of (AA% × grams × 1000 / L) × utilisation.
+    // Whirlpool hops use their stand time as the boil time, scaled by [WHIRLPOOL_UTILISATION].
     fun ibu(hops: List<HopAddition>, volumeL: Double, boilGravity: Double): Double {
         require(volumeL > 0) { "volume must be > 0" }
         val bigness = 1.65 * 0.000125.pow(boilGravity - 1.0)
         return hops.sumOf { hop ->
             val boilTimeFactor = (1 - exp(-0.04 * hop.boilTimeMinutes)) / 4.15
-            val utilisation = bigness * boilTimeFactor
+            val stageFactor = if (hop.whirlpool) WHIRLPOOL_UTILISATION else 1.0
+            val utilisation = bigness * boilTimeFactor * stageFactor
             val mgPerLitre = (hop.alphaAcidPercent / 100.0) * hop.massGrams * 1000.0 / volumeL
             mgPerLitre * utilisation
         }

@@ -87,7 +87,7 @@ enum class HopUsage(override val code: String) : BrewStage {
     WHIRLPOOL("whirlpool"),
     DRY_HOP("dry_hop");
 
-    val bitters get() = inBoil
+    val bitters get() = inBoil || this == WHIRLPOOL
 
     override val takesTime get() = this == FIRST_WORT || this == BOIL || this == WHIRLPOOL
 

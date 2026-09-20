@@ -153,6 +153,19 @@ class RecipeStatsTest {
     }
 
     @Test
+    fun `should count whirlpool additions towards ibu`() {
+        val boilOnly = recipe(hops = listOf(hop(30.0, 5.5, 60, HopUsage.BOIL)))
+        val withWhirlpool = recipe(
+            hops = listOf(
+                hop(30.0, 5.5, 60, HopUsage.BOIL),
+                hop(50.0, 12.0, 20, HopUsage.WHIRLPOOL),
+            ),
+        )
+
+        withWhirlpool.stats().ibu shouldBeGreaterThan boilOnly.stats().ibu
+    }
+
+    @Test
     fun `should guess a higher extract yield for sugar than grain`() {
         val grainBill = recipe(fermentables = listOf(fermentable(FermentableType.MALT, amountKg = 1.0)))
         val sugarBill = recipe(fermentables = listOf(fermentable(FermentableType.SUGAR, amountKg = 1.0)))

@@ -49,8 +49,8 @@ class RecipeEnumsTest {
     }
 
     @Test
-    fun `should bitter with exactly the hops that sit in the boil`() {
-        HopUsage.all.forEach { it.bitters shouldBe it.inBoil }
+    fun `should bitter with the hops that sit in hot wort, boil or whirlpool`() {
+        HopUsage.all.forEach { it.bitters shouldBe (it.inBoil || it == HopUsage.WHIRLPOOL) }
     }
 
     @Test

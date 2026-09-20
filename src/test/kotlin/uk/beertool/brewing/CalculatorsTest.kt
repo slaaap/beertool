@@ -2,6 +2,7 @@ package uk.beertool.brewing
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.comparables.shouldBeGreaterThan
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.ranges.shouldBeIn
 import io.kotest.matchers.shouldBe
@@ -79,6 +80,18 @@ class CalculatorsTest {
 
         shortIbu shouldBeGreaterThan 0.0
         longIbu shouldBeGreaterThan shortIbu
+    }
+
+    @Test
+    fun `should give a whirlpool stand fewer ibus than the same time at the boil, but more than none`() {
+        val boiled = listOf(HopAddition(5.5, 30.0, 20))
+        val whirlpooled = listOf(HopAddition(5.5, 30.0, 20, whirlpool = true))
+
+        val boilIbu = Calculators.ibu(boiled, 20.0, 1.050)
+        val whirlpoolIbu = Calculators.ibu(whirlpooled, 20.0, 1.050)
+
+        whirlpoolIbu shouldBeGreaterThan 0.0
+        whirlpoolIbu shouldBeLessThan boilIbu
     }
 
     @Test
