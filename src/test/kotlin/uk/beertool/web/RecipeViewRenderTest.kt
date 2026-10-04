@@ -8,7 +8,9 @@ import kotlinx.html.html
 import org.junit.jupiter.api.Test
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.Recipe
+import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.RecipeFermentable
+import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.RecipeYeast
 import uk.beertool.recipe.stats
 import uk.beertool.user.User
@@ -33,6 +35,42 @@ class RecipeViewRenderTest {
         html shouldNotContain """<table class="bill mash">"""
     }
 
+    @Test
+    fun `should group the hop schedule by brew stage, naming the time each stage measures`() {
+        val html = render(
+            recipe(
+                mashSteps = emptyList(),
+                hops = listOf(
+                    RecipeHop("Magnum", 10.0, 12.0, HopUsage.BOIL, boilTimeMin = 30),
+                    RecipeHop("Nelson", 33.0, 12.5, HopUsage.WHIRLPOOL, boilTimeMin = 10),
+                    RecipeHop("Citra", 67.0, 12.0, HopUsage.DRY_HOP, dryHopDays = 4),
+                ),
+            ),
+        )
+
+        html shouldContain "Stand (min)"
+        html shouldContain "Days"
+        html.hopTables().forEach { it shouldNotContain "Use" }
+    }
+
+    @Test
+    fun `should leave out a stage the recipe never uses`() {
+        val html = render(
+            recipe(
+                mashSteps = emptyList(),
+                hops = listOf(RecipeHop("Magnum", 10.0, 12.0, HopUsage.BOIL, boilTimeMin = 30)),
+            ),
+        )
+
+        html shouldContain "Boil"
+        html shouldNotContain "Dry hop"
+    }
+
+    private fun String.hopTables() =
+        Regex("""<table class="bill hops">.*?</table>""", RegexOption.DOT_MATCHES_ALL).findAll(this)
+            .map { it.value }
+            .toList()
+
     private fun render(recipe: Recipe): String {
         val user = User(id = 1, email = "b@t.uk", displayName = "Brewer", createdAt = Instant.EPOCH)
         return createHTMLDocument()
@@ -40,12 +78,12 @@ class RecipeViewRenderTest {
             .serialize()
     }
 
-    private fun recipe(mashSteps: List<MashStep>) = Recipe(
+    private fun recipe(mashSteps: List<MashStep>, hops: List<RecipeHop> = emptyList()) = Recipe(
         id = 1, userId = 1, name = "Test", style = "Saison", description = null,
         preBoilVolumeL = 27.0, postBoilVolumeL = 22.0, fermenterVolumeL = 19.0,
         efficiency = 0.68, boilTimeMin = 60, mashSteps = mashSteps,
         fermentables = listOf(RecipeFermentable(name = "Pilsner", amountKg = 5.0)),
-        hops = emptyList(),
+        hops = hops,
         yeasts = listOf(RecipeYeast(name = "US-05", attenuation = 0.80)),
         extras = emptyList(),
         createdAt = Instant.EPOCH, updatedAt = Instant.EPOCH,

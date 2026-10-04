@@ -66,7 +66,7 @@ h1 .title-num { color:var(--muted); font-weight:400; }
 
 .section-head { display:flex; align-items:center; justify-content:space-between; gap:14px;
   margin:34px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--hairline); }
-.section-actions { display:flex; gap:8px; flex:0 0 auto; }
+.section-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
 
 .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:4px 0; }
 .table-scroll table { margin:0; }
@@ -91,9 +91,28 @@ table.bill { table-layout:fixed; }
 .c-what { width:12%; }
 .c-use { width:15%; }
 .c-time { width:11%; }
-.c-act { width:44px; }
+.c-act { width:32px; }
 
 .c-prop-narrow { width:8%; }
+.c-alpha { width:20%; }
+
+.hop-stage + .hop-stage { margin-top:18px; }
+.stage-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:14px 0 0; }
+.stage-head h3 { margin:0; font-family:var(--font-display); font-size:17px; font-weight:600; }
+.stage-note { color:var(--muted); font-size:13px; }
+
+table.hops .c-name { width:36%; }
+table.hops .c-amount { width:20%; }
+table.hops .c-time { width:20%; }
+
+.more-stages { position:relative; display:inline-block; }
+.more-stages > summary { list-style:none; color:var(--muted); }
+.more-stages > summary::-webkit-details-marker { display:none; }
+.more-stages > div { display:none; position:absolute; right:0; top:calc(100% + 5px); z-index:5;
+  flex-direction:column; gap:6px; padding:8px; background:var(--surface);
+  border:1px solid var(--hairline); border-radius:11px; box-shadow:0 8px 24px rgba(0,0,0,0.13); }
+.more-stages[open] > div { display:flex; }
+.more-stages[open] > div .btn { white-space:nowrap; }
 
 table.mash tbody { counter-reset:step; }
 table.mash td.c-name { color:var(--muted); font-family:var(--font-mono); }
@@ -222,6 +241,11 @@ li { margin:3px 0; }
   .table-scroll table { min-width:520px; }
   .table-scroll table.bill { min-width:620px; }
   .table-scroll table.fit { min-width:0; }
+  .table-scroll table.hops { min-width:0; }
+  table.hops .c-name { width:32%; }
+  table.hops .c-amount, table.hops .c-time, table.hops .c-alpha { width:19%; }
+  table.hops td:not(:last-child), table.hops th:not(:last-child) { padding-right:6px; }
+  table.hops td.num input[type=number] { padding-left:4px; padding-right:4px; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
 

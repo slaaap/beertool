@@ -158,6 +158,34 @@ class RecipeFormTest {
         recipe.hops.single().boilTimeMin shouldBe 15
     }
 
+    @Test
+    fun `should read hops posted from several stage tables as one list in stage order`() {
+        val form = form(
+            "boilTimeMin" to "60",
+            "hops.0.name" to "Magnum", "hops.0.usage" to "boil", "hops.0.boilTimeMin" to "60",
+            "hops.1.name" to "Nelson Sauvin", "hops.1.usage" to "whirlpool", "hops.1.boilTimeMin" to "10",
+            "hops.2.name" to "Nectaron", "hops.2.usage" to "dry_hop", "hops.2.dryHopDays" to "4",
+        )
+
+        val recipe = form.toNewRecipe()
+
+        recipe.hops.map { it.usage } shouldBe listOf(HopUsage.BOIL, HopUsage.WHIRLPOOL, HopUsage.DRY_HOP)
+        recipe.hops.map { it.boilTimeMin } shouldBe listOf(60, 10, null)
+        recipe.hops.map { it.dryHopDays } shouldBe listOf(null, null, 4)
+    }
+
+    @Test
+    fun `should keep days in contact only for a dry hop, whatever stray value a kettle row carries`() {
+        val form = form(
+            "hops.0.name" to "Magnum", "hops.0.usage" to "boil", "hops.0.dryHopDays" to "4",
+            "hops.1.name" to "Citra", "hops.1.usage" to "dry_hop", "hops.1.dryHopDays" to "3",
+        )
+
+        val recipe = form.toNewRecipe()
+
+        recipe.hops.map { it.dryHopDays } shouldBe listOf(null, 3)
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     private fun form(vararg fields: Pair<String, String>): RecipeForm {
         val parameters = parametersOf(*fields.map { (k, v) -> k to listOf(v) }.toTypedArray())

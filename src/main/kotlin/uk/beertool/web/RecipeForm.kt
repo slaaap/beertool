@@ -61,6 +61,7 @@ data class HopRow(
     @Serializable(with = BlankAsNullDouble::class) val amountG: Double? = null,
     @Serializable(with = HopUsageCode::class) val usage: HopUsage = HopUsage.default,
     @Serializable(with = BlankAsNullInt::class) val boilTimeMin: Int? = null,
+    @Serializable(with = BlankAsNullInt::class) val dryHopDays: Int? = null,
     @Serializable(with = BlankAsNullDouble::class) val alphaAcid: Double? = null,
 ) : FormRow
 
@@ -112,6 +113,7 @@ fun RecipeForm.toNewRecipe(prefs: BrewerPreferences = BrewerPreferences()): NewR
                 alphaAcid = it.alphaAcid ?: 0.0,
                 usage = it.usage,
                 boilTimeMin = it.usage.kettleTime(it.boilTimeMin, boilTime),
+                dryHopDays = it.dryHopDays?.takeIf { _ -> it.usage == HopUsage.DRY_HOP },
             )
         },
         yeasts = yeasts.filled().map {

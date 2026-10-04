@@ -53,6 +53,8 @@ data class RecipeHop(
     val alphaAcid: Double,
     val usage: HopUsage = HopUsage.default,
     val boilTimeMin: Int? = null,
+
+    val dryHopDays: Int? = null,
 )
 
 data class RecipeYeast(

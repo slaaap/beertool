@@ -21,25 +21,77 @@
     syncRow(row);
   };
 
+  window.addHop = function (key) {
+    var stage = document.getElementById(key);
+    var row = document.querySelector('#' + key + '-proto tr').cloneNode(true);
+    stage.querySelector('tbody').appendChild(row);
+    stage.hidden = false;
+    renumberHops();
+    syncRow(row);
+    row.querySelector('input[type=text]').focus();
+  };
+
+  function hideWhenEmpty(stage) {
+    if (!stage.querySelector('tbody tr')) stage.hidden = true;
+  }
+
   function renumber(body) {
     Array.prototype.forEach.call(body.rows, function (row, i) {
-      Array.prototype.forEach.call(row.querySelectorAll('[name]'), function (input) {
-        input.name = input.name.replace(/^([A-Za-z]+)\.\d+\./, '$1.' + i + '.');
-      });
+      renumberRow(row, i);
+    });
+  }
+
+  // Hop rows are numbered across every stage, since they post as one list.
+  function renumberHops() {
+    document.querySelectorAll('#hop-sections tbody tr').forEach(renumberRow);
+  }
+
+  function renumberRow(row, i) {
+    row.querySelectorAll('[name]').forEach(function (input) {
+      input.name = input.name.replace(/^([A-Za-z]+)\.\d+\./, '$1.' + i + '.');
     });
   }
 
   window.removeRow = function (button) {
     var row = button.closest('tr');
     var body = row.parentNode;
+    var stage = row.closest('.hop-stage');
     row.remove();
-    renumber(body);
+    if (stage) {
+      renumberHops();
+      hideWhenEmpty(stage);
+    } else {
+      renumber(body);
+    }
     recalc();
   };
 
   var boil = form.querySelector('input[name="boilTimeMin"]');
 
+  function boilLimit() {
+    if (!boil || boil.value === '') return NaN;
+    return Number(boil.value);
+  }
+
+  function capAtBoil(input, capped) {
+    var limit = capped ? boilLimit() : NaN;
+    if (isNaN(limit)) {
+      input.removeAttribute('max');
+      return;
+    }
+    input.max = limit;
+    if (input.value !== '' && Number(input.value) > limit) input.value = limit;
+  }
+
+  function syncHopRow(row, stage) {
+    var time = row.querySelector('input[name$=".boilTimeMin"]');
+    if (time && !time.hidden) capAtBoil(time, stage.dataset.inBoil === '1');
+  }
+
   function syncRow(row) {
+    var stage = row.closest('.hop-stage');
+    if (stage) return syncHopRow(row, stage);
+
     var usage = row.querySelector('select[name$=".usage"]');
     if (!usage) return;
 
@@ -66,15 +118,7 @@
       time.removeAttribute('max');
       return;
     }
-
-    var capped = selected.dataset.inBoil === '1' && boil && boil.value !== '';
-    var limit = capped ? Number(boil.value) : NaN;
-    if (isNaN(limit)) {
-      time.removeAttribute('max');
-      return;
-    }
-    time.max = limit;
-    if (time.value !== '' && Number(time.value) > limit) time.value = limit;
+    capAtBoil(time, selected.dataset.inBoil === '1');
   }
 
   function syncAllRows() {
@@ -87,5 +131,5 @@
   });
   if (boil) boil.addEventListener('input', syncAllRows);
   syncAllRows();
-  document.querySelectorAll('#ferm-proto tr, #hop-proto tr, #extra-proto tr').forEach(function (row) { syncRow(row); });
+  document.querySelectorAll('#ferm-proto tr, #extra-proto tr').forEach(function (row) { syncRow(row); });
 })();

@@ -175,6 +175,7 @@ object RecipeRepository {
                 it[amountG] = h.amountG.toBigDecimal()
                 it[alphaAcid] = h.alphaAcid.toBigDecimal()
                 it[boilTimeMin] = h.boilTimeMin
+                it[dryHopDays] = h.dryHopDays
                 it[usage] = h.usage.code
             }
         }
@@ -290,6 +291,7 @@ object RecipeRepository {
         amountG = this[RecipeHops.amountG].toDouble(),
         alphaAcid = this[RecipeHops.alphaAcid].toDouble(),
         boilTimeMin = this[RecipeHops.boilTimeMin],
+        dryHopDays = this[RecipeHops.dryHopDays],
         usage = HopUsage.fromCode(this[RecipeHops.usage]),
     )
 

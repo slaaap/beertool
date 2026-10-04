@@ -44,6 +44,7 @@ object RecipeHops : LongIdTable("recipe_hops") {
     val amountG = decimal("amount_g", 7, 2)
     val alphaAcid = decimal("alpha_acid", 4, 2)
     val boilTimeMin = integer("boil_time_min").nullable()
+    val dryHopDays = integer("dry_hop_days").nullable()
     val usage = text("usage")
 }
 

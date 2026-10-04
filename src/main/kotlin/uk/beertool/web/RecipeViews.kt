@@ -10,6 +10,7 @@ import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
 import uk.beertool.recipe.unmaltedFraction
 import uk.beertool.recipe.inBrewOrder
+import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 
 fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Long, BrewInfo>, term: String) {
@@ -91,6 +92,32 @@ private fun <T> FlowContent.billTable(
     }
 }
 
+private fun FlowContent.hopStages(recipe: Recipe, prefs: BrewerPreferences) {
+    val hops = recipe.hops.inBrewOrder()
+    if (hops.isEmpty()) return
+    sectionHead("Hops")
+    HOP_SECTIONS.forEach { section ->
+        val rows = hops.filter { it.usage == section.usage }
+        if (rows.isEmpty()) return@forEach
+        div("hop-stage") {
+            hopStageTitle(section, section.note(prefs, recipe.boilTimeMin))
+            scrollTable("bill hops") {
+                thead { tr { hopStageColumns(section) } }
+                tbody {
+                    rows.forEach { h ->
+                        tr {
+                            td { +h.name }
+                            numCell(h.amountG, decimals = 0)
+                            numCell(section.timeOf(h))
+                            numCell(h.alphaAcid, decimals = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: List<BatchSummary>, activeBrewDay: Batch?) {
     page(recipe.name, user) {
         h1 { +recipe.name }
@@ -137,14 +164,7 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
         }
         unmaltedWarning(recipe.unmaltedFraction())
 
-        billTable("Hops", recipe.hops.inBrewOrder(), TR::hopHead) { h ->
-            td { +h.name }
-            numCell(h.amountG, decimals = 0)
-            emptyCell()
-            td { +prettify(h.usage.name) }
-            numCell(h.boilTimeMin)
-            numCell(h.alphaAcid, decimals = 1)
-        }
+        hopStages(recipe, user.preferences)
 
         billTable("Yeasts", recipe.yeasts.inBrewOrder(), TR::yeastHead) { y ->
             td { +y.name }

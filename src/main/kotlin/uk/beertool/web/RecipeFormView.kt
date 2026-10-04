@@ -19,6 +19,7 @@ import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeYeast
 import uk.beertool.recipe.YeastUsage
 import uk.beertool.recipe.inBrewOrder
+import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 
 fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
@@ -96,9 +97,7 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
             editableBill(FERMENTABLES, "Fermentables", "Add fermentable", TR::fermentableHead) {
                 recipe?.fermentables.orEmpty().inBrewOrder().forEachIndexed { i, f -> fermentableRow(i, f) }
             }
-            editableBill(HOPS, "Hops", "Add hop", TR::hopHead) {
-                recipe?.hops.orEmpty().inBrewOrder().forEachIndexed { i, h -> hopRow(i, h) }
-            }
+            hopSections(recipe, prefs, recipe?.boilTimeMin ?: prefs.boilTimeMin)
             editableBill(YEASTS, "Yeasts", "Add yeast", TR::yeastHead) {
                 recipe?.yeasts.orEmpty().inBrewOrder().forEachIndexed { i, y -> yeastRow(i, y) }
             }
@@ -112,7 +111,7 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
 
         prototypeRow(MASH) { mashStepRow(0, null) }
         prototypeRow(FERMENTABLES) { fermentableRow(0, null) }
-        prototypeRow(HOPS) { hopRow(0, null) }
+        HOP_SECTIONS.forEach { section -> prototypeRow(section.key) { hopRow(0, null, section) } }
         prototypeRow(YEASTS) { yeastRow(0, null) }
         prototypeRow(EXTRAS) { extraRow(0, null) }
 
@@ -124,7 +123,6 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
 
 private const val MASH = "mash"
 private const val FERMENTABLES = "ferm"
-private const val HOPS = "hop"
 private const val YEASTS = "yeast"
 private const val EXTRAS = "extra"
 
@@ -190,18 +188,80 @@ private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?) {
     }
 }
 
-private fun TBODY.hopRow(i: Int, h: RecipeHop?) {
+private fun FlowContent.hopSections(recipe: Recipe?, prefs: BrewerPreferences, boilTimeMin: Int) {
+    val hops = recipe?.hops.orEmpty().inBrewOrder()
+    sectionHead("Hops") {
+        HOP_SECTIONS.filter { it.primary }.forEach { addStageButton(it) }
+        details(classes = "more-stages") {
+            summary(classes = "btn small") { +"Other" }
+            div { HOP_SECTIONS.filterNot { it.primary }.forEach { addStageButton(it) } }
+        }
+    }
+    div {
+        id = "hop-sections"
+        var index = 0
+        HOP_SECTIONS.forEach { section ->
+            val rows = hops.filter { it.usage == section.usage }
+            hopStage(section, rows, index, section.note(prefs, boilTimeMin))
+            index += rows.size
+        }
+    }
+}
+
+private fun HopSection.note(prefs: BrewerPreferences, boilTimeMin: Int): String? = when (usage) {
+    HopUsage.BOIL -> "$boilTimeMin min boil"
+    HopUsage.WHIRLPOOL ->
+        "hops in at ${fmt(prefs.whirlpoolTempC, 0)} °C, then chilled to pitching over ${prefs.coolingTimeMin} min"
+    else -> null
+}
+
+private fun FlowContent.addStageButton(section: HopSection) {
+    button(type = ButtonType.button, classes = "btn small") {
+        onClick = "addHop('${section.key}')"
+        span("ico") { unsafe { +Icon.PLUS.markup() } }
+        span { +prettify(section.usage.name) }
+    }
+}
+
+private fun FlowContent.hopStage(section: HopSection, rows: List<RecipeHop>, startIndex: Int, note: String?) {
+    div("hop-stage") {
+        id = section.key
+        hidden = rows.isEmpty()
+        attributes["data-usage"] = section.usage.code
+        attributes["data-unit"] = section.timeField ?: ""
+        attributes["data-in-boil"] = if (section.usage.inBoil) "1" else "0"
+        hopStageTitle(section, note)
+        scrollTable("bill hops") {
+            thead { tr { hopStageColumns(section); actionSlot() } }
+            tbody {
+                id = section.bodyId
+                rows.forEachIndexed { i, h -> hopRow(startIndex + i, h, section) }
+            }
+        }
+    }
+}
+
+private fun TBODY.hopRow(i: Int, h: RecipeHop?, section: HopSection) {
     fun field(name: String) = rowField("hops", i, name)
     tr {
-        td { textInput(name = field("name")) { value = h?.name ?: "" } }
+        td {
+            textInput(name = field("name")) { value = h?.name ?: "" }
+            hiddenInput(name = field("usage")) { value = section.usage.code }
+        }
         numInput(field("amountG"), h?.amountG?.toString(), "1")
-        emptyCell()
-        td { select { name = field("usage"); enumOptions(h?.usage, HopUsage) { u -> usageAttrs(u) } } }
-        numInput(field("boilTimeMin"), h?.boilTimeMin?.toString(), "1")
+        td("num") {
+            section.timeField?.let { stageTimeInput(field(it), h?.let(section::timeOf)) }
+        }
         numInput(field("alphaAcid"), h?.alphaAcid?.toString(), "0.1")
         td("right") { removeButton() }
     }
 }
+
+private fun TD.stageTimeInput(name: String, value: Int?) =
+    numberInput(name = name) {
+        this.value = value?.toString() ?: ""
+        numAttrs("1")
+    }
 
 private fun TBODY.yeastRow(i: Int, y: RecipeYeast?) {
     fun field(name: String) = rowField("yeasts", i, name)

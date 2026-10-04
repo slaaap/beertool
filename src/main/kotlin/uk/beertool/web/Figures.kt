@@ -2,9 +2,12 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
+import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MAX_UNMALTED_FRACTION
 import uk.beertool.recipe.Recipe
+import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.RecipeStats
+import uk.beertool.user.BrewerPreferences
 import java.time.LocalDate
 
 internal const val MISSING = "—"
@@ -20,6 +23,7 @@ internal const val SLOT_AMOUNT = "c-amount"
 internal const val SLOT_WHAT = "c-what"
 internal const val SLOT_USE = "c-use"
 internal const val SLOT_TIME = "c-time"
+internal const val SLOT_ALPHA = "c-alpha"
 
 internal fun TR.stepNumberCell() = td(SLOT_NAME) {}
 
@@ -45,13 +49,51 @@ internal fun TR.fermentableHead() {
     numHead("Extract", "%")
 }
 
-internal fun TR.hopHead() {
+// Hops are shown and entered per brew stage, so each stage carries only the columns that mean
+// something there: minutes in the kettle, or days in the fermenter.
+internal class HopSection(
+    val usage: HopUsage,
+    val timeLabel: String?,
+    val timeUnit: String?,
+    val timeField: String?,
+    val primary: Boolean,
+) {
+    val key get() = "hop-${usage.code}"
+    val bodyId get() = "$key-body"
+
+    fun timeOf(hop: RecipeHop) = when (timeField) {
+        "boilTimeMin" -> hop.boilTimeMin
+        "dryHopDays" -> hop.dryHopDays
+        else -> null
+    }
+
+    fun note(prefs: BrewerPreferences, boilTimeMin: Int) = when (usage) {
+        HopUsage.BOIL -> "$boilTimeMin min boil"
+        HopUsage.WHIRLPOOL -> "hops in at ${fmt(prefs.whirlpoolTempC, 0)} °C"
+        else -> null
+    }
+}
+
+internal val HOP_SECTIONS = listOf(
+    HopSection(HopUsage.MASH, null, null, null, primary = false),
+    HopSection(HopUsage.FIRST_WORT, "Time", "min", "boilTimeMin", primary = false),
+    HopSection(HopUsage.BOIL, "Time", "min", "boilTimeMin", primary = true),
+    HopSection(HopUsage.WHIRLPOOL, "Stand", "min", "boilTimeMin", primary = true),
+    HopSection(HopUsage.DRY_HOP, "Days", null, "dryHopDays", primary = true),
+)
+
+internal fun FlowContent.hopStageTitle(section: HopSection, note: String?) {
+    div("stage-head") {
+        h3 { +prettify(section.usage.name) }
+        note?.let { span("stage-note") { +it } }
+    }
+}
+
+internal fun TR.hopStageColumns(section: HopSection) {
     head("Hop", SLOT_NAME)
     numHead("Amount", "g", SLOT_AMOUNT)
-    emptySlot(SLOT_WHAT)
-    head("Use", SLOT_USE)
-    numHead("Time", "min", SLOT_TIME)
-    numHead("Alpha", "%")
+    if (section.timeLabel == null) emptySlot(SLOT_TIME) else numHead(section.timeLabel, section.timeUnit, SLOT_TIME)
+    numHead("Alpha", "%", SLOT_ALPHA)
 }
 
 internal fun TR.yeastHead() {
