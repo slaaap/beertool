@@ -2,6 +2,8 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
+import uk.beertool.recipe.FermentableType
+import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MAX_UNMALTED_FRACTION
 import uk.beertool.recipe.Recipe
@@ -39,12 +41,24 @@ internal fun TR.mashHead() {
     propertySpacer()
 }
 
-internal fun TR.fermentableHead() {
+// Fermentables are entered per brew stage too. The stage supplies the usage, and with it the only
+// types that are legal there, so an impossible pairing such as sugar in the mash cannot be offered.
+internal class FermentableSection(val usage: FermentableUsage, val primary: Boolean) {
+    val key get() = "ferm-${usage.code}"
+    val bodyId get() = "$key-body"
+    val types get() = FermentableType.all.filter { usage in it.usages }
+    val label get() = if (usage == FermentableUsage.MASH) "Grist" else prettify(usage.name)
+}
+
+internal val FERMENTABLE_SECTIONS = FermentableUsage.all.map { usage ->
+    FermentableSection(usage, primary = usage in setOf(FermentableUsage.MASH, FermentableUsage.BOIL, FermentableUsage.SECONDARY))
+}
+
+internal fun TR.fermentableStageColumns(section: FermentableSection) {
     head("Fermentable", SLOT_NAME)
     numHead("Amount", "kg", SLOT_AMOUNT)
     head("Type", SLOT_WHAT)
-    head("Use", SLOT_USE)
-    numHead("Time", "min", SLOT_TIME)
+    if (section.usage.takesTime) numHead("Time", "min", SLOT_TIME)
     numHead("EBC", slot = SLOT_PROP_NARROW)
     numHead("Extract", "%")
 }
@@ -82,9 +96,9 @@ internal val HOP_SECTIONS = listOf(
     HopSection(HopUsage.DRY_HOP, "Days", null, "dryHopDays", primary = true),
 )
 
-internal fun FlowContent.hopStageTitle(section: HopSection, note: String?) {
+internal fun FlowContent.stageTitle(label: String, note: String? = null) {
     div("stage-head") {
-        h3 { +prettify(section.usage.name) }
+        h3 { +label }
         note?.let { span("stage-note") { +it } }
     }
 }
@@ -92,7 +106,7 @@ internal fun FlowContent.hopStageTitle(section: HopSection, note: String?) {
 internal fun TR.hopStageColumns(section: HopSection) {
     head("Hop", SLOT_NAME)
     numHead("Amount", "g", SLOT_AMOUNT)
-    if (section.timeLabel == null) emptySlot(SLOT_TIME) else numHead(section.timeLabel, section.timeUnit, SLOT_TIME)
+    section.timeLabel?.let { numHead(it, section.timeUnit, SLOT_TIME) }
     numHead("Alpha", "%", SLOT_ALPHA)
 }
 

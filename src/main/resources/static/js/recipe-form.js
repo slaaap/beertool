@@ -21,12 +21,12 @@
     syncRow(row);
   };
 
-  window.addHop = function (key) {
+  window.addStageRow = function (key) {
     var stage = document.getElementById(key);
     var row = document.querySelector('#' + key + '-proto tr').cloneNode(true);
     stage.querySelector('tbody').appendChild(row);
     stage.hidden = false;
-    renumberHops();
+    renumberStages(stage.closest('.stages'));
     syncRow(row);
     row.querySelector('input[type=text]').focus();
   };
@@ -41,9 +41,9 @@
     });
   }
 
-  // Hop rows are numbered across every stage, since they post as one list.
-  function renumberHops() {
-    document.querySelectorAll('#hop-sections tbody tr').forEach(renumberRow);
+  // A stage's rows are numbered across all of its sibling stages, since they post as one list.
+  function renumberStages(container) {
+    container.querySelectorAll('tbody tr').forEach(renumberRow);
   }
 
   function renumberRow(row, i) {
@@ -55,10 +55,11 @@
   window.removeRow = function (button) {
     var row = button.closest('tr');
     var body = row.parentNode;
-    var stage = row.closest('.hop-stage');
+    var stage = row.closest('.stage');
+    var stages = row.closest('.stages');
     row.remove();
     if (stage) {
-      renumberHops();
+      renumberStages(stages);
       hideWhenEmpty(stage);
     } else {
       renumber(body);
@@ -83,29 +84,17 @@
     if (input.value !== '' && Number(input.value) > limit) input.value = limit;
   }
 
-  function syncHopRow(row, stage) {
+  function syncStageRow(row, stage) {
     var time = row.querySelector('input[name$=".boilTimeMin"]');
-    if (time && !time.hidden) capAtBoil(time, stage.dataset.inBoil === '1');
+    if (time) capAtBoil(time, stage.dataset.inBoil === '1');
   }
 
   function syncRow(row) {
-    var stage = row.closest('.hop-stage');
-    if (stage) return syncHopRow(row, stage);
+    var stage = row.closest('.stage');
+    if (stage) return syncStageRow(row, stage);
 
     var usage = row.querySelector('select[name$=".usage"]');
     if (!usage) return;
-
-    var type = row.querySelector('select[name$=".type"]');
-    if (type) {
-      var chosen = null;
-      Array.prototype.forEach.call(usage.options, function (o) {
-        var allowed = !o.dataset.types || o.dataset.types.split(' ').indexOf(type.value) >= 0;
-        o.hidden = !allowed;
-        o.disabled = !allowed;
-        if (allowed && !chosen) chosen = o;
-      });
-      if (usage.selectedOptions[0] && usage.selectedOptions[0].disabled && chosen) usage.value = chosen.value;
-    }
 
     var time = row.querySelector('input[name$=".boilTimeMin"]');
     if (!time) return;
@@ -131,5 +120,5 @@
   });
   if (boil) boil.addEventListener('input', syncAllRows);
   syncAllRows();
-  document.querySelectorAll('#ferm-proto tr, #extra-proto tr').forEach(function (row) { syncRow(row); });
+  document.querySelectorAll('#extra-proto tr').forEach(function (row) { syncRow(row); });
 })();

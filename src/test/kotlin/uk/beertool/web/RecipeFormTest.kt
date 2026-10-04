@@ -8,6 +8,7 @@ import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 import org.junit.jupiter.api.Test
 import uk.beertool.recipe.FermentableType
+import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
 
 class RecipeFormTest {
@@ -184,6 +185,27 @@ class RecipeFormTest {
         val recipe = form.toNewRecipe()
 
         recipe.hops.map { it.dryHopDays } shouldBe listOf(null, 3)
+    }
+
+    @Test
+    fun `should read fermentables posted from several stage tables as one list in stage order`() {
+        val form = form(
+            "boilTimeMin" to "60",
+            "fermentables.0.name" to "Maris Otter", "fermentables.0.usage" to "mash",
+            "fermentables.0.type" to "malt", "fermentables.0.amountKg" to "5",
+            "fermentables.1.name" to "Dextrose", "fermentables.1.usage" to "boil",
+            "fermentables.1.type" to "sugar", "fermentables.1.boilTimeMin" to "10",
+            "fermentables.2.name" to "Raspberry", "fermentables.2.usage" to "secondary",
+            "fermentables.2.type" to "fruit", "fermentables.2.amountKg" to "2",
+        )
+
+        val recipe = form.toNewRecipe()
+
+        recipe.fermentables.map { it.usage } shouldBe
+            listOf(FermentableUsage.MASH, FermentableUsage.BOIL, FermentableUsage.SECONDARY)
+        recipe.fermentables.map { it.type } shouldBe
+            listOf(FermentableType.MALT, FermentableType.SUGAR, FermentableType.FRUIT)
+        recipe.fermentables.map { it.boilTimeMin } shouldBe listOf(null, 10, null)
     }
 
     @OptIn(ExperimentalSerializationApi::class)

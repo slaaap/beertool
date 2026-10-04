@@ -2,6 +2,7 @@ package uk.beertool.web
 
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.html.dom.createHTMLDocument
 import kotlinx.html.dom.serialize
 import kotlinx.html.html
@@ -51,14 +52,54 @@ class RecipeFormRenderTest {
     }
 
     @Test
+    fun `should offer a fermentable stage only the types that are legal there`() {
+        val html = render(null)
+
+        html.stageTypes("ferm-mash") shouldBe listOf("malt", "unmalted")
+        html.stageTypes("ferm-boil") shouldBe listOf("extract", "sugar", "fruit")
+        html.stageTypes("ferm-secondary") shouldBe listOf("sugar", "fruit")
+    }
+
+    @Test
+    fun `should call the mash fermentables the grist, to tell them from the mash rests`() {
+        val html = render(null)
+
+        html shouldContain "<h3>Grist</h3>"
+    }
+
+    @Test
+    fun `should give a time column only to the stage that happens in the boil`() {
+        val html = render(null)
+
+        html.stageHeaders("ferm-boil") shouldContain "Time (min)"
+        html.stageHeaders("ferm-mash") shouldNotContain "Time"
+    }
+
+    @Test
     fun `should label the whirlpool stage with the temperature the brewer adds at`() {
         val html = render(null)
 
         html shouldContain "hops in at 80"
     }
 
+    private fun String.stage(key: String) =
+        Regex("""<div class="stage"[^>]*id="$key">.*?</table>""", RegexOption.DOT_MATCHES_ALL).find(this)!!.value
+
+    private fun String.prototype(key: String) =
+        Regex("""<tbody id="$key-proto">.*?</tbody>""", RegexOption.DOT_MATCHES_ALL).find(this)!!.value
+
+    private fun String.stageTypes(key: String): List<String> {
+        val select = Regex("""<select name="fermentables\.0\.type">.*?</select>""", RegexOption.DOT_MATCHES_ALL)
+            .find(prototype(key))!!
+            .value
+        return Regex("""value="([a-z]+)"""").findAll(select).map { it.groupValues[1] }.toList()
+    }
+
+    private fun String.stageHeaders(key: String) =
+        Regex("""<thead>.*?</thead>""", RegexOption.DOT_MATCHES_ALL).find(stage(key))!!.value
+
     private fun String.stageIsHidden(id: String) =
-        Regex("""<div class="hop-stage"([^>]*)id="$id"""").find(this)!!.groupValues[1].contains("hidden")
+        Regex("""<div class="stage"([^>]*)id="$id"""").find(this)!!.groupValues[1].contains("hidden")
 
     private fun String.shouldHaveField(name: String, value: String) =
         this shouldContain Regex("""name="${Regex.escape(name)}"[^>]*value="$value"""")

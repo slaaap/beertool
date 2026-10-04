@@ -92,6 +92,34 @@ private fun <T> FlowContent.billTable(
     }
 }
 
+private fun FlowContent.fermentableStages(recipe: Recipe) {
+    val bill = recipe.fermentables.inBrewOrder()
+    if (bill.isEmpty()) return
+    sectionHead("Fermentables")
+    FERMENTABLE_SECTIONS.forEach { section ->
+        val rows = bill.filter { it.usage == section.usage }
+        if (rows.isEmpty()) return@forEach
+        div("stage") {
+            stageTitle(section.label)
+            scrollTable("bill ferm") {
+                thead { tr { fermentableStageColumns(section) } }
+                tbody {
+                    rows.forEach { f ->
+                        tr {
+                            td { +f.name }
+                            numCell(f.amountKg, decimals = 3)
+                            td { +prettify(f.type.name) }
+                            if (section.usage.takesTime) numCell(f.boilTimeMin)
+                            numCell(f.colourEbc, decimals = 0)
+                            numCell(f.extractPercent, decimals = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun FlowContent.hopStages(recipe: Recipe, prefs: BrewerPreferences) {
     val hops = recipe.hops.inBrewOrder()
     if (hops.isEmpty()) return
@@ -99,8 +127,8 @@ private fun FlowContent.hopStages(recipe: Recipe, prefs: BrewerPreferences) {
     HOP_SECTIONS.forEach { section ->
         val rows = hops.filter { it.usage == section.usage }
         if (rows.isEmpty()) return@forEach
-        div("hop-stage") {
-            hopStageTitle(section, section.note(prefs, recipe.boilTimeMin))
+        div("stage") {
+            stageTitle(prettify(section.usage.name), section.note(prefs, recipe.boilTimeMin))
             scrollTable("bill hops") {
                 thead { tr { hopStageColumns(section) } }
                 tbody {
@@ -153,15 +181,7 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
             emptyCell()
         }
 
-        billTable("Fermentables", recipe.fermentables.inBrewOrder(), TR::fermentableHead) { f ->
-            td { +f.name }
-            numCell(f.amountKg, decimals = 3)
-            td { +prettify(f.type.name) }
-            td { +prettify(f.usage.name) }
-            numCell(f.boilTimeMin)
-            numCell(f.colourEbc, decimals = 0)
-            numCell(f.extractPercent, decimals = 1)
-        }
+        fermentableStages(recipe)
         unmaltedWarning(recipe.unmaltedFraction())
 
         hopStages(recipe, user.preferences)

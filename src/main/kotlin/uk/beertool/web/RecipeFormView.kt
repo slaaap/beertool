@@ -7,9 +7,6 @@ import uk.beertool.recipe.CodeLookup
 import uk.beertool.recipe.Coded
 import uk.beertool.recipe.DEFAULT_ATTENUATION
 import uk.beertool.recipe.ExtraUsage
-import uk.beertool.recipe.FermentableType
-import uk.beertool.recipe.FermentableUsage
-import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeExtra
@@ -94,9 +91,7 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
             editableBill(MASH, "Mash", "Add rest", TR::mashHead, "bill mash") {
                 (recipe?.mashSteps ?: prefs.mashSteps).forEachIndexed { i, m -> mashStepRow(i, m) }
             }
-            editableBill(FERMENTABLES, "Fermentables", "Add fermentable", TR::fermentableHead) {
-                recipe?.fermentables.orEmpty().inBrewOrder().forEachIndexed { i, f -> fermentableRow(i, f) }
-            }
+            fermentableSections(recipe)
             hopSections(recipe, prefs, recipe?.boilTimeMin ?: prefs.boilTimeMin)
             editableBill(YEASTS, "Yeasts", "Add yeast", TR::yeastHead) {
                 recipe?.yeasts.orEmpty().inBrewOrder().forEachIndexed { i, y -> yeastRow(i, y) }
@@ -110,7 +105,7 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
         }
 
         prototypeRow(MASH) { mashStepRow(0, null) }
-        prototypeRow(FERMENTABLES) { fermentableRow(0, null) }
+        FERMENTABLE_SECTIONS.forEach { section -> prototypeRow(section.key) { fermentableRow(0, null, section) } }
         HOP_SECTIONS.forEach { section -> prototypeRow(section.key) { hopRow(0, null, section) } }
         prototypeRow(YEASTS) { yeastRow(0, null) }
         prototypeRow(EXTRAS) { extraRow(0, null) }
@@ -167,21 +162,53 @@ private fun TBODY.mashStepRow(i: Int, m: MashStep?) {
     }
 }
 
-private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?) {
+private fun FlowContent.fermentableSections(recipe: Recipe?) {
+    val bill = recipe?.fermentables.orEmpty().inBrewOrder()
+    sectionHead("Fermentables") {
+        FERMENTABLE_SECTIONS.filter { it.primary }.forEach { addStageButton(it.key, it.label) }
+        otherStages(FERMENTABLE_SECTIONS.filterNot { it.primary }.map { it.key to it.label })
+    }
+    stages("ferm-sections") {
+        var index = 0
+        FERMENTABLE_SECTIONS.forEach { section ->
+            val rows = bill.filter { it.usage == section.usage }
+            stage(section.key, rows.isEmpty(), section.usage.inBoil) {
+                stageTitle(section.label)
+                scrollTable("bill ferm") {
+                    thead { tr { fermentableStageColumns(section); actionSlot() } }
+                    tbody {
+                        id = section.bodyId
+                        rows.forEachIndexed { i, f -> fermentableRow(index + i, f, section) }
+                    }
+                }
+            }
+            index += rows.size
+        }
+    }
+}
+
+private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?, section: FermentableSection) {
     fun field(name: String) = rowField("fermentables", i, name)
     tr {
-        td { textInput(name = field("name")) { value = f?.name ?: "" } }
+        td {
+            textInput(name = field("name")) { value = f?.name ?: "" }
+            hiddenInput(name = field("usage")) { value = section.usage.code }
+        }
         numInput(field("amountKg"), f?.amountKg?.toString(), "0.01")
-        td { select { name = field("type"); enumOptions(f?.type, FermentableType) } }
         td {
             select {
-                name = field("usage")
-                enumOptions(f?.usage, FermentableUsage) { u ->
-                    usageAttrs(u, forTypes = FermentableType.all.filter { u in it.usages })
+                name = field("type")
+                val chosen = f?.type ?: section.types.first()
+                section.types.forEach { type ->
+                    option {
+                        value = type.code
+                        if (type == chosen) selected = true
+                        +prettify(type.name)
+                    }
                 }
             }
         }
-        numInput(field("boilTimeMin"), f?.boilTimeMin?.toString(), "1")
+        if (section.usage.takesTime) numInput(field("boilTimeMin"), f?.boilTimeMin?.toString(), "1")
         numInput(field("colourEbc"), f?.colourEbc?.toString(), "1")
         numInput(field("extractPercent"), f?.extractPercent?.toString(), "0.1", placeholder = "auto")
         td("right") { removeButton() }
@@ -191,53 +218,51 @@ private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?) {
 private fun FlowContent.hopSections(recipe: Recipe?, prefs: BrewerPreferences, boilTimeMin: Int) {
     val hops = recipe?.hops.orEmpty().inBrewOrder()
     sectionHead("Hops") {
-        HOP_SECTIONS.filter { it.primary }.forEach { addStageButton(it) }
-        details(classes = "more-stages") {
-            summary(classes = "btn small") { +"Other" }
-            div { HOP_SECTIONS.filterNot { it.primary }.forEach { addStageButton(it) } }
-        }
+        HOP_SECTIONS.filter { it.primary }.forEach { addStageButton(it.key, prettify(it.usage.name)) }
+        otherStages(HOP_SECTIONS.filterNot { it.primary }.map { it.key to prettify(it.usage.name) })
     }
-    div {
-        id = "hop-sections"
+    stages("hop-sections") {
         var index = 0
         HOP_SECTIONS.forEach { section ->
             val rows = hops.filter { it.usage == section.usage }
-            hopStage(section, rows, index, section.note(prefs, boilTimeMin))
+            stage(section.key, rows.isEmpty(), section.usage.inBoil) {
+                stageTitle(prettify(section.usage.name), section.note(prefs, boilTimeMin))
+                scrollTable("bill hops") {
+                    thead { tr { hopStageColumns(section); actionSlot() } }
+                    tbody {
+                        id = section.bodyId
+                        rows.forEachIndexed { i, h -> hopRow(index + i, h, section) }
+                    }
+                }
+            }
             index += rows.size
         }
     }
 }
 
-private fun HopSection.note(prefs: BrewerPreferences, boilTimeMin: Int): String? = when (usage) {
-    HopUsage.BOIL -> "$boilTimeMin min boil"
-    HopUsage.WHIRLPOOL ->
-        "hops in at ${fmt(prefs.whirlpoolTempC, 0)} °C, then chilled to pitching over ${prefs.coolingTimeMin} min"
-    else -> null
-}
+private fun FlowContent.stages(id: String, block: DIV.() -> Unit) = div("stages") { this.id = id; block() }
 
-private fun FlowContent.addStageButton(section: HopSection) {
-    button(type = ButtonType.button, classes = "btn small") {
-        onClick = "addHop('${section.key}')"
-        span("ico") { unsafe { +Icon.PLUS.markup() } }
-        span { +prettify(section.usage.name) }
+private fun FlowContent.stage(key: String, empty: Boolean, inBoil: Boolean, block: DIV.() -> Unit) {
+    div("stage") {
+        id = key
+        hidden = empty
+        attributes["data-in-boil"] = if (inBoil) "1" else "0"
+        block()
     }
 }
 
-private fun FlowContent.hopStage(section: HopSection, rows: List<RecipeHop>, startIndex: Int, note: String?) {
-    div("hop-stage") {
-        id = section.key
-        hidden = rows.isEmpty()
-        attributes["data-usage"] = section.usage.code
-        attributes["data-unit"] = section.timeField ?: ""
-        attributes["data-in-boil"] = if (section.usage.inBoil) "1" else "0"
-        hopStageTitle(section, note)
-        scrollTable("bill hops") {
-            thead { tr { hopStageColumns(section); actionSlot() } }
-            tbody {
-                id = section.bodyId
-                rows.forEachIndexed { i, h -> hopRow(startIndex + i, h, section) }
-            }
-        }
+private fun FlowContent.otherStages(stages: List<Pair<String, String>>) {
+    details(classes = "more-stages") {
+        summary(classes = "btn small") { +"Other" }
+        div { stages.forEach { (key, label) -> addStageButton(key, label) } }
+    }
+}
+
+private fun FlowContent.addStageButton(key: String, label: String) {
+    button(type = ButtonType.button, classes = "btn small") {
+        onClick = "addStageRow('$key')"
+        span("ico") { unsafe { +Icon.PLUS.markup() } }
+        span { +label }
     }
 }
 
@@ -306,8 +331,7 @@ private fun <E> SELECT.enumOptions(
     }
 }
 
-private fun OPTION.usageAttrs(usage: BrewStage, forTypes: List<FermentableType>? = null) {
+private fun OPTION.usageAttrs(usage: BrewStage) {
     attributes["data-time"] = if (usage.takesTime) "1" else "0"
     attributes["data-in-boil"] = if (usage.inBoil) "1" else "0"
-    forTypes?.let { attributes["data-types"] = it.joinToString(" ") { type -> type.code } }
 }

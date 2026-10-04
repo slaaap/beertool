@@ -96,7 +96,7 @@ table.bill { table-layout:fixed; }
 .c-prop-narrow { width:8%; }
 .c-alpha { width:20%; }
 
-.hop-stage + .hop-stage { margin-top:18px; }
+.stage + .stage { margin-top:18px; }
 .stage-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:14px 0 0; }
 .stage-head h3 { margin:0; font-family:var(--font-display); font-size:17px; font-weight:600; }
 .stage-note { color:var(--muted); font-size:13px; }
@@ -104,6 +104,12 @@ table.bill { table-layout:fixed; }
 table.hops .c-name { width:36%; }
 table.hops .c-amount { width:20%; }
 table.hops .c-time { width:20%; }
+
+table.ferm .c-name { width:26%; }
+table.ferm .c-amount { width:15%; }
+table.ferm .c-what { width:17%; }
+table.ferm .c-time { width:13%; }
+table.ferm .c-prop-narrow { width:12%; }
 
 .more-stages { position:relative; display:inline-block; }
 .more-stages > summary { list-style:none; color:var(--muted); }
@@ -242,6 +248,9 @@ li { margin:3px 0; }
   .table-scroll table.bill { min-width:620px; }
   .table-scroll table.fit { min-width:0; }
   .table-scroll table.hops { min-width:0; }
+  .table-scroll table.ferm { min-width:0; }
+  table.ferm td:not(:last-child), table.ferm th:not(:last-child) { padding-right:6px; }
+  table.ferm td.num input[type=number] { padding-left:4px; padding-right:4px; }
   table.hops .c-name { width:32%; }
   table.hops .c-amount, table.hops .c-time, table.hops .c-alpha { width:19%; }
   table.hops td:not(:last-child), table.hops th:not(:last-child) { padding-right:6px; }
