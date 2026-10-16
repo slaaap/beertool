@@ -1,10 +1,12 @@
 package uk.beertool.telegram
 
 import io.kotest.matchers.ints.shouldBeLessThan
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.Batch
+import uk.beertool.batch.BatchSummary
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.Recipe
@@ -141,6 +143,16 @@ class CardsTest {
         val card = batchCard(recipe, batch, recipe.stats(), today)
 
         card shouldContain "<blockquote expandable>Mash ran hot &lt;5 min&gt;\nDry hopped day 3</blockquote>"
+    }
+
+    @Test
+    fun `should keep packaged batches plain in the brew log and tag the ones still going`() {
+        val packaged = BatchSummary(sampleBatch(brewDate = LocalDate.of(2026, 9, 1), packagedDate = LocalDate.of(2026, 9, 20)), "Pale Ale", 7)
+        val fermenting = BatchSummary(sampleBatch(brewDate = LocalDate.of(2026, 10, 7), measuredOg = 1.050), "Stout", 8)
+
+        val lines = listOf(batchLine(packaged, today), batchLine(fermenting, today))
+
+        lines shouldBe listOf("Pale Ale #7 · batch 1 · 1 Sep", "Stout #8 · batch 1 · 7 Oct · fermenting")
     }
 
     private val today = LocalDate.of(2026, 10, 16)

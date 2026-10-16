@@ -109,13 +109,13 @@ internal fun String.escapeAttribute() = escapeHtml().replace("\"", "&quot;")
 
 private fun days(n: Long) = if (n == 1L) "1 day" else "$n days"
 
-fun statusIcon(batch: Batch) = when {
+private fun statusIcon(batch: Batch) = when {
     batch.packagedDate != null -> "🍺"
     batch.measuredOg == null -> "🔥"
     else -> "🫧"
 }
 
-fun batchStatus(batch: Batch, today: LocalDate) = statusIcon(batch) + " " + when {
+fun batchStatus(batch: Batch, today: LocalDate) = when {
     batch.packagedDate != null -> "packaged ${friendlyDate(batch.packagedDate, today)}"
     batch.measuredOg == null -> "brew day"
     else -> "fermenting"
@@ -247,4 +247,8 @@ fun readingsSaved(readings: Readings): String {
 fun recipeLine(summary: RecipeSummary) = "${summary.name} #${summary.no}" + (summary.style?.let { " · $it" } ?: "")
 
 fun batchLine(summary: BatchSummary, today: LocalDate) =
-    "${statusIcon(summary.batch)} ${summary.recipeName} #${summary.recipeNo} · batch ${summary.batch.no} · ${friendlyDate(summary.batch.brewDate, today)}"
+    "${summary.recipeName} #${summary.recipeNo} · batch ${summary.batch.no} · ${friendlyDate(summary.batch.brewDate, today)}" +
+        activeTag(summary.batch, today)
+
+// List rows stay plain; only brews still going are tagged, so they stand out from the packaged majority.
+fun activeTag(batch: Batch, today: LocalDate) = if (batch.packagedDate == null) " · ${batchStatus(batch, today)}" else ""
