@@ -115,12 +115,6 @@ private fun statusIcon(batch: Batch) = when {
     else -> "🫧"
 }
 
-fun batchStatus(batch: Batch, today: LocalDate) = when {
-    batch.packagedDate != null -> "packaged ${friendlyDate(batch.packagedDate, today)}"
-    batch.measuredOg == null -> "brew day"
-    else -> "fermenting"
-}
-
 private fun batchProgress(batch: Batch, today: LocalDate): String {
     val brewed = batch.brewDate
     val packaged = batch.packagedDate
@@ -244,11 +238,10 @@ fun readingsSaved(readings: Readings): String {
     return "✅ Saved ${parts.joinToString(", ")}"
 }
 
-fun recipeLine(summary: RecipeSummary) = "${summary.name} #${summary.no}" + (summary.style?.let { " · $it" } ?: "")
+fun recipeLine(summary: RecipeSummary) = summary.name + (summary.style?.let { " · $it" } ?: "")
 
 fun batchLine(summary: BatchSummary, today: LocalDate) =
-    "${summary.recipeName} #${summary.recipeNo} · batch ${summary.batch.no} · ${friendlyDate(summary.batch.brewDate, today)}" +
-        activeTag(summary.batch, today)
+    "${friendlyDate(summary.batch.brewDate, today)} · ${summary.recipeName}${activeMark(summary.batch)}"
 
-// List rows stay plain; only brews still going are tagged, so they stand out from the packaged majority.
-fun activeTag(batch: Batch, today: LocalDate) = if (batch.packagedDate == null) " · ${batchStatus(batch, today)}" else ""
+// List rows read like a diary; a dot marks the brews still going among the packaged majority.
+fun activeMark(batch: Batch) = if (batch.packagedDate == null) " •" else ""

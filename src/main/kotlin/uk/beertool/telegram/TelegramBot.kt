@@ -153,7 +153,7 @@ class TelegramBot(
             val heading = if (current == null) "🔥 <b>Which brew?</b>\n<i>Pick the one you're working on.</i>" else "🔥 <b>Brews on the go</b>"
             say(who, heading, keyboard(*open.map { (recipe, batch) ->
                 val mark = if (batch.id == current?.second?.id) "✓ " else ""
-                listOf(button("$mark${batchName(recipe, batch)} · ${batchStatus(batch, today())}".short(), "cur:${recipe.no}:${batch.no}"))
+                listOf(button("$mark${friendlyDate(batch.brewDate, today())} · ${recipe.name}".short(), "cur:${recipe.no}:${batch.no}"))
             }.toTypedArray()))
         }
         when {
@@ -210,7 +210,7 @@ class TelegramBot(
                     val batches = BatchRepository.listByRecipe(recipe.id, user.id)
                     if (batches.isEmpty()) say(who, "📚 ${recipeName(recipe).escapeHtml()} hasn't been brewed yet.")
                     else say(who, "📚 <b>Brews of ${recipeName(recipe).escapeHtml()}</b>", keyboard(*batches.map {
-                        listOf(button("Batch ${it.no} · ${friendlyDate(it.brewDate, today())}${activeTag(it, today())}", "b:${recipe.no}:${it.no}"))
+                        listOf(button("${friendlyDate(it.brewDate, today())}${activeMark(it)}", "b:${recipe.no}:${it.no}"))
                     }.toTypedArray()))
                 }
                 "b" -> batchOf(user, n1, n2)?.let { (recipe, batch) -> showBatch(who, user, recipe, batch) }
