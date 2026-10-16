@@ -51,18 +51,18 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should link a Telegram account with a token issued from settings`() = runBlocking {
+    fun `should link a Telegram account with a token issued from settings`() = runBlocking<Unit> {
         val user = newUser()
         val token = TelegramLinkRepository.issueToken(user.id)
 
         send("/start $token")
 
         TelegramLinkRepository.findByTelegramUser(telegramId)!!.userId shouldBe user.id
-        api.last.text shouldContain "Linked to Brewer"
+        api.last.text shouldContain "Connected as Brewer"
     }
 
     @Test
-    fun `should refuse a link token that was already used`() = runBlocking {
+    fun `should refuse a link token that was already used`() = runBlocking<Unit> {
         val token = TelegramLinkRepository.issueToken(newUser().id)
         TelegramLinkRepository.redeem(token, telegramUserId = 42, chatId = 42)
 
@@ -73,7 +73,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should greet a linked brewer with the bot commands only`() = runBlocking {
+    fun `should greet a linked brewer with the bot commands only`() = runBlocking<Unit> {
         linkedUser()
 
         send("/start")
@@ -83,7 +83,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should not offer brewing commands to a showcase visitor`() = runBlocking {
+    fun `should not offer brewing commands to a showcase visitor`() = runBlocking<Unit> {
         SingleUser.email = newUser().email
 
         send("/help")
@@ -94,7 +94,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should explain how brew day works when nothing is brewing`() = runBlocking {
+    fun `should explain how brew day works when nothing is brewing`() = runBlocking<Unit> {
         linkedUser()
 
         send("/brew")
@@ -104,14 +104,14 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should tell an unlinked chat how to connect when there is no showcase`() = runBlocking {
+    fun `should tell an unlinked chat how to connect when there is no showcase`() = runBlocking<Unit> {
         send("/recipes")
 
-        api.last.text shouldContain "isn't linked to beertool yet"
+        api.last.text shouldContain "isn't connected to beertool yet"
     }
 
     @Test
-    fun `should let anyone browse the showcase brewer's recipes without offering to brew`() = runBlocking {
+    fun `should let anyone browse the showcase brewer's recipes without offering to brew`() = runBlocking<Unit> {
         val owner = newUser()
         val recipe = newRecipe(owner)
         SingleUser.email = owner.email
@@ -119,11 +119,11 @@ class TelegramBotTest {
         send("/recipe ${recipe.no}")
 
         api.last.text shouldContain "Pale Ale"
-        api.last.buttons.map { it.text } shouldNotContain "Start brew day"
+        api.last.buttons.map { it.text } shouldNotContain "🔥 Start brew day"
     }
 
     @Test
-    fun `should refuse readings from a showcase visitor`() = runBlocking {
+    fun `should refuse readings from a showcase visitor`() = runBlocking<Unit> {
         val owner = newUser()
         BatchRepository.create(owner.id, NewBatch(recipeId = newRecipe(owner).id))
         SingleUser.email = owner.email
@@ -135,7 +135,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should log readings against the only brew on the go and stamp its ABV`() = runBlocking {
+    fun `should log readings against the only brew on the go and stamp its ABV`() = runBlocking<Unit> {
         val user = linkedUser()
         val batch = BatchRepository.create(user.id, NewBatch(recipeId = newRecipe(user).id, measuredOg = 1.050))!!
 
@@ -145,11 +145,11 @@ class TelegramBotTest {
         saved.measuredFg shouldBe 1.010
         saved.measuredFermenterVolumeL shouldBe 21.0
         saved.abv.shouldNotBeNull() shouldBe (5.25 plusOrMinus 0.1)
-        api.last.text shouldContain "Saved ✓"
+        api.last.text shouldContain "✅ Saved FG 1.010, fermenter 21 L"
     }
 
     @Test
-    fun `should ask which brew the readings are for when several are on the go`() = runBlocking {
+    fun `should ask which brew the readings are for when several are on the go`() = runBlocking<Unit> {
         val user = linkedUser()
         BatchRepository.create(user.id, NewBatch(recipeId = newRecipe(user, "Stout").id))
         BatchRepository.create(user.id, NewBatch(recipeId = newRecipe(user, "Lager").id))
@@ -161,7 +161,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should ignore messages in group chats`() = runBlocking {
+    fun `should ignore messages in group chats`() = runBlocking<Unit> {
         linkedUser()
 
         send("/recipes", chatType = "group")
@@ -170,7 +170,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should start today's brew from a recipe and send readings to it`() = runBlocking {
+    fun `should start today's brew from a recipe and send readings to it`() = runBlocking<Unit> {
         val user = linkedUser()
         val recipe = newRecipe(user)
 
@@ -183,7 +183,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should call each boil addition when it falls due and then flame-out`() = runBlocking {
+    fun `should call each boil addition when it falls due and then flame-out`() = runBlocking<Unit> {
         val user = linkedUser()
         val recipe = newRecipe(
             user,
@@ -201,16 +201,16 @@ class TelegramBotTest {
         bot.tickBoilTimers()
         bot.tickBoilTimers()
 
-        val alerts = api.sent.map { it.text }.filter { it.startsWith("<b>Pale Ale</b>:") }
+        val alerts = api.sent.map { it.text }.filter { "<b>Add now</b>" in it || "<b>Flame-out</b>" in it }
         alerts shouldHaveSize 3
         alerts[0] shouldContain "Magnum 20 g"
         alerts[1] shouldContain "Cascade 30 g"
-        alerts[2] shouldContain "flame-out!"
+        alerts[2] shouldContain "<b>Flame-out</b> · Pale Ale #1"
         BoilTimerRepository.find(batch.id).shouldBeNull()
     }
 
     @Test
-    fun `should not let a showcase visitor press a write button`() = runBlocking {
+    fun `should not let a showcase visitor press a write button`() = runBlocking<Unit> {
         val owner = newUser()
         val recipe = newRecipe(owner)
         SingleUser.email = owner.email
@@ -222,7 +222,7 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should offer recipe cards for inline sharing`() = runBlocking {
+    fun `should offer recipe cards for inline sharing`() = runBlocking<Unit> {
         val user = linkedUser()
         newRecipe(user, "Citra Pale")
         newRecipe(user, "Dry Stout")
@@ -231,11 +231,11 @@ class TelegramBotTest {
 
         val results = api.inlineAnswers.single()
         results.map { it.title } shouldBe listOf("Citra Pale")
-        results.single().inputMessageContent.messageText shouldContain "<b>Citra Pale</b>"
+        results.single().inputMessageContent.messageText shouldContain "Citra Pale #1</a></b>"
     }
 
     @Test
-    fun `should page through the recipe list in place`() = runBlocking {
+    fun `should page through the recipe list in place`() = runBlocking<Unit> {
         val user = linkedUser()
         repeat(9) { newRecipe(user, "Beer $it") }
 
@@ -243,7 +243,7 @@ class TelegramBotTest {
         press("rl:2")
 
         api.last.buttons.map { it.text } shouldContain "Next »"
-        api.edited.single().text shouldBe "Recipes · page 2 of 2"
+        api.edited.single().text shouldBe "📚 <b>Recipes</b>\n<i>Page 2 of 2</i>"
         api.edited.single().buttons.map { it.text } shouldContain "« Prev"
     }
 

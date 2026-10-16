@@ -51,7 +51,7 @@ All configuration is via environment variables:
 | `SINGLE_USER_EMAIL` | *(unset → normal multi-user mode)*                | Enables single-user mode for this account (see below)         |
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
 | `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
-| `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot uses it for "Open in beertool" buttons |
+| `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site |
 
 Example, pointing at a real database:
 

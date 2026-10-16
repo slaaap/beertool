@@ -19,35 +19,31 @@ import java.time.ZoneId
 
 val BOT_COMMANDS = listOf(
     BotCommand("recipes", "Browse recipes"),
-    BotCommand("find", "Search recipes, e.g. /find citra"),
+    BotCommand("find", "Search by name or ingredient"),
     BotCommand("log", "Brew log"),
-    BotCommand("brew", "Today's brew: water, mash, boil, readings"),
-    BotCommand("help", "What I can do"),
-    BotCommand("unlink", "Disconnect this Telegram account"),
+    BotCommand("brew", "Brew day: plan, boil timer, readings"),
+    BotCommand("help", "Commands"),
+    BotCommand("unlink", "Disconnect Telegram"),
 )
 
 private val LINKED_ONLY_COMMANDS = setOf("brew", "unlink")
 
 private val BREW_DAY_GUIDE = """
-    <b>Nothing brewing right now.</b> Here's how brew day works:
+    🔥 <b>Brew day</b>
+    <i>Nothing brewing right now. Here's how it works:</i>
 
-    1. Pick a recipe with /recipes and tap <b>Start brew day</b>.
+    1. Pick a recipe in /recipes and tap <b>Start brew day</b>.
     2. You get its water, mash and boil plan.
     3. Tap <b>Start boil timer</b> and I'll message you at each addition and at flame-out.
-    4. Send readings as plain messages: <code>pre 27.5</code>, <code>og 1.052</code>, <code>post 23</code>, <code>fermenter 21</code>, <code>fg 1.010</code>, <code>note …</code>
+    4. Send readings as plain messages: $READINGS_HINT
     5. Once the FG is in, tap <b>Mark packaged</b>.
-
-    Come back to it any time with /brew.
 """.trimIndent()
 
 private const val LIST_PAGE_SIZE = 8
 private const val SEARCH_LIMIT = 10
 private const val BUTTON_TEXT_MAX = 60
 
-private const val NOT_LINKED =
-    "This Telegram account isn't linked to beertool yet. Open <b>Settings</b> in beertool and tap <b>Connect Telegram</b>."
-private const val READ_ONLY =
-    "This is a read-only showcase. To log brews, link your own account from <b>Settings</b> in beertool."
+private const val READ_ONLY = "🔒 This is a read-only showcase, so brewing and logging are switched off."
 
 class TelegramBot(
     private val api: TelegramApi,
@@ -90,49 +86,55 @@ class TelegramBot(
                     "recipes" -> recipeListPage(user, 1).let { (text, keys) -> say(who, text, keys) }
                     "find" -> onFind(who, user, arg)
                     "recipe" -> arg.removePrefix("#").toIntOrNull()?.let { showRecipe(who, user, it) }
-                        ?: say(who, "Which one? e.g. <code>/recipe 12</code>")
+                        ?: say(who, "Which recipe? Send its number, e.g. <code>/recipe 12</code>, or browse /recipes.")
                     "log" -> logPage(user, 1).let { (text, keys) -> say(who, text, keys) }
                     "brew" -> onBrew(who, user)
-                    else -> say(who, "I don't know that one. Try /help.")
+                    else -> say(who, "🤔 I don't know that command. /help lists them all.")
                 }
             }
         }
     }
 
     private suspend fun onStart(who: Chatter, token: String) {
-        if (token.isBlank()) return say(who, "Cheers! 🍺\n\n" + helpText(who))
+        if (token.isBlank()) return say(who, "🍺 <b>Welcome to beertool</b>\n" + helpText(who))
         val link = TelegramLinkRepository.redeem(token, who.telegramUserId, who.chatId, clock())
         val user = link?.let { UserRepository.findById(it.userId) }
-        if (user == null) say(who, "That link has expired or was already used. Make a new one from <b>Settings</b> in beertool.")
-        else say(who, "Linked to ${user.displayName.escapeHtml()}'s beertool account. 🍺\n\n" + helpText(chatter(TgUser(who.telegramUserId), who.chatId)))
+        if (user == null) say(who, "⚠️ That link has expired or was already used. Get a fresh one from ${settings()} → <b>Connect Telegram</b>.")
+        else say(who, "✅ <b>Connected</b>\n" + helpText(chatter(TgUser(who.telegramUserId), who.chatId)))
     }
 
     private suspend fun onUnlink(who: Chatter) {
-        if (who.link == null) return say(who, "This Telegram account isn't linked.")
+        if (who.link == null) return say(who, "This Telegram account isn't connected.")
         TelegramLinkRepository.unlinkUser(who.link.userId)
-        say(who, "Unlinked. You can connect again from <b>Settings</b> in beertool.")
+        say(who, "👋 Disconnected. Connect again any time from ${settings()}.")
     }
 
     private fun helpText(who: Chatter): String {
         val status = when {
-            who.link != null -> "Linked to ${who.user!!.displayName.escapeHtml()}."
-            who.user != null -> "Browsing ${who.user.displayName.escapeHtml()}'s recipes read-only."
-            else -> NOT_LINKED
+            who.link != null -> "Connected as ${who.user!!.displayName.escapeHtml()}."
+            who.user != null -> "Browsing ${who.user.displayName.escapeHtml()}'s recipes, read-only."
+            else -> return notLinked()
         }
         val commands = if (who.link != null) BOT_COMMANDS else BOT_COMMANDS.filterNot { it.command in LINKED_ONLY_COMMANDS }
-        return status + "\n\n" + commands.joinToString("\n") { "/${it.command} - ${it.description}" }
+        return "<i>$status</i>\n\n" + commands.joinToString("\n") { "/${it.command} - ${it.description}" }
     }
 
     private suspend fun onFind(who: Chatter, user: User, term: String) {
-        if (term.isBlank()) return say(who, "What should I look for? e.g. <code>/find citra</code>")
-        val found = RecipeRepository.search(user.id, term, user.preferences.whirlpool).take(SEARCH_LIMIT)
-        if (found.isEmpty()) return say(who, "Nothing matches “${term.escapeHtml()}”.")
-        say(who, "Recipes matching “${term.escapeHtml()}”:", keyboard(*found.map { listOf(button(recipeLine(it).short(), "r:${it.no}")) }.toTypedArray()))
+        if (term.isBlank()) return say(who, "🔎 What should I look for? Send e.g. <code>/find citra</code>")
+        val found = RecipeRepository.search(user.id, term, user.preferences.whirlpool)
+        val quoted = "“${term.escapeHtml()}”"
+        if (found.isEmpty()) return say(who, "🔎 Nothing matches $quoted. Try a hop, malt or style.")
+        val heading = when {
+            found.size > SEARCH_LIMIT -> "🔎 <b>Top $SEARCH_LIMIT of ${found.size} matches for $quoted</b>"
+            found.size == 1 -> "🔎 <b>1 match for $quoted</b>"
+            else -> "🔎 <b>${found.size} matches for $quoted</b>"
+        }
+        say(who, heading, keyboard(*found.take(SEARCH_LIMIT).map { listOf(button(recipeLine(it).short(), "r:${it.no}")) }.toTypedArray()))
     }
 
     private suspend fun showRecipe(who: Chatter, user: User, no: Int) {
-        val recipe = RecipeRepository.findByNo(no, user.id) ?: return say(who, "There's no recipe #$no.")
-        say(who, recipeCard(recipe, recipe.stats(user.preferences.whirlpool)), recipeKeyboard(user, recipe))
+        val recipe = RecipeRepository.findByNo(no, user.id) ?: return say(who, "⚠️ There's no recipe #$no. Browse /recipes.")
+        say(who, recipeCard(recipe, recipe.stats(user.preferences.whirlpool), publicUrl), recipeKeyboard(user, recipe))
     }
 
     private suspend fun showBatch(who: Chatter, user: User, recipe: Recipe, batch: Batch) {
@@ -140,7 +142,7 @@ class TelegramBot(
     }
 
     private suspend fun showBrewDay(who: Chatter, user: User, recipe: Recipe, batch: Batch) {
-        say(who, brewDayCard(recipe, batch, user.preferences), brewDayKeyboard(recipe, batch))
+        say(who, brewDayCard(recipe, batch, user.preferences, today(), publicUrl), brewDayKeyboard(recipe, batch))
     }
 
     private suspend fun onBrew(who: Chatter, user: User) {
@@ -148,9 +150,10 @@ class TelegramBot(
         val open = openBatches(user)
         val current = currentBatch(who, user)
         if (open.size > 1) {
-            say(who, "Brews on the go:", keyboard(*open.map { (recipe, batch) ->
+            val heading = if (current == null) "🔥 <b>Which brew?</b>\n<i>Pick the one you're working on.</i>" else "🔥 <b>Brews on the go</b>"
+            say(who, heading, keyboard(*open.map { (recipe, batch) ->
                 val mark = if (batch.id == current?.second?.id) "✓ " else ""
-                listOf(button("$mark${recipe.name} #${recipe.no}/${batch.no} · ${batchStatus(batch, today())}".short(), "cur:${recipe.no}:${batch.no}"))
+                listOf(button("$mark${batchStatus(batch, today())} · ${batchName(recipe, batch)}".short(), "cur:${recipe.no}:${batch.no}"))
             }.toTypedArray()))
         }
         when {
@@ -160,18 +163,18 @@ class TelegramBot(
     }
 
     private suspend fun onReadings(who: Chatter, text: String) {
-        val user = who.user ?: return say(who, NOT_LINKED)
-        if (!user.canWrite) return say(who, READ_ONLY)
+        val user = who.user ?: return say(who, notLinked())
         val readings = when (val parsed = parseReadings(text)) {
-            is ReadingsParse.NotReadings -> return say(who, "I didn't catch that. Send readings like <code>og 1.052</code>, or try /help.")
-            is ReadingsParse.Invalid -> return say(who, parsed.reason.escapeHtml())
+            is ReadingsParse.NotReadings -> return say(who, "🤔 Not sure what to do with that. /help lists the commands.")
+            is ReadingsParse.Invalid -> return say(who, "⚠️ ${parsed.reason.escapeHtml()}")
             is ReadingsParse.Ok -> parsed.readings
         }
+        if (!user.canWrite) return say(who, READ_ONLY)
         val (recipe, batch) = currentBatch(who, user)
-            ?: return say(who, if (openBatches(user).isEmpty()) "No brew is on the go. Start one from /recipes." else "Which brew is this for? Pick one with /brew.")
+            ?: return say(who, if (openBatches(user).isEmpty()) "Nothing is brewing. Start a brew day from /recipes first." else "Which brew is that for? Pick one in /brew, then send it again.")
         val saved = BatchRepository.update(batch.id, user.id, readings.applyTo(batch.toDraft())) ?: return
         TelegramLinkRepository.setCurrentBatch(who.telegramUserId, saved.id)
-        say(who, "Saved ✓\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, saved))
+        say(who, readingsSaved(readings) + "\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, saved))
     }
 
     private fun openBatches(user: User): List<Pair<Recipe, Batch>> =
@@ -192,7 +195,7 @@ class TelegramBot(
             val message = query.message ?: return
             if (!message.chat.isPrivate) return
             val who = chatter(query.from, message.chat.id)
-            val user = who.user ?: return say(who, NOT_LINKED)
+            val user = who.user ?: return say(who, notLinked())
             val parts = query.data.orEmpty().split(':')
             val n1 = parts.getOrNull(1)?.toIntOrNull()
             val n2 = parts.getOrNull(2)?.toIntOrNull()
@@ -205,9 +208,9 @@ class TelegramBot(
                 "r" -> n1?.let { showRecipe(who, user, it) }
                 "rb" -> recipeOf(user, n1)?.let { recipe ->
                     val batches = BatchRepository.listByRecipe(recipe.id, user.id)
-                    if (batches.isEmpty()) say(who, "${recipe.name.escapeHtml()} hasn't been brewed yet.")
-                    else say(who, "Brews of ${recipe.name.escapeHtml()}:", keyboard(*batches.map {
-                        listOf(button("Batch ${it.no} · ${friendlyDate(it.brewDate, today())} · ${batchStatus(it, today())}", "b:${recipe.no}:${it.no}"))
+                    if (batches.isEmpty()) say(who, "📚 ${recipeName(recipe).escapeHtml()} hasn't been brewed yet.")
+                    else say(who, "📚 <b>Brews of ${recipeName(recipe).escapeHtml()}</b>", keyboard(*batches.map {
+                        listOf(button("${statusIcon(it)} Batch ${it.no} · ${friendlyDate(it.brewDate, today())}", "b:${recipe.no}:${it.no}"))
                     }.toTypedArray()))
                 }
                 "b" -> batchOf(user, n1, n2)?.let { (recipe, batch) -> showBatch(who, user, recipe, batch) }
@@ -225,8 +228,8 @@ class TelegramBot(
                     TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
                     say(
                         who,
-                        "Boil timer on: ${recipe.boilTimeMin} min. I'll message you at each addition and at flame-out.",
-                        keyboard(listOf(button("Stop boil timer", "stop:${recipe.no}:${batch.no}"))),
+                        "⏱ <b>Boil timer started</b> · ${recipe.boilTimeMin} min\n<i>I'll message you at each addition and at flame-out.</i>",
+                        keyboard(listOf(button("⏹ Stop boil timer", "stop:${recipe.no}:${batch.no}"))),
                     )
                     tickBoilTimers()
                 }
@@ -234,7 +237,7 @@ class TelegramBot(
                     notice = if (BoilTimerRepository.stop(batch.id)) "Boil timer stopped" else "No boil timer running"
                 }
                 "pkg" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    if (batch.measuredFg == null) return say(who, "Log the final gravity first, e.g. <code>fg 1.010</code>.")
+                    if (batch.measuredFg == null) return say(who, "⚠️ Send the final gravity first, e.g. <code>fg 1.010</code>")
                     val packaged = BatchRepository.markPackaged(batch.id, user.id, today()) ?: return
                     notice = "Packaged 🍻"
                     showBatch(who, user, recipe, packaged)
@@ -256,8 +259,7 @@ class TelegramBot(
                 id = recipe.no.toString(),
                 title = recipe.name,
                 description = listOfNotNull(recipe.style, statsLine(s.stats)).joinToString("\n"),
-                inputMessageContent = InputTextMessageContent(recipeCard(recipe, s.stats)),
-                replyMarkup = publicUrl?.let { keyboard(listOf(linkButton("Open in beertool", "$it/recipes/${recipe.no}"))) },
+                inputMessageContent = InputTextMessageContent(recipeCard(recipe, s.stats, publicUrl)),
             )
         }
         api.answerInlineQuery(query.id, results)
@@ -291,7 +293,7 @@ class TelegramBot(
 
     private fun recipeListPage(user: User, page: Int): Pair<String, InlineKeyboardMarkup> {
         val p = RecipeRepository.listByUser(user.id, user.preferences.whirlpool).paginate(page, LIST_PAGE_SIZE)
-        val text = if (p.total == 0) "No recipes yet." else "Recipes · page ${p.page} of ${p.pageCount}"
+        val text = if (p.total == 0) "📚 No recipes yet." else "📚 <b>Recipes</b>\n<i>Page ${p.page} of ${p.pageCount}</i>"
         return text to keyboard(
             *p.items.map { listOf(button(recipeLine(it).short(), "r:${it.no}")) }.toTypedArray(),
             pager(p.page, p.hasPrev, p.hasNext, "rl"),
@@ -300,7 +302,7 @@ class TelegramBot(
 
     private fun logPage(user: User, page: Int): Pair<String, InlineKeyboardMarkup> {
         val p = BatchRepository.listByUser(user.id).paginate(page, LIST_PAGE_SIZE)
-        val text = if (p.total == 0) "Nothing brewed yet." else "Brew log · page ${p.page} of ${p.pageCount}"
+        val text = if (p.total == 0) "📚 Nothing brewed yet." else "📚 <b>Brew log</b>\n<i>Page ${p.page} of ${p.pageCount}</i>"
         return text to keyboard(
             *p.items.map { listOf(button(batchLine(it, today()).short(), "b:${it.recipeNo}:${it.batch.no}")) }.toTypedArray(),
             pager(p.page, p.hasPrev, p.hasNext, "ll"),
@@ -314,33 +316,36 @@ class TelegramBot(
 
     private fun recipeKeyboard(user: User, recipe: Recipe) = keyboard(
         listOfNotNull(
-            button("Brews", "rb:${recipe.no}"),
-            button("Start brew day", "sb:${recipe.no}").takeIf { user.canWrite },
+            button("📚 Brews", "rb:${recipe.no}"),
+            button("🔥 Start brew day", "sb:${recipe.no}").takeIf { user.canWrite },
         ),
-        listOfNotNull(publicUrl?.let { linkButton("Open in beertool", "$it/recipes/${recipe.no}") }),
     )
 
     private fun batchKeyboard(user: User, recipe: Recipe, batch: Batch) = keyboard(
         listOfNotNull(
-            button("Brew day", "cur:${recipe.no}:${batch.no}").takeIf { user.canWrite && batch.packagedDate == null },
-            button("Mark packaged", "pkg:${recipe.no}:${batch.no}")
+            button("🔥 Brew day", "cur:${recipe.no}:${batch.no}").takeIf { user.canWrite && batch.packagedDate == null },
+            button("🍺 Mark packaged", "pkg:${recipe.no}:${batch.no}")
                 .takeIf { user.canWrite && batch.packagedDate == null && batch.measuredFg != null },
         ),
     )
 
     private fun brewDayKeyboard(recipe: Recipe, batch: Batch) = keyboard(
         listOf(
-            if (BoilTimerRepository.find(batch.id) == null) button("Start boil timer", "boil:${recipe.no}:${batch.no}")
-            else button("Stop boil timer", "stop:${recipe.no}:${batch.no}"),
-            button("Readings so far", "b:${recipe.no}:${batch.no}"),
+            if (BoilTimerRepository.find(batch.id) == null) button("⏱ Start boil timer", "boil:${recipe.no}:${batch.no}")
+            else button("⏹ Stop boil timer", "stop:${recipe.no}:${batch.no}"),
+            button("📊 Readings", "b:${recipe.no}:${batch.no}"),
         ),
-        listOfNotNull(publicUrl?.let { linkButton("Open brew day page", "$it/recipes/${recipe.no}/batches/${batch.no}/brew") }),
     )
 
     private suspend fun withUser(who: Chatter, block: suspend (User) -> Unit) {
-        val user = who.user ?: return say(who, NOT_LINKED)
+        val user = who.user ?: return say(who, notLinked())
         block(user)
     }
+
+    private fun settings() = publicUrl?.let { "<a href=\"${"$it/settings".escapeAttribute()}\">Settings</a>" } ?: "<b>Settings</b>"
+
+    private fun notLinked() = "🔒 This Telegram account isn't connected to beertool yet. " +
+        "Open ${settings()} on the website and tap <b>Connect Telegram</b>."
 
     private suspend fun say(who: Chatter, text: String, keyboard: InlineKeyboardMarkup? = null) =
         api.sendMessage(who.chatId, text, keyboard)

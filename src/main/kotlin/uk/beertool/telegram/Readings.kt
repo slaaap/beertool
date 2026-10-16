@@ -36,12 +36,13 @@ fun parseReadings(text: String): ReadingsParse {
     var readings = Readings(note = note)
     for (m in matches) {
         val key = m.groupValues[1].lowercase()
-        val value = m.groupValues[2].replace(',', '.').toDouble()
+        val typed = m.groupValues[2]
+        val value = typed.replace(',', '.').toDouble()
         readings = when {
-            key == "og" -> readings.copy(og = gravity(value) ?: return invalidGravity(key, value))
-            key == "fg" -> readings.copy(fg = gravity(value) ?: return invalidGravity(key, value))
+            key == "og" -> readings.copy(og = gravity(value) ?: return invalidGravity(key, typed))
+            key == "fg" -> readings.copy(fg = gravity(value) ?: return invalidGravity(key, typed))
             else -> {
-                if (value <= 0.0 || value > MAX_VOLUME_L) return ReadingsParse.Invalid("$value L doesn't look like a volume.")
+                if (value <= 0.0 || value > MAX_VOLUME_L) return ReadingsParse.Invalid("$typed L doesn't look like a volume.")
                 when {
                     key.startsWith("pre") -> readings.copy(preBoilL = value)
                     key.startsWith("post") -> readings.copy(postBoilL = value)
@@ -60,8 +61,8 @@ private fun gravity(value: Double) = when (value) {
     else -> null
 }
 
-private fun invalidGravity(key: String, value: Double) =
-    ReadingsParse.Invalid("${key.uppercase()} $value doesn't look like a gravity. Try 1.052 or 1052.")
+private fun invalidGravity(key: String, typed: String) =
+    ReadingsParse.Invalid("${key.uppercase()} $typed doesn't look like a gravity. Send it as 1.052 or 1052.")
 
 private const val MAX_VOLUME_L = 1000.0
 

@@ -20,7 +20,7 @@ class TelegramJsonTest {
     }
 
     @Test
-    fun `should send a callback button without an empty url field`() {
+    fun `should send a callback button in the shape Telegram expects`() {
         val markup = keyboard(listOf(button("Brews", "rb:3")))
 
         val json = TelegramJson.encodeToString(InlineKeyboardMarkup.serializer(), markup)

@@ -58,8 +58,7 @@ data class InlineKeyboardMarkup(
 @Serializable
 data class InlineKeyboardButton(
     val text: String,
-    @SerialName("callback_data") val callbackData: String? = null,
-    val url: String? = null,
+    @SerialName("callback_data") val callbackData: String,
 )
 
 @Serializable
@@ -96,5 +95,3 @@ internal val NO_PREVIEW = LinkPreviewOptions(isDisabled = true)
 fun keyboard(vararg rows: List<InlineKeyboardButton>) = InlineKeyboardMarkup(rows.filter { it.isNotEmpty() })
 
 fun button(text: String, data: String) = InlineKeyboardButton(text, callbackData = data)
-
-fun linkButton(text: String, url: String) = InlineKeyboardButton(text, url = url)

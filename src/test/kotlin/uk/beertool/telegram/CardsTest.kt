@@ -47,8 +47,8 @@ class CardsTest {
 
         val card = recipeCard(recipe, recipe.stats())
 
-        card shouldContain "20 g Magnum (12.5%) · boil 60 min"
-        card shouldContain "50 g Citra (13%) · dry hop 4 days"
+        card shouldContain "• 20 g Magnum 12.5% · boil 60 min"
+        card shouldContain "• 50 g Citra 13% · dry hop 4 days"
     }
 
     @Test
@@ -64,7 +64,7 @@ class CardsTest {
     fun `should give the strike water on the brew day card`() {
         val recipe = recipe()
 
-        val card = brewDayCard(recipe, sampleBatch(), BrewerPreferences())
+        val card = brewDayCard(recipe, sampleBatch(), BrewerPreferences(), today)
 
         card shouldContain "Strike 13.5 L at"
     }
@@ -89,7 +89,7 @@ class CardsTest {
 
         val card = batchCard(recipe, batch, recipe.stats(), today)
 
-        card shouldContain "Still to log: fg, pre, post, fermenter → send <code>fg 1.010</code>"
+        card shouldContain "Still to log: fg, pre, post, fermenter. Send e.g. <code>fg 1.010</code>"
     }
 
     @Test
