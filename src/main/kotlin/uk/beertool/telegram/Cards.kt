@@ -2,6 +2,7 @@ package uk.beertool.telegram
 
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
+import uk.beertool.batch.stats
 import uk.beertool.recipe.BoilAddition
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.HopUsage
@@ -12,8 +13,13 @@ import uk.beertool.recipe.boilAdditions
 import uk.beertool.recipe.inBrewOrder
 import uk.beertool.recipe.mashWater
 import uk.beertool.user.BrewerPreferences
+import uk.beertool.web.MISSING
 import uk.beertool.web.fmt
 import uk.beertool.web.prettify
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 // Telegram rejects messages longer than 4096 characters.
 private const val MAX_MESSAGE = 4000
@@ -27,7 +33,7 @@ private fun num(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else "%.2f
 private fun stage(usage: BrewStage, minutes: Int?) =
     prettify((usage as Enum<*>).name).lowercase() + if (usage.inBoil && minutes != null) " $minutes min" else ""
 
-// Cards are built line by line and every tag closes on its own line, so cutting between lines keeps the HTML valid.
+// Cards are built as a list of entries that each close their own tags, so cutting between entries keeps the HTML valid.
 private fun clip(lines: List<String>): String {
     val kept = mutableListOf<String>()
     var length = 0
@@ -69,30 +75,87 @@ fun recipeCard(recipe: Recipe, stats: RecipeStats): String {
     return clip(lines)
 }
 
-fun batchStatus(batch: Batch) = when {
-    batch.packagedDate != null -> "packaged ${fmt(batch.packagedDate)}"
+private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+private const val MAX_NOTES = 1500
+
+fun friendlyDate(date: LocalDate?, today: LocalDate): String = when {
+    date == null -> MISSING
+    date.year == today.year -> date.format(DAY_MONTH)
+    else -> date.format(DAY_MONTH_YEAR)
+}
+
+private fun String.escapeAttribute() = escapeHtml().replace("\"", "&quot;")
+
+private fun days(n: Long) = if (n == 1L) "1 day" else "$n days"
+
+private fun statusIcon(batch: Batch) = when {
+    batch.packagedDate != null -> "🍺"
+    batch.measuredOg == null -> "🔥"
+    else -> "🫧"
+}
+
+fun batchStatus(batch: Batch, today: LocalDate) = statusIcon(batch) + " " + when {
+    batch.packagedDate != null -> "packaged ${friendlyDate(batch.packagedDate, today)}"
     batch.measuredOg == null -> "brew day"
     else -> "fermenting"
 }
 
-fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats): String {
-    val lines = mutableListOf(
-        "${bold(recipe.name)} #${recipe.no} · batch ${batch.no}",
-        "Brewed ${fmt(batch.brewDate)} · ${batchStatus(batch)}",
-        "",
-        "OG ${fmt(batch.measuredOg, 3)} (plan ${fmt(estimate.og, 3)})",
-        "FG ${fmt(batch.measuredFg, 3)} (plan ${fmt(estimate.fg, 3)})",
-        "Pre-boil ${fmt(batch.measuredPreBoilVolumeL, 1)} L (plan ${fmt(recipe.preBoilVolumeL, 1)})",
-        "Post-boil ${fmt(batch.measuredPostBoilVolumeL, 1)} L (plan ${fmt(recipe.postBoilVolumeL, 1)})",
-        "Fermenter ${fmt(batch.measuredFermenterVolumeL, 1)} L (plan ${fmt(recipe.fermenterVolumeL, 1)})",
+private fun batchProgress(batch: Batch, today: LocalDate): String {
+    val brewed = batch.brewDate
+    val packaged = batch.packagedDate
+    return when {
+        packaged != null -> "Packaged ${friendlyDate(packaged, today)} · ${days(ChronoUnit.DAYS.between(packaged, today))} in the bottle"
+        batch.measuredOg == null -> "Brew day"
+        brewed != null -> "Fermenting · day ${ChronoUnit.DAYS.between(brewed, today)}"
+        else -> "Fermenting"
+    } + (brewed?.let { " · brewed ${friendlyDate(it, today)}" } ?: "")
+}
+
+private class Reading(val label: String, val key: String, val example: String, val actual: Double?, val plan: Double?, val decimals: Int)
+
+private fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
+    Reading("OG", "og", "og 1.052", batch.measuredOg, estimate.og, 3),
+    Reading("FG", "fg", "fg 1.010", batch.measuredFg, estimate.fg, 3),
+    Reading("Pre-boil", "pre", "pre 27.5", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, 1),
+    Reading("Post-boil", "post", "post 23", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, 1),
+    Reading("Fermenter", "fermenter", "fermenter 21", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, 1),
+)
+
+fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalDate, publicUrl: String? = null): String {
+    val name = "${recipe.name} #${recipe.no} · batch ${batch.no}".escapeHtml()
+    val title = publicUrl?.let { "<a href=\"${"$it/recipes/${recipe.no}/batches/${batch.no}".escapeAttribute()}\">$name</a>" } ?: name
+    val lines = mutableListOf("${statusIcon(batch)} <b>$title</b>", batchProgress(batch, today))
+
+    val headline = listOfNotNull(
+        batch.abv?.let { "${fmt(it, 1)}% ABV" },
+        batch.stats().attenuation?.let { "${fmt(it * 100, 0)}% attenuation" },
+        batch.mashEfficiency?.let { "${fmt(it * 100, 0)}% efficiency" },
     )
-    if (batch.abv != null || batch.mashEfficiency != null) {
-        lines += "${fmt(batch.abv, 1)}% ABV · ${fmt(batch.mashEfficiency?.times(100), 0)}% efficiency"
-    }
-    batch.notes?.let {
+    if (headline.isNotEmpty()) {
         lines += ""
-        lines += bold("Notes")
-        lines += it.escapeHtml().lines()
+        lines += "<b>${headline.joinToString(" · ")}</b>"
+    }
+
+    val all = readings(recipe, batch, estimate)
+    val logged = all.filter { it.actual != null }
+    if (logged.isNotEmpty()) {
+        val table = listOf("%-10s%7s%7s".format("", "Actual", "Plan")) +
+            logged.map { "%-10s%7s%7s".format(it.label, fmt(it.actual, it.decimals), fmt(it.plan, it.decimals)) }
+        lines += ""
+        lines += "<pre>${table.joinToString("\n")}</pre>"
+    }
+
+    val missing = all.filter { it.actual == null }
+    if (batch.packagedDate == null && missing.isNotEmpty()) {
+        lines += ""
+        lines += "Still to log: ${missing.joinToString(", ") { it.key }} → send <code>${missing.first().example}</code>"
+    }
+
+    batch.notes?.let {
+        val notes = if (it.length > MAX_NOTES) it.take(MAX_NOTES) + "…" else it
+        lines += ""
+        lines += "<blockquote expandable>${notes.escapeHtml()}</blockquote>"
     }
     return clip(lines)
 }
@@ -138,5 +201,5 @@ fun boilAlertText(recipe: Recipe, alert: BoilAlert, minutesLeft: Long): String {
 
 fun recipeLine(summary: RecipeSummary) = "#${summary.no} ${summary.name}" + (summary.style?.let { " · $it" } ?: "")
 
-fun batchLine(summary: BatchSummary) =
-    "${summary.recipeName} #${summary.recipeNo}/${summary.batch.no} · ${fmt(summary.batch.brewDate)} · ${batchStatus(summary.batch)}"
+fun batchLine(summary: BatchSummary, today: LocalDate) =
+    "${batchStatus(summary.batch, today)} · ${summary.recipeName} #${summary.recipeNo}/${summary.batch.no} · ${friendlyDate(summary.batch.brewDate, today)}"

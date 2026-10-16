@@ -12,7 +12,6 @@ import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import uk.beertool.user.readOnly
 import uk.beertool.web.SingleUser
-import uk.beertool.web.fmt
 import uk.beertool.web.paginate
 import java.time.Instant
 import java.time.LocalDate
@@ -123,7 +122,7 @@ class TelegramBot(
     }
 
     private suspend fun showBatch(who: Chatter, user: User, recipe: Recipe, batch: Batch) {
-        say(who, batchCard(recipe, batch, recipe.stats(user.preferences.whirlpool)), batchKeyboard(user, recipe, batch))
+        say(who, batchCard(recipe, batch, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, batch))
     }
 
     private suspend fun showBrewDay(who: Chatter, user: User, recipe: Recipe, batch: Batch) {
@@ -137,7 +136,7 @@ class TelegramBot(
         if (open.size > 1) {
             say(who, "Brews on the go:", keyboard(*open.map { (recipe, batch) ->
                 val mark = if (batch.id == current?.second?.id) "✓ " else ""
-                listOf(button("$mark${recipe.name} #${recipe.no}/${batch.no} · ${batchStatus(batch)}".short(), "cur:${recipe.no}:${batch.no}"))
+                listOf(button("$mark${recipe.name} #${recipe.no}/${batch.no} · ${batchStatus(batch, today())}".short(), "cur:${recipe.no}:${batch.no}"))
             }.toTypedArray()))
         }
         when {
@@ -158,7 +157,7 @@ class TelegramBot(
             ?: return say(who, if (openBatches(user).isEmpty()) "No brew is on the go. Start one from /recipes." else "Which brew is this for? Pick one with /brew.")
         val saved = BatchRepository.update(batch.id, user.id, readings.applyTo(batch.toDraft())) ?: return
         TelegramLinkRepository.setCurrentBatch(who.telegramUserId, saved.id)
-        say(who, "Saved ✓\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool)), batchKeyboard(user, recipe, saved))
+        say(who, "Saved ✓\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, saved))
     }
 
     private fun openBatches(user: User): List<Pair<Recipe, Batch>> =
@@ -194,7 +193,7 @@ class TelegramBot(
                     val batches = BatchRepository.listByRecipe(recipe.id, user.id)
                     if (batches.isEmpty()) say(who, "${recipe.name.escapeHtml()} hasn't been brewed yet.")
                     else say(who, "Brews of ${recipe.name.escapeHtml()}:", keyboard(*batches.map {
-                        listOf(button("Batch ${it.no} · ${fmt(it.brewDate)} · ${batchStatus(it)}", "b:${recipe.no}:${it.no}"))
+                        listOf(button("Batch ${it.no} · ${friendlyDate(it.brewDate, today())} · ${batchStatus(it, today())}", "b:${recipe.no}:${it.no}"))
                     }.toTypedArray()))
                 }
                 "b" -> batchOf(user, n1, n2)?.let { (recipe, batch) -> showBatch(who, user, recipe, batch) }
@@ -289,7 +288,7 @@ class TelegramBot(
         val p = BatchRepository.listByUser(user.id).paginate(page, LIST_PAGE_SIZE)
         val text = if (p.total == 0) "Nothing brewed yet." else "Brew log · page ${p.page} of ${p.pageCount}"
         return text to keyboard(
-            *p.items.map { listOf(button(batchLine(it).short(), "b:${it.recipeNo}:${it.batch.no}")) }.toTypedArray(),
+            *p.items.map { listOf(button(batchLine(it, today()).short(), "b:${it.recipeNo}:${it.batch.no}")) }.toTypedArray(),
             pager(p.page, p.hasPrev, p.hasNext, "ll"),
         )
     }
@@ -313,7 +312,6 @@ class TelegramBot(
             button("Mark packaged", "pkg:${recipe.no}:${batch.no}")
                 .takeIf { user.canWrite && batch.packagedDate == null && batch.measuredFg != null },
         ),
-        listOfNotNull(publicUrl?.let { linkButton("Open in beertool", "$it/recipes/${recipe.no}/batches/${batch.no}") }),
     )
 
     private fun brewDayKeyboard(recipe: Recipe, batch: Batch) = keyboard(
