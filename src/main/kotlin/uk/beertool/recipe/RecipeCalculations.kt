@@ -4,6 +4,7 @@ import uk.beertool.brewing.Calculators
 import uk.beertool.brewing.FermentableAddition
 import uk.beertool.brewing.HopAddition
 import uk.beertool.brewing.MashRest
+import uk.beertool.brewing.MashWater
 import uk.beertool.brewing.Whirlpool
 
 data class RecipeStats(
@@ -29,6 +30,21 @@ fun Recipe.measuredEfficiency(measuredOg: Double, postBoilVolumeL: Double = this
     Calculators.impliedEfficiency(fermentables.map { it.toCalcInput() }, postBoilVolumeL, measuredOg)
 
 fun Recipe.mashGrainKg(): Double = fermentables.filter { it.type.isMashed }.sumOf { it.amountKg }
+
+fun Recipe.mashWater(thicknessLPerKg: Double, absorptionLPerKg: Double, grainTempC: Double = DEFAULT_GRAIN_TEMP_C): MashWater? {
+    val grainKg = mashGrainKg()
+    val preBoil = preBoilVolumeL
+    val firstRest = mashSteps.firstOrNull()?.tempC
+    if (grainKg <= 0.0 || preBoil == null || firstRest == null) return null
+    return Calculators.mashWater(
+        grainKg = grainKg,
+        firstRestTempC = firstRest,
+        grainTempC = grainTempC,
+        preBoilVolumeL = preBoil,
+        thicknessLPerKg = thicknessLPerKg,
+        absorptionLPerKg = absorptionLPerKg,
+    )
+}
 
 fun Recipe.unmaltedFraction(): Double = fermentables.unmaltedFraction()
 

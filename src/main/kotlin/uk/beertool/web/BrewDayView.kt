@@ -8,6 +8,7 @@ import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.boilAdditions
 import uk.beertool.recipe.mashGrainKg
+import uk.beertool.recipe.mashWater
 import uk.beertool.user.User
 import java.time.LocalDate
 
@@ -115,19 +116,11 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
 }
 
 private fun FlowContent.mashWaterGuide(recipe: Recipe, user: User) {
-    val grainKg = recipe.mashGrainKg()
-    val preBoil = recipe.preBoilVolumeL
-    val firstRest = recipe.mashSteps.first().tempC
-    if (grainKg <= 0.0 || preBoil == null) return
     val prefs = user.preferences
-    val water = Calculators.mashWater(
-        grainKg = grainKg,
-        firstRestTempC = firstRest,
-        grainTempC = DEFAULT_GRAIN_TEMP_C,
-        preBoilVolumeL = preBoil,
-        thicknessLPerKg = prefs.mashThicknessLPerKg,
-        absorptionLPerKg = prefs.grainAbsorptionLPerKg,
-    )
+    val water = recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg) ?: return
+    val grainKg = recipe.mashGrainKg()
+    val preBoil = recipe.preBoilVolumeL!!
+    val firstRest = recipe.mashSteps.first().tempC
     div("mash-water") {
         id = "mash-water"
         attributes["data-grain"] = fmt(grainKg, 3)

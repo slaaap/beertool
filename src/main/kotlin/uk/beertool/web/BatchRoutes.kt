@@ -7,7 +7,6 @@ import io.ktor.server.resources.post
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import uk.beertool.batch.BatchRepository
-import uk.beertool.batch.NewBatch
 import uk.beertool.recipe.stats
 import java.time.LocalDate
 
@@ -80,8 +79,7 @@ fun Route.batchRoutes() {
 
     post<RecipeStartBrewRes> { res ->
         withRecipe(res.recipeNo, write = true) { call, user, recipe ->
-            val target = BatchRepository.activeBrewDay(recipe.id, user.id)
-                ?: BatchRepository.create(user.id, NewBatch(recipeId = recipe.id, brewDate = LocalDate.now()))
+            val target = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.now())
             if (target == null) call.respondRedirect("/recipes")
             else call.respondRedirect("/recipes/${recipe.no}/batches/${target.no}/brew")
         }

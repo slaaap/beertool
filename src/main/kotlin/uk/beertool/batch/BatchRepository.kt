@@ -88,6 +88,10 @@ object BatchRepository {
             ?.toBatch()
     }
 
+    fun startBrewDay(recipeId: Long, userId: Long, on: LocalDate): Batch? = transaction {
+        activeBrewDay(recipeId, userId) ?: create(userId, NewBatch(recipeId = recipeId, brewDate = on))
+    }
+
     fun listByRecipe(recipeId: Long, userId: Long): List<Batch> = transaction {
         Batches.selectAll()
             .where { (Batches.recipeId eq recipeId) and (Batches.userId eq userId) }

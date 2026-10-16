@@ -8,6 +8,8 @@ import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.recipe.MashStep
+import uk.beertool.telegram.Telegram
+import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
@@ -53,6 +55,21 @@ fun Route.settingsRoutes() {
             val updated = call.receiveForm<SettingsForm>().toPreferences(user.preferences)
             UserRepository.updatePreferences(user.id, updated)
             call.respondRedirect("/settings?saved=true")
+        }
+    }
+
+    post<SettingsTelegram> {
+        withUser(write = true) { call, user ->
+            val bot = Telegram.botUsername
+            if (bot == null) call.respondRedirect("/settings")
+            else call.respondRedirect("https://t.me/$bot?start=${TelegramLinkRepository.issueToken(user.id)}")
+        }
+    }
+
+    post<SettingsTelegramUnlink> {
+        withUser(write = true) { call, user ->
+            TelegramLinkRepository.unlinkUser(user.id)
+            call.respondRedirect("/settings")
         }
     }
 }
@@ -141,10 +158,22 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
             }
         }
 
+        if (Telegram.enabled) telegramSection(user)
+
         table { style = "display:none"; tbody { id = "sm-proto"; mashPrefRow(0, null) } }
 
         js("settings.js")
         js("ui.js")
+    }
+}
+
+private fun FlowContent.telegramSection(user: User) {
+    sectionHead("Telegram")
+    if (TelegramLinkRepository.findByUser(user.id) == null) {
+        actionBar { btnPost("/settings/telegram", "Connect Telegram", Icon.PLUS) }
+    } else {
+        p("muted") { +"Connected to @${Telegram.botUsername}." }
+        actionBar { btnPost("/settings/telegram/unlink", "Disconnect", Icon.TRASH, style = ButtonStyle.DANGER) }
     }
 }
 

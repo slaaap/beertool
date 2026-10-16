@@ -16,3 +16,9 @@ class Logout
 
 @Resource("/settings")
 class Settings(val saved: Boolean = false)
+
+@Resource("/settings/telegram")
+class SettingsTelegram
+
+@Resource("/settings/telegram/unlink")
+class SettingsTelegramUnlink

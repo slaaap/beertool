@@ -13,3 +13,15 @@ data class NewBatch(
     val measuredFermenterVolumeL: Double? = null,
     val notes: String? = null,
 )
+
+fun Batch.toDraft() = NewBatch(
+    recipeId = recipeId,
+    brewDate = brewDate,
+    packagedDate = packagedDate,
+    measuredOg = measuredOg,
+    measuredFg = measuredFg,
+    measuredPreBoilVolumeL = measuredPreBoilVolumeL,
+    measuredPostBoilVolumeL = measuredPostBoilVolumeL,
+    measuredFermenterVolumeL = measuredFermenterVolumeL,
+    notes = notes,
+)

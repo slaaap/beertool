@@ -17,6 +17,8 @@ including a phone-first **Brew Day** mode for using it at the kettle.
   efficiency (recorded at the time, so later recipe edits never rewrite a brew's history).
 - **Per-user settings** — your kit volumes, efficiency, default mash, and mash-water ratios; new recipes
   open pre-filled from them.
+- **Telegram bot** (optional) - browse and search recipes, share recipe cards inline in any chat, get the
+  brew day plan, a boil timer that messages you at each addition, and log readings by just typing `og 1.052`.
 - **Two modes** — multi-user with accounts, or a **single-user public-showcase mode** where visitors browse
   one brewer's recipes read-only.
 
@@ -48,6 +50,8 @@ All configuration is via environment variables:
 | `SESSION_SECRET`    | *(random per boot)*                               | Signs the session cookie — **set a long random value in production** (otherwise sessions don't survive a restart) |
 | `SINGLE_USER_EMAIL` | *(unset → normal multi-user mode)*                | Enables single-user mode for this account (see below)         |
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
+| `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
+| `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot uses it for "Open in beertool" buttons |
 
 Example, pointing at a real database:
 
@@ -72,6 +76,48 @@ export SINGLE_USER_EMAIL=you@example.com
 Anonymous visitors can then browse that user's recipes and brew log, but every write action is hidden and
 blocked (new/edit/settings and all form submissions redirect to login), and registration is disabled. Log
 in as that account to edit.
+
+## Telegram bot (optional)
+
+The bot is off unless `TELEGRAM_BOT_TOKEN` is set. It long-polls Telegram, so it needs outbound HTTPS only:
+no webhook, no open port, and it works the same on a laptop as on a server.
+
+1. In Telegram, talk to [@BotFather](https://t.me/BotFather): `/newbot`, pick a name and a username, and
+   copy the token it gives you.
+2. Optionally, send BotFather `/setinline` for your bot, so you can type `@yourbot citra` in any chat to
+   share a recipe card.
+3. Start beertool with the token (and `PUBLIC_URL`, if the app is reachable on the internet):
+
+   ```bash
+   export TELEGRAM_BOT_TOKEN=123456789:AA...
+   export PUBLIC_URL=https://beer.example.com
+   ./gradlew run
+   ```
+
+4. In beertool, open **Settings → Telegram → Connect Telegram**. That opens the bot with a one-time link
+   (valid for 15 minutes); tap **Start** and your Telegram account is linked.
+
+What it does:
+
+| Command / action              | What happens                                                                    |
+|-------------------------------|---------------------------------------------------------------------------------|
+| `/recipes`, `/find <text>`    | Browse or search recipes; tap one for the full recipe card                      |
+| `/log`                        | The brew log; tap a batch for its readings against the plan                     |
+| **Start brew day** (button)   | Starts today's batch (or resumes it) and sends water, mash and boil plan        |
+| `/brew`                       | Shows the brew in progress, or lets you pick one when several are going         |
+| **Start boil timer** (button) | Messages you as each addition falls due and at flame-out; survives restarts     |
+| Plain text, e.g. `og 1.052 post 23` | Logs readings to the current brew (`og`, `fg`, `pre`, `post`, `fermenter`, `note …`); gravity as `1.052` or `1052` |
+| **Mark packaged** (button)    | Once the FG is in                                                               |
+| `@yourbot <text>` in any chat | Shares a recipe card (needs inline mode, step 2)                                |
+| `/unlink`                     | Disconnects the Telegram account (also possible from Settings)                  |
+
+Notes:
+
+- The bot only answers in private chats, so a linked account can't be used by a whole group.
+- In single-user mode, anyone can browse the showcase recipes through the bot read-only, just like the
+  website; only the linked owner can log brews.
+- A bot token can be polled by **one** running app at a time. Use a separate bot for development, or
+  Telegram will answer the second instance with "Conflict" errors.
 
 ## Build a standalone jar
 
