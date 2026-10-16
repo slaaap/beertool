@@ -176,8 +176,8 @@ fun brewDayCard(recipe: Recipe, batch: Batch, prefs: BrewerPreferences): String 
     lines += bold("Boil · ${recipe.boilTimeMin} min")
     recipe.boilAdditions().forEach { lines += "• ${additionLine(it)}" }
     lines += ""
-    lines += "Send readings as they come, e.g. <code>pre 27.5</code>, <code>og 1.052 post 23</code>, " +
-        "<code>fermenter 21</code>, <code>fg 1.010</code> or <code>note smelled great</code>."
+    lines += "Send readings as they come: <code>pre 27.5</code>, <code>og 1.052</code>, <code>post 23</code>, " +
+        "<code>fermenter 21</code>, <code>fg 1.010</code>, <code>note …</code>"
     return clip(lines)
 }
 

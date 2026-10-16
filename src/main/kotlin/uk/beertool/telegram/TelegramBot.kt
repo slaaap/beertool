@@ -26,6 +26,20 @@ val BOT_COMMANDS = listOf(
     BotCommand("unlink", "Disconnect this Telegram account"),
 )
 
+private val LINKED_ONLY_COMMANDS = setOf("brew", "unlink")
+
+private val BREW_DAY_GUIDE = """
+    <b>Nothing brewing right now.</b> Here's how brew day works:
+
+    1. Pick a recipe with /recipes and tap <b>Start brew day</b>.
+    2. You get its water, mash and boil plan.
+    3. Tap <b>Start boil timer</b> and I'll message you at each addition and at flame-out.
+    4. Send readings as plain messages: <code>pre 27.5</code>, <code>og 1.052</code>, <code>post 23</code>, <code>fermenter 21</code>, <code>fg 1.010</code>, <code>note …</code>
+    5. Once the FG is in, tap <b>Mark packaged</b>.
+
+    Come back to it any time with /brew.
+""".trimIndent()
+
 private const val LIST_PAGE_SIZE = 8
 private const val SEARCH_LIMIT = 10
 private const val BUTTON_TEXT_MAX = 60
@@ -105,8 +119,8 @@ class TelegramBot(
             who.user != null -> "Browsing ${who.user.displayName.escapeHtml()}'s recipes read-only."
             else -> NOT_LINKED
         }
-        return status + "\n\n" + BOT_COMMANDS.joinToString("\n") { "/${it.command} - ${it.description}" } +
-            if (who.link != null) "\n\nOn brew day, just send readings: <code>og 1.052</code>, <code>post 23</code>, <code>note …</code>" else ""
+        val commands = if (who.link != null) BOT_COMMANDS else BOT_COMMANDS.filterNot { it.command in LINKED_ONLY_COMMANDS }
+        return status + "\n\n" + commands.joinToString("\n") { "/${it.command} - ${it.description}" }
     }
 
     private suspend fun onFind(who: Chatter, user: User, term: String) {
@@ -141,7 +155,7 @@ class TelegramBot(
         }
         when {
             current != null -> showBrewDay(who, user, current.first, current.second)
-            open.isEmpty() -> say(who, "Nothing on the go. Pick a recipe with /recipes and tap <b>Start brew day</b>.")
+            open.isEmpty() -> say(who, BREW_DAY_GUIDE)
         }
     }
 

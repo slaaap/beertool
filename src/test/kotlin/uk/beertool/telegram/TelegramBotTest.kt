@@ -9,6 +9,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -69,6 +70,37 @@ class TelegramBotTest {
 
         TelegramLinkRepository.findByTelegramUser(telegramId).shouldBeNull()
         api.last.text shouldContain "expired or was already used"
+    }
+
+    @Test
+    fun `should greet a linked brewer with the bot commands only`() = runBlocking {
+        linkedUser()
+
+        send("/start")
+
+        api.last.text shouldContain "/brew - "
+        api.last.text shouldNotContain "og 1.052"
+    }
+
+    @Test
+    fun `should not offer brewing commands to a showcase visitor`() = runBlocking {
+        SingleUser.email = newUser().email
+
+        send("/help")
+
+        api.last.text shouldContain "/recipes - "
+        api.last.text shouldNotContain "/brew"
+        api.last.text shouldNotContain "/unlink"
+    }
+
+    @Test
+    fun `should explain how brew day works when nothing is brewing`() = runBlocking {
+        linkedUser()
+
+        send("/brew")
+
+        api.last.text shouldContain "Start brew day"
+        api.last.text shouldContain "<code>og 1.052</code>"
     }
 
     @Test
