@@ -80,7 +80,7 @@ class CardsTest {
         val card = batchCard(recipe, batch, estimate, today)
 
         card shouldContain "OG 1.052 (plan ${"%.3f".format(estimate.og)}) · FG ${"%.3f".format(estimate.fg)}\n"
-        card shouldContain "Post-boil 22 L (plan 23)"
+        card shouldContain "Post-boil 22 L (plan 23 L)"
         card shouldNotContain "Pre-boil"
         card shouldNotContain "<pre>"
     }

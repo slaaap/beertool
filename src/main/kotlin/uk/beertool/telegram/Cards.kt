@@ -150,7 +150,7 @@ private fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = list
 private fun Reading.text(): String {
     val measured = show(actual!!)
     val planned = plan?.let(show)
-    return "$label $measured$unit" + if (planned != null && planned != measured) " (plan $planned)" else ""
+    return "$label $measured$unit" + if (planned != null && planned != measured) " (plan $planned$unit)" else ""
 }
 
 private fun readingsLine(readings: List<Reading>) =
