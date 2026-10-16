@@ -116,26 +116,45 @@ private fun statusIcon(batch: Batch) = when {
 }
 
 private fun batchProgress(batch: Batch, today: LocalDate): String {
+    fun day(date: LocalDate) = if (date == today) "today" else friendlyDate(date, today)
     val brewed = batch.brewDate
     val packaged = batch.packagedDate
     return when {
-        packaged == today -> "Packaged today"
-        packaged != null -> "Packaged ${friendlyDate(packaged, today)} · ${days(ChronoUnit.DAYS.between(packaged, today))} in the bottle"
-        batch.measuredOg == null -> "Brew day"
-        brewed != null && brewed != today -> "Fermenting · day ${ChronoUnit.DAYS.between(brewed, today)}"
-        else -> "Fermenting"
-    } + (brewed?.let { " · brewed " + if (it == today) "today" else friendlyDate(it, today) } ?: "")
+        batch.measuredOg == null && packaged == null -> "Brew day" + (brewed?.let { " · ${day(it)}" } ?: "")
+        else -> listOfNotNull(
+            brewed?.let { "Brewed ${day(it)}" },
+            when {
+                packaged != null -> "packaged ${day(packaged)}"
+                brewed != null && brewed != today -> "fermenting, day ${ChronoUnit.DAYS.between(brewed, today)}"
+                else -> "fermenting"
+            },
+        ).joinToString(" · ").replaceFirstChar { it.uppercase() }
+    }
 }
 
-private class Reading(val label: String, val key: String, val example: String, val actual: Double?, val plan: Double?, val decimals: Int)
+private class Reading(val label: String, val key: String, val example: String, val actual: Double?, val plan: Double?, val unit: String, val show: (Double) -> String)
+
+private fun gravity(v: Double) = fmt(v, 3)
+
+private fun volume(v: Double) = num(Math.round(v * 10) / 10.0)
 
 private fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
-    Reading("OG", "og", "og 1.052", batch.measuredOg, estimate.og, 3),
-    Reading("FG", "fg", "fg 1.010", batch.measuredFg, estimate.fg, 3),
-    Reading("Pre-boil", "pre", "pre 27.5", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, 1),
-    Reading("Post-boil", "post", "post 23", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, 1),
-    Reading("Fermenter", "fermenter", "fermenter 21", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, 1),
+    Reading("OG", "og", "og 1.052", batch.measuredOg, estimate.og, "", ::gravity),
+    Reading("FG", "fg", "fg 1.010", batch.measuredFg, estimate.fg, "", ::gravity),
+    Reading("pre-boil", "pre", "pre 27.5", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, " L", ::volume),
+    Reading("post-boil", "post", "post 23", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, " L", ::volume),
+    Reading("fermenter", "fermenter", "fermenter 21", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, " L", ::volume),
 )
+
+// The plan is only worth reading where it differs from what was measured, as shown.
+private fun Reading.text(): String {
+    val measured = show(actual!!)
+    val planned = plan?.let(show)
+    return "$label $measured$unit" + if (planned != null && planned != measured) " (plan $planned)" else ""
+}
+
+private fun readingsLine(readings: List<Reading>) =
+    readings.filter { it.actual != null }.joinToString(" · ") { it.text() }.replaceFirstChar { it.uppercase() }.ifEmpty { null }
 
 fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalDate, publicUrl: String? = null): String {
     val lines = mutableListOf(
@@ -148,19 +167,11 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
         batch.stats().attenuation?.let { "${fmt(it * 100, 0)}% attenuation" },
         batch.mashEfficiency?.let { "${fmt(it * 100, 0)}% efficiency" },
     )
-    if (headline.isNotEmpty()) {
-        lines += ""
-        lines += "<b>${headline.joinToString(" · ")}</b>"
-    }
-
     val all = readings(recipe, batch, estimate)
-    val logged = all.filter { it.actual != null }
-    if (logged.isNotEmpty()) {
-        val table = listOf("%-10s%7s%7s".format("", "Actual", "Plan")) +
-            logged.map { "%-10s%7s%7s".format(it.label, fmt(it.actual, it.decimals), fmt(it.plan, it.decimals)) }
-        lines += ""
-        lines += "<pre>${table.joinToString("\n")}</pre>"
-    }
+    val figures = listOfNotNull(readingsLine(all.take(2)), readingsLine(all.drop(2)))
+    if (headline.isNotEmpty() || figures.isNotEmpty()) lines += ""
+    if (headline.isNotEmpty()) lines += "<b>${headline.joinToString(" · ")}</b>"
+    lines += figures
 
     val missing = all.filter { it.actual == null }
     if (batch.packagedDate == null && missing.isNotEmpty()) {

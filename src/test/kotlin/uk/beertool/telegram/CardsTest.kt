@@ -72,16 +72,17 @@ class CardsTest {
     }
 
     @Test
-    fun `should line up logged readings against the plan and leave out the ones still to come`() {
+    fun `should give the plan next to a reading only where they differ`() {
         val recipe = recipe()
-        val batch = sampleBatch(measuredOg = 1.052, measuredPostBoilVolumeL = 22.0)
+        val estimate = recipe.stats()
+        val batch = sampleBatch(measuredOg = 1.052, measuredFg = estimate.fg, measuredPostBoilVolumeL = 22.0)
 
-        val card = batchCard(recipe, batch, recipe.stats(), today)
+        val card = batchCard(recipe, batch, estimate, today)
 
-        card shouldContain "<pre>" + "           Actual   Plan\n" +
-            "OG          1.052  ${"%.3f".format(recipe.stats().og)}\n" +
-            "Post-boil    22.0   23.0</pre>"
+        card shouldContain "OG 1.052 (plan ${"%.3f".format(estimate.og)}) · FG ${"%.3f".format(estimate.fg)}\n"
+        card shouldContain "Post-boil 22 L (plan 23)"
         card shouldNotContain "Pre-boil"
+        card shouldNotContain "<pre>"
     }
 
     @Test
@@ -102,17 +103,17 @@ class CardsTest {
         val card = batchCard(recipe, batch, recipe.stats(), today)
 
         card shouldContain "🫧"
-        card shouldContain "Fermenting · day 9 · brewed 7 Oct"
+        card shouldContain "Brewed 7 Oct · fermenting, day 9"
     }
 
     @Test
-    fun `should count the days in the bottle once packaged and stop asking for readings`() {
+    fun `should say when a batch was packaged and stop asking for readings`() {
         val recipe = recipe()
         val batch = sampleBatch(brewDate = LocalDate.of(2025, 12, 1), packagedDate = LocalDate.of(2026, 10, 1), measuredOg = 1.052)
 
         val card = batchCard(recipe, batch, recipe.stats(), today)
 
-        card shouldContain "Packaged 1 Oct · 15 days in the bottle · brewed 1 Dec 2025"
+        card shouldContain "Brewed 1 Dec 2025 · packaged 1 Oct"
         card shouldNotContain "Still to log"
     }
 
