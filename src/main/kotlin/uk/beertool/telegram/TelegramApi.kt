@@ -8,6 +8,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -87,6 +88,8 @@ class HttpTelegramApi(private val token: String, pollTimeoutSeconds: Int) : Tele
             client.post("https://api.telegram.org/bot$token/$method") {
                 setBody(TextContent(TelegramJson.encodeToString(requestSerializer, request), ContentType.Application.Json))
             }.bodyAsText()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             // Transport errors can quote the request URL, and the URL carries the bot token.
             throw TelegramException(null, "$method failed: ${e::class.simpleName}: ${e.message?.replace(token, "<token>")}")
