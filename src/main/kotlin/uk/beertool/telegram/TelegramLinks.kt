@@ -13,12 +13,10 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
-import java.security.MessageDigest
-import java.security.SecureRandom
+import uk.beertool.auth.Secrets
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.Base64
 
 object TelegramLinks : Table("telegram_links") {
     val telegramUserId = long("telegram_user_id")
@@ -47,13 +45,11 @@ val LINK_TOKEN_TTL: Duration = Duration.ofMinutes(15)
 
 object TelegramLinkRepository {
 
-    private val random = SecureRandom()
-
     fun issueToken(userId: Long, now: Instant = Instant.now()): String = transaction {
-        val token = ByteArray(32).also(random::nextBytes).let(Base64.getUrlEncoder().withoutPadding()::encodeToString)
+        val token = Secrets.newToken()
         TelegramLinkTokens.deleteWhere { (TelegramLinkTokens.userId eq userId) or (TelegramLinkTokens.expiresAt lessEq now) }
         TelegramLinkTokens.insert {
-            it[tokenHash] = sha256(token)
+            it[tokenHash] = Secrets.sha256(token)
             it[TelegramLinkTokens.userId] = userId
             it[expiresAt] = now.plus(LINK_TOKEN_TTL).truncatedTo(ChronoUnit.MICROS)
         }
@@ -61,7 +57,7 @@ object TelegramLinkRepository {
     }
 
     fun redeem(token: String, telegramUserId: Long, chatId: Long, now: Instant = Instant.now()): TelegramLink? = transaction {
-        val hash = sha256(token)
+        val hash = Secrets.sha256(token)
         val userId = TelegramLinkTokens.selectAll()
             .where { (TelegramLinkTokens.tokenHash eq hash) and (TelegramLinkTokens.expiresAt greater now) }
             .singleOrNull()
@@ -93,9 +89,6 @@ object TelegramLinkRepository {
     fun setCurrentBatch(telegramUserId: Long, batchId: Long?) = transaction {
         TelegramLinks.update({ TelegramLinks.telegramUserId eq telegramUserId }) { it[currentBatchId] = batchId }
     }
-
-    private fun sha256(token: String) =
-        MessageDigest.getInstance("SHA-256").digest(token.toByteArray()).joinToString("") { "%02x".format(it) }
 
     private fun ResultRow.toLink() = TelegramLink(
         telegramUserId = this[TelegramLinks.telegramUserId],

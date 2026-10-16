@@ -17,6 +17,12 @@ class Logout
 @Resource("/settings")
 class Settings(val saved: Boolean = false)
 
+@Resource("/settings/tokens")
+class SettingsTokens
+
+@Resource("/settings/tokens/{id}/revoke")
+class SettingsTokenRevoke(val id: Long)
+
 @Resource("/settings/telegram")
 class SettingsTelegram
 

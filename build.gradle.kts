@@ -33,6 +33,7 @@ dependencies {
     implementation(libs.ktor.server.resources)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
+    implementation(libs.mcp.server)
     implementation(libs.serialization.properties)
     implementation(libs.serialization.json)
 

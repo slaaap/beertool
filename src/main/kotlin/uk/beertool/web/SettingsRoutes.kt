@@ -8,7 +8,13 @@ import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.recipe.MashStep
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.origin
+import uk.beertool.mcp.ApiTokenRepository
+import uk.beertool.mcp.MCP_PATH
+import uk.beertool.mcp.Mcp
 import uk.beertool.telegram.Telegram
+import java.time.ZoneId
 import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
@@ -46,7 +52,7 @@ fun SettingsForm.toPreferences(current: BrewerPreferences) = current.copy(
 fun Route.settingsRoutes() {
     get<Settings> { res ->
         withUser(write = true) { call, user ->
-            call.respondHtml { settingsPage(user, saved = res.saved) }
+            call.respondHtml { settingsPage(user, saved = res.saved, mcpEndpoint = call.mcpEndpoint()) }
         }
     }
 
@@ -55,6 +61,22 @@ fun Route.settingsRoutes() {
             val updated = call.receiveForm<SettingsForm>().toPreferences(user.preferences)
             UserRepository.updatePreferences(user.id, updated)
             call.respondRedirect("/settings?saved=true")
+        }
+    }
+
+    post<SettingsTokens> {
+        withUser(write = true) { call, user ->
+            if (!Mcp.enabled) return@withUser call.respondRedirect("/settings")
+            val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
+            val token = ApiTokenRepository.create(user.id, name)
+            call.respondHtml { settingsPage(user, saved = false, mcpEndpoint = call.mcpEndpoint(), newToken = NewToken(name, token)) }
+        }
+    }
+
+    post<SettingsTokenRevoke> { res ->
+        withUser(write = true) { call, user ->
+            ApiTokenRepository.revoke(res.id, user.id)
+            call.respondRedirect("/settings")
         }
     }
 
@@ -74,7 +96,12 @@ fun Route.settingsRoutes() {
     }
 }
 
-fun HTML.settingsPage(user: User, saved: Boolean) {
+data class NewToken(val name: String, val token: String)
+
+@Serializable
+data class TokenForm(val name: String = "")
+
+fun HTML.settingsPage(user: User, saved: Boolean, mcpEndpoint: String? = null, newToken: NewToken? = null) {
     val prefs = user.preferences
     page("Settings", user) {
         h1 { +"Brewing preferences" }
@@ -159,6 +186,7 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
         }
 
         if (Telegram.enabled) telegramSection(user)
+        mcpEndpoint?.let { assistantSection(user, it, newToken) }
 
         table { style = "display:none"; tbody { id = "sm-proto"; mashPrefRow(0, null) } }
 
@@ -174,6 +202,50 @@ private fun FlowContent.telegramSection(user: User) {
     } else {
         p("muted") { +"Connected to @${Telegram.botUsername}." }
         actionBar { btnPost("/settings/telegram/unlink", "Disconnect", Icon.TRASH, style = ButtonStyle.DANGER) }
+    }
+}
+
+private fun ApplicationCall.mcpEndpoint(): String? {
+    if (!Mcp.enabled) return null
+    val base = Mcp.publicUrl ?: request.origin.let { o ->
+        val port = if (o.serverPort == 80 || o.serverPort == 443) "" else ":${o.serverPort}"
+        "${o.scheme}://${o.serverHost}$port"
+    }
+    return base + MCP_PATH
+}
+
+private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
+    sectionHead("AI assistant")
+    p("muted") { +"MCP endpoint "; code { +endpoint } }
+    newToken?.let {
+        div("token-box") {
+            p { strong { +"Copy the token for “${it.name}” now." }; +" It won't be shown again." }
+            code("token") { +it.token }
+            p("muted") { +"To connect Claude Code:" }
+            code("token") { +"claude mcp add --transport http beertool $endpoint --header \"Authorization: Bearer ${it.token}\"" }
+        }
+    }
+    val tokens = ApiTokenRepository.listByUser(user.id)
+    if (tokens.isNotEmpty()) {
+        table {
+            thead { tr { th { +"Token" }; th { +"Created" }; th { +"Last used" }; th {} } }
+            tbody {
+                tokens.forEach { t ->
+                    tr {
+                        td { +t.name }
+                        td { +fmt(t.createdAt.atZone(ZoneId.systemDefault()).toLocalDate()) }
+                        td { +(t.lastUsedAt?.atZone(ZoneId.systemDefault())?.toLocalDate()?.toString() ?: "never") }
+                        td("right") { deleteButton("/settings/tokens/${t.id}/revoke", "Revoke “${t.name}”? Anything using it will lose access.") }
+                    }
+                }
+            }
+        }
+    }
+    form(action = "/settings/tokens", method = FormMethod.post) {
+        fieldGrid(columns = 2) {
+            field("New token name") { textInput(name = "name") { placeholder = "e.g. Claude Code on my laptop" } }
+        }
+        actionBar { submitInput(classes = "btn") { value = "Create token" } }
     }
 }
 

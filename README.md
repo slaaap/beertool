@@ -19,6 +19,8 @@ including a phone-first **Brew Day** mode for using it at the kettle.
   open pre-filled from them.
 - **Telegram bot** (optional) - browse and search recipes, share recipe cards inline in any chat, get the
   brew day plan, a boil timer that messages you at each addition, and log readings by just typing `og 1.052`.
+- **AI assistant access** (optional) - an MCP endpoint, so an assistant such as Claude can read your recipes
+  and brew log, estimate drafts with beertool's own maths, and save recipes you agree on.
 - **Two modes** — multi-user with accounts, or a **single-user public-showcase mode** where visitors browse
   one brewer's recipes read-only.
 
@@ -51,7 +53,8 @@ All configuration is via environment variables:
 | `SINGLE_USER_EMAIL` | *(unset → normal multi-user mode)*                | Enables single-user mode for this account (see below)         |
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
 | `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
-| `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site |
+| `MCP_ENABLED`       | *(unset → off)*                                   | `true` turns on the MCP endpoint at `/mcp` (see below)        |
+| `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site, and the MCP endpoint accepts requests for this host |
 
 Example, pointing at a real database:
 
@@ -118,6 +121,36 @@ Notes:
   website; only the linked owner can log brews.
 - A bot token can be polled by **one** running app at a time. Use a separate bot for development, or
   Telegram will answer the second instance with "Conflict" errors.
+
+## AI assistant (MCP, optional)
+
+With `MCP_ENABLED=true`, beertool serves the [Model Context Protocol](https://modelcontextprotocol.io) at
+`/mcp`, so an AI assistant can work with your recipes. Each brewer creates their own access token in
+**Settings → AI assistant**; the token only ever reaches that brewer's data.
+
+To connect [Claude Code](https://claude.com/claude-code), copy the command Settings shows after you create
+a token:
+
+```bash
+claude mcp add --transport http beertool https://beer.example.com/mcp --header "Authorization: Bearer bt_…"
+```
+
+Then ask it things like *"design a 5% citra pale ale for my kit"* or *"why did my last stout finish
+high?"*. The tools it gets:
+
+| Tool                 | What it does                                                                 |
+|----------------------|------------------------------------------------------------------------------|
+| `get_brewer_profile` | Your kit volumes, efficiency, boil and default mash, so drafts fit your setup |
+| `search_recipes`     | Find recipes by name or ingredient                                           |
+| `get_recipe`         | A whole recipe with its estimate and every brew of it                        |
+| `list_brews`         | The brew log with measured figures and notes                                 |
+| `find_styles`        | BJCP 2021 style names                                                        |
+| `estimate_recipe`    | OG, FG, ABV, IBU and colour for a draft, without saving it                   |
+| `create_recipe`      | Save a new recipe                                                            |
+| `update_recipe`      | Replace an existing recipe                                                   |
+
+Revoke a token in Settings and anything using it loses access at once. Set `PUBLIC_URL` in production:
+requests addressed to any other host are refused, which protects the endpoint against DNS rebinding.
 
 ## Build a standalone jar
 

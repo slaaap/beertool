@@ -8,6 +8,7 @@ import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.resources.Resources
 import uk.beertool.auth.configureSecurity
 import uk.beertool.db.DatabaseFactory
+import uk.beertool.mcp.configureMcp
 import uk.beertool.telegram.configureTelegram
 import uk.beertool.web.configureRouting
 
@@ -23,5 +24,6 @@ fun Application.module() {
     install(Resources)
     configureSecurity()
     configureRouting()
+    configureMcp()
     configureTelegram()
 }
