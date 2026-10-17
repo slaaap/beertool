@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.UserSession
 import uk.beertool.user.UserRepository
+import java.net.URI
 
 @Serializable
 data class RegisterForm(val email: String = "", val displayName: String = "", val password: String = "")
@@ -21,9 +22,11 @@ data class RegisterForm(val email: String = "", val displayName: String = "", va
 @Serializable
 data class LoginForm(val email: String = "", val password: String = "", val next: String = "")
 
-// Only same-site paths, so a crafted link can't bounce a fresh login to another site.
-internal fun safeNext(next: String?): String? =
-    next?.takeIf { it.startsWith("/") && !it.startsWith("//") && '\\' !in it }
+// Only a plain same-site path: browsers drop tabs and newlines from URLs, so "/\t/evil.example" would leave the site.
+internal fun safeNext(next: String?): String? = next?.takeIf { path ->
+    path.startsWith("/") && !path.startsWith("//") && path.none { it.code < 0x20 || it.code == 0x7f || it == '\\' } &&
+        runCatching { URI(path) }.getOrNull()?.let { it.scheme == null && it.rawAuthority == null } == true
+}
 
 fun Route.authRoutes() {
     get<Register> {

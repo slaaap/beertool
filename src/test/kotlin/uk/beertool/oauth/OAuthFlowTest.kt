@@ -159,6 +159,16 @@ class OAuthFlowTest {
     }
 
     @Test
+    fun `should send a brewer to the recipes, not another site, when the login link is tampered with`() = oauthApp { client ->
+        val email = "tamper-${UUID.randomUUID()}@beertool.test"
+        UserRepository.create(email, PasswordHasher.hash("secret123"), "Brewer")
+
+        val loggedIn = client.form("/login", listOf("email" to email, "password" to "secret123", "next" to "/\t/evil.example"))
+
+        loggedIn.headers[HttpHeaders.Location] shouldBe "/recipes"
+    }
+
+    @Test
     fun `should not let a showcase visitor approve access`() = oauthApp { client ->
         val owner = "owner-${UUID.randomUUID()}@beertool.test"
         UserRepository.create(owner, PasswordHasher.hash("secret123"), "Owner")
