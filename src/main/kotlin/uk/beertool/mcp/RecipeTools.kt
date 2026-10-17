@@ -29,6 +29,7 @@ import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.RecipeStats
+import uk.beertool.recipe.RecipeWater
 import uk.beertool.recipe.TARGET_MASH_PH
 import uk.beertool.recipe.WaterReport
 import uk.beertool.recipe.YeastUsage
@@ -245,13 +246,7 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
                 })
             }
         }
-        r.water?.let { w ->
-            put("water", buildJsonObject {
-                put("source", w.source); put("blendSource", w.blendSource); put("blendPercent", w.blendPercent)
-                put("gypsumG", w.gypsumG); put("calciumChlorideG", w.calciumChlorideG); put("epsomG", w.epsomG)
-                put("tableSaltG", w.tableSaltG); put("bakingSodaG", w.bakingSodaG); put("lacticMl", w.lacticMl)
-            })
-        }
+        r.water?.let { put("water", waterInputJson(it)) }
     }
 
     private fun brewJson(recipe: Recipe, b: Batch) = buildJsonObject {
@@ -269,6 +264,10 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         put("postBoilVolumeL", b.measuredPostBoilVolumeL)
         put("fermenterVolumeL", b.measuredFermenterVolumeL)
         put("notes", b.notes)
+        b.water?.let { snapshot ->
+            put("water", waterInputJson(snapshot.water))
+            put("waterEstimate", waterJson(recipe.waterReport(snapshot, prefs)))
+        }
     }
 }
 
@@ -289,6 +288,12 @@ private fun ions(p: WaterProfile) = buildJsonObject {
     put("chloride", round(p.chloride, 1))
     put("sulphate", round(p.sulphate, 1))
     put("bicarbonate", round(p.bicarbonate, 1))
+}
+
+private fun waterInputJson(w: RecipeWater) = buildJsonObject {
+    put("source", w.source); put("blendSource", w.blendSource); put("blendPercent", w.blendPercent)
+    put("gypsumG", w.gypsumG); put("calciumChlorideG", w.calciumChlorideG); put("epsomG", w.epsomG)
+    put("tableSaltG", w.tableSaltG); put("bakingSodaG", w.bakingSodaG); put("lacticMl", w.lacticMl)
 }
 
 private fun waterJson(r: WaterReport) = buildJsonObject {

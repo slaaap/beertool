@@ -7,6 +7,7 @@ import uk.beertool.batch.BatchSummary
 import uk.beertool.batch.stats
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
+import uk.beertool.recipe.waterReport
 import uk.beertool.user.User
 import java.time.LocalDate
 
@@ -91,6 +92,8 @@ fun HTML.batchViewPage(user: User, batch: Batch, recipe: Recipe, estimate: Recip
         sectionHead("Recipe estimate")
         div("stats") { statsTiles(estimate) }
         p("muted") { +"Assumed efficiency ${fmt(recipe.efficiency.asPercent(), 0)}%." }
+
+        batch.water?.let { waterSummary(it.water, recipe.waterReport(it, user.preferences)) }
 
         batch.notes?.takeIf { it.isNotBlank() }?.let {
             sectionHead("Notes")

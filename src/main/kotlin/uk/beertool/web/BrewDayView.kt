@@ -26,7 +26,6 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 p("muted") { +"No mash schedule on this recipe." }
             } else {
                 mashWaterGuide(recipe, user)
-                brewDayWater(recipe, user.preferences)
                 table("mash-plan") {
                     thead { tr { th { +"Rest" }; th(classes = "num") { +"Temp (°C)" }; th(classes = "num") { +"Time (min)" } } }
                     tbody {
@@ -40,6 +39,8 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                     }
                 }
             }
+
+            brewDayWater(recipe, batch, user.preferences)
 
             sectionHead("Boil")
             div("boil-clock") {

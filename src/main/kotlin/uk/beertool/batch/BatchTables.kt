@@ -3,6 +3,9 @@ package uk.beertool.batch
 import org.jetbrains.exposed.v1.core.dao.id.LongIdTable
 import org.jetbrains.exposed.v1.javatime.date
 import org.jetbrains.exposed.v1.javatime.timestamp
+import org.jetbrains.exposed.v1.json.jsonb
+import uk.beertool.recipe.WaterSnapshot
+import uk.beertool.user.PrefsJson
 
 object Batches : LongIdTable("batches") {
     val recipeId = long("recipe_id")
@@ -19,4 +22,5 @@ object Batches : LongIdTable("batches") {
     val abv = decimal("abv", 4, 2).nullable()
     val mashEfficiency = decimal("mash_efficiency", 4, 3).nullable()
     val createdAt = timestamp("created_at")
+    val water = jsonb("water", PrefsJson, WaterSnapshot.serializer()).nullable()
 }

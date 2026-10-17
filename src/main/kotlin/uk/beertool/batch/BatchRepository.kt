@@ -14,8 +14,11 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.Recipes
+import uk.beertool.recipe.WaterSnapshot
 import uk.beertool.recipe.lateAdditionAbv
 import uk.beertool.recipe.measuredEfficiency
+import uk.beertool.recipe.snapshot
+import uk.beertool.user.UserRepository
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -41,6 +44,7 @@ object BatchRepository {
             it[Batches.userId] = userId
             it[no] = nextNo
             it[createdAt] = Instant.now().truncatedTo(ChronoUnit.MICROS)
+            it[water] = plannedWater(userId, draft.recipeId)
         }.value
         findById(id, userId)
     }
@@ -107,6 +111,13 @@ object BatchRepository {
         if (rows == 0) null else findById(id, userId)
     }
 
+    fun updateWater(id: Long, userId: Long, snapshot: WaterSnapshot?): Batch? = transaction {
+        val rows = Batches.update({ (Batches.id eq id) and (Batches.userId eq userId) and Batches.measuredOg.isNull() }) {
+            it[water] = snapshot
+        }
+        if (rows == 0) null else findById(id, userId)
+    }
+
     fun markPackaged(id: Long, userId: Long, on: LocalDate): Batch? = transaction {
         val rows = Batches.update({ (Batches.id eq id) and (Batches.userId eq userId) }) {
             it[packagedDate] = on
@@ -155,6 +166,12 @@ object BatchRepository {
         )
     }
 
+    private fun plannedWater(userId: Long, recipeId: Long): WaterSnapshot? {
+        val water = RecipeRepository.findById(recipeId, userId)?.water ?: return null
+        val prefs = UserRepository.findById(userId)?.preferences ?: return null
+        return prefs.snapshot(water)
+    }
+
     private fun ownsRecipe(userId: Long, recipeId: Long) =
         Recipes.selectAll()
             .where { (Recipes.id eq recipeId) and (Recipes.userId eq userId) }
@@ -183,5 +200,6 @@ object BatchRepository {
         abv = this[Batches.abv]?.toDouble(),
         mashEfficiency = this[Batches.mashEfficiency]?.toDouble(),
         createdAt = this[Batches.createdAt],
+        water = this[Batches.water],
     )
 }

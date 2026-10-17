@@ -1,5 +1,6 @@
 package uk.beertool.batch
 
+import uk.beertool.recipe.WaterSnapshot
 import java.time.Instant
 import java.time.LocalDate
 
@@ -24,6 +25,9 @@ data class Batch(
 
     val mashEfficiency: Double?,
     val createdAt: Instant,
+    val water: WaterSnapshot? = null,
 ) {
+    val waterLocked get() = measuredOg != null
+
     val isOnBrewDay get() = packagedDate == null && measuredOg == null
 }

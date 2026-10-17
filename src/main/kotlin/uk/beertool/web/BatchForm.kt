@@ -27,3 +27,6 @@ fun BatchForm.toNewBatch(recipeId: Long): NewBatch = NewBatch(
     measuredFermenterVolumeL = measuredFermenterVolumeL,
     notes = notes.trim().ifBlank { null },
 )
+
+@Serializable
+data class BrewWaterForm(val water: WaterForm = WaterForm())

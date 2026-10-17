@@ -8,6 +8,7 @@ import uk.beertool.brewing.SaltAddition
 import uk.beertool.brewing.WaterChemistry
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.user.BrewerPreferences
+import uk.beertool.user.WaterSource
 
 const val TARGET_MASH_PH = 5.4
 const val MIN_MASH_PH = 5.2
@@ -39,6 +40,16 @@ data class RecipeWater(
 }
 
 const val DISTILLED_WATER = "Distilled / RO"
+
+// What a brew was made with: the sources are copied so later edits in Settings leave the brew log alone.
+@Serializable
+data class WaterSnapshot(
+    val water: RecipeWater,
+    val sources: List<WaterSource>,
+)
+
+fun BrewerPreferences.snapshot(water: RecipeWater) =
+    WaterSnapshot(water, waterSources.filter { it.name == water.source || it.name == water.blendSource })
 
 fun BrewerPreferences.defaultRecipeWater() = waterSources.firstOrNull()?.let { RecipeWater(source = it.name) }
 
@@ -85,13 +96,17 @@ data class WaterReport(
 }
 
 fun Recipe.waterReport(prefs: BrewerPreferences): WaterReport? =
-    water?.let { waterReport(it, fermentables, preBoilVolumeL, postBoilVolumeL, prefs) }
+    water?.let { waterReport(it, prefs.waterSources, fermentables, preBoilVolumeL, postBoilVolumeL, prefs) }
 
 fun NewRecipe.waterReport(prefs: BrewerPreferences): WaterReport? =
-    water?.let { waterReport(it, fermentables, preBoilVolumeL, postBoilVolumeL, prefs) }
+    water?.let { waterReport(it, prefs.waterSources, fermentables, preBoilVolumeL, postBoilVolumeL, prefs) }
+
+fun Recipe.waterReport(snapshot: WaterSnapshot, prefs: BrewerPreferences): WaterReport =
+    waterReport(snapshot.water, snapshot.sources, fermentables, preBoilVolumeL, postBoilVolumeL, prefs)
 
 private fun waterReport(
     water: RecipeWater,
+    sources: List<WaterSource>,
     fermentables: List<RecipeFermentable>,
     preBoilVolumeL: Double?,
     postBoilVolumeL: Double,
@@ -100,7 +115,7 @@ private fun waterReport(
     val missing = mutableListOf<String>()
     fun profileOf(name: String?): WaterProfile {
         if (name == null) return WaterProfile.DISTILLED
-        return prefs.waterSources.find { it.name == name }?.profile ?: WaterProfile.DISTILLED.also { missing += name }
+        return sources.find { it.name == name }?.profile ?: WaterProfile.DISTILLED.also { missing += name }
     }
 
     val base = profileOf(water.source)

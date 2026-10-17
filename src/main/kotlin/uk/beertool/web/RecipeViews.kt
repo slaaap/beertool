@@ -9,6 +9,7 @@ import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
 import uk.beertool.recipe.unmaltedFraction
+import uk.beertool.recipe.waterReport
 import uk.beertool.recipe.inBrewOrder
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
@@ -204,7 +205,7 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
             emptyCell()
         }
 
-        waterViewSection(recipe, user.preferences)
+        waterSummary(recipe.water, recipe.waterReport(user.preferences))
 
         sectionHead("Brews") {
             if (user.canWrite) btnLink("/recipes/${recipe.no}/batches/new", "Log a brew", Icon.BREW)

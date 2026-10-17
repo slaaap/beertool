@@ -7,6 +7,7 @@ import io.ktor.server.resources.post
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import uk.beertool.batch.BatchRepository
+import uk.beertool.recipe.snapshot
 import uk.beertool.recipe.stats
 import java.time.LocalDate
 
@@ -27,6 +28,9 @@ class BatchEditRes(val recipeNo: Int, val no: Int, val packageToday: Boolean = f
 
 @Resource("/recipes/{recipeNo}/batches/{no}/brew")
 class BatchBrewRes(val recipeNo: Int, val no: Int, val saved: Boolean = false)
+
+@Resource("/recipes/{recipeNo}/batches/{no}/water")
+class BatchWaterRes(val recipeNo: Int, val no: Int)
 
 @Resource("/recipes/{recipeNo}/batches/{no}/packaged")
 class BatchPackagedRes(val recipeNo: Int, val no: Int)
@@ -95,6 +99,14 @@ fun Route.batchRoutes() {
         withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
             BatchRepository.update(batch.id, user.id, call.receiveForm<BatchForm>().toNewBatch(recipe.id))
             call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}/brew?saved=true")
+        }
+    }
+
+    post<BatchWaterRes> { res ->
+        withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
+            val water = call.receiveForm<BrewWaterForm>().water.toRecipeWater()
+            BatchRepository.updateWater(batch.id, user.id, water?.let { user.preferences.snapshot(it) })
+            call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}/brew#water")
         }
     }
 
