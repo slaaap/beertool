@@ -43,7 +43,7 @@ data class McpConfig(val publicUrl: String?, val trustedClientHosts: Set<String>
             ?.let { OAuthConfig(it, MCP_PATH) }
 
     companion object {
-        val DEFAULT_CLIENT_HOSTS = setOf("claude.ai")
+        val DEFAULT_CLIENT_HOSTS = setOf("claude.ai", "chatgpt.com")
 
         fun fromEnv(env: (String) -> String? = System::getenv): McpConfig? {
             if (env("MCP_ENABLED")?.trim()?.equals("true", ignoreCase = true) != true) return null
