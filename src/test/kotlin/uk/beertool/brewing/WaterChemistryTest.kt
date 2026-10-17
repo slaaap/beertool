@@ -1,0 +1,124 @@
+package uk.beertool.brewing
+
+import io.kotest.matchers.doubles.plusOrMinus
+import io.kotest.matchers.doubles.shouldBeGreaterThan
+import io.kotest.matchers.doubles.shouldBeLessThan
+import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.Test
+
+class WaterChemistryTest {
+
+    private val londonTap = WaterProfile(calcium = 99.0, magnesium = 4.5, sodium = 30.0, chloride = 45.0, sulphate = 47.0, bicarbonate = 250.0)
+    private val paleGrist = listOf(FermentableAddition(extractPercent = 80.0, colourEbc = 6.0, massKg = 5.0))
+
+    @Test
+    fun `should add the published ion yield of a gram of gypsum in a litre`() {
+        val salts = listOf(SaltAddition(Salt.GYPSUM, 1.0))
+
+        val water = WaterChemistry.withSalts(WaterProfile.DISTILLED, salts, volumeL = 1.0)
+
+        water.calcium shouldBe (232.8 plusOrMinus 0.5)
+        water.sulphate shouldBe (557.9 plusOrMinus 0.5)
+    }
+
+    @Test
+    fun `should count calcium chloride flakes as the dihydrate`() {
+        val salts = listOf(SaltAddition(Salt.CALCIUM_CHLORIDE, 1.0))
+
+        val water = WaterChemistry.withSalts(WaterProfile.DISTILLED, salts, volumeL = 1.0)
+
+        water.calcium shouldBe (272.6 plusOrMinus 0.5)
+        water.chloride shouldBe (482.3 plusOrMinus 0.5)
+    }
+
+    @Test
+    fun `should spread salts over the whole volume they are dissolved in`() {
+        val salts = listOf(SaltAddition(Salt.TABLE_SALT, 2.0))
+
+        val water = WaterChemistry.withSalts(londonTap, salts, volumeL = 20.0)
+
+        water.sodium shouldBe (30.0 + 2.0 * 393.4 / 20.0 plusOrMinus 0.1)
+        water.calcium shouldBe 99.0
+    }
+
+    @Test
+    fun `should mix two waters in proportion`() {
+        val soft = WaterProfile(calcium = 11.0, bicarbonate = 25.0)
+
+        val mixed = WaterChemistry.blend(londonTap, soft, otherFraction = 0.4)
+
+        mixed.calcium shouldBe (99.0 * 0.6 + 11.0 * 0.4 plusOrMinus 0.001)
+        mixed.bicarbonate shouldBe (250.0 * 0.6 + 25.0 * 0.4 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should let calcium cancel part of hard water's alkalinity`() {
+        val ra = londonTap.residualAlkalinityMeqPerL
+
+        ra shouldBe (2.64 plusOrMinus 0.02)
+        ra shouldBeLessThan londonTap.bicarbonate / 61.017
+    }
+
+    @Test
+    fun `should land a pale grist near its distilled water pH in distilled water`() {
+        val ph = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, strikeL = 15.0, lacticMl = 0.0)!!
+
+        ph shouldBe (5.70 plusOrMinus 0.05)
+    }
+
+    @Test
+    fun `should give a dark grist a lower mash pH than a pale one`() {
+        val dark = paleGrist + FermentableAddition(extractPercent = 70.0, colourEbc = 1000.0, massKg = 0.5)
+
+        val palePh = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, 15.0, 0.0)!!
+        val darkPh = WaterChemistry.mashPh(dark, WaterProfile.DISTILLED, 16.5, 0.0)!!
+
+        darkPh shouldBeLessThan palePh - 0.05
+    }
+
+    @Test
+    fun `should raise mash pH by about Kolbach's 0_3 for 10 degrees German of residual alkalinity`() {
+        val alkaline = WaterProfile(bicarbonate = 10 * 17.8 * 1.22)
+
+        val distilled = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, strikeL = 15.0, lacticMl = 0.0)!!
+        val hard = WaterChemistry.mashPh(paleGrist, alkaline, strikeL = 15.0, lacticMl = 0.0)!!
+
+        hard - distilled shouldBe (0.3 plusOrMinus 0.05)
+    }
+
+    @Test
+    fun `should bring the mash pH down as lactic acid goes in`() {
+        val without = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, lacticMl = 0.0)!!
+        val with = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, lacticMl = 5.0)!!
+
+        without shouldBeGreaterThan 5.8
+        with shouldBeLessThan without - 0.2
+    }
+
+    @Test
+    fun `should suggest the lactic acid that hits the target pH exactly`() {
+        val ml = WaterChemistry.lacticForPh(5.4, paleGrist, londonTap, strikeL = 15.0)!!
+
+        val ph = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, ml)!!
+
+        ph shouldBe (5.4 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should suggest no acid for a mash already below the target`() {
+        val roast = listOf(FermentableAddition(extractPercent = 70.0, colourEbc = 1000.0, massKg = 5.0))
+
+        val ml = WaterChemistry.lacticForPh(5.4, roast, WaterProfile.DISTILLED, strikeL = 15.0)
+
+        ml shouldBe 0.0
+    }
+
+    @Test
+    fun `should not guess a mash pH when nothing is mashed`() {
+        val extract = listOf(FermentableAddition(extractPercent = 95.0, colourEbc = 15.0, massKg = 3.0, mashed = false))
+
+        WaterChemistry.mashPh(extract, londonTap, strikeL = 15.0, lacticMl = 0.0).shouldBeNull()
+        WaterChemistry.lacticForPh(5.4, extract, londonTap, strikeL = 15.0).shouldBeNull()
+    }
+}

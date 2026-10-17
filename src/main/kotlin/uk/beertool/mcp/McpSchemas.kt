@@ -85,6 +85,22 @@ private val EXTRA = objectOf(
     listOf("name", "amount"),
 )
 
+private val WATER = objectOf(
+    mapOf(
+        "source" to string("Name of one of the brewer's waterSources. Omit for distilled or RO water"),
+        "blendSource" to string("A second water to mix in, by name. Omit for distilled or RO water"),
+        "blendPercent" to number("Share of the mix that is blendSource, %. 0 or omitted means no mix"),
+        "gypsumG" to number("Gypsum (calcium sulphate), grams for all the brewing water"),
+        "calciumChlorideG" to number("Calcium chloride flakes (dihydrate), grams for all the brewing water"),
+        "epsomG" to number("Epsom salt (magnesium sulphate), grams for all the brewing water"),
+        "tableSaltG" to number("Table salt (sodium chloride), grams for all the brewing water"),
+        "bakingSodaG" to number("Baking soda (sodium bicarbonate), grams for all the brewing water"),
+        "lacticMl" to number("Lactic acid 80%, ml, added to the mash"),
+    ),
+    emptyList(),
+    "Brewing water and its treatment. Salts are dosed across strike and sparge water in proportion.",
+)
+
 private val RECIPE = objectOf(
     mapOf(
         "name" to string("Recipe name"),
@@ -99,7 +115,8 @@ private val RECIPE = objectOf(
         "fermentables" to arrayProp("Grain bill and other fermentables", FERMENTABLE),
         "hops" to arrayProp("Hop additions", HOP),
         "yeasts" to arrayProp("Yeasts", YEAST),
-        "extras" to arrayProp("Finings, salts, spices, adjuncts that add no sugar", EXTRA),
+        "extras" to arrayProp("Finings, spices, adjuncts that add no sugar. Water salts and acid belong in water", EXTRA),
+        "water" to WATER,
     ),
     listOf("name"),
     "A whole recipe. Units: kg, g, litres, °C, minutes; efficiency and attenuation as percentages.",

@@ -1,6 +1,7 @@
 package uk.beertool.user
 
 import kotlinx.serialization.Serializable
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.brewing.Whirlpool
 import uk.beertool.recipe.BOIL_OFF_L
 import uk.beertool.recipe.DEFAULT_BOIL_TIME_MIN
@@ -30,8 +31,16 @@ data class BrewerPreferences(
 
     val mashThicknessLPerKg: Double = DEFAULT_MASH_THICKNESS_L_PER_KG,
     val grainAbsorptionLPerKg: Double = DEFAULT_GRAIN_ABSORPTION_L_PER_KG,
+
+    val waterSources: List<WaterSource> = emptyList(),
 ) {
     val postBoilVolumeL: Double get() = preBoilVolumeL - boilOffL
     val fermenterVolumeL: Double get() = postBoilVolumeL - kettleRetentionL
     val whirlpool: Whirlpool get() = Whirlpool(whirlpoolTempC, coolingTimeMin)
 }
+
+@Serializable
+data class WaterSource(
+    val name: String,
+    val profile: WaterProfile,
+)

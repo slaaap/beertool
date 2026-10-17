@@ -100,6 +100,8 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
                 recipe?.extras.orEmpty().inBrewOrder().forEachIndexed { i, e -> extraRow(i, e) }
             }
 
+            waterFormSection(recipe, prefs)
+
             sectionHead("Estimates")
             div { id = "stats"; div("stats") { statsTiles(stats) } }
         }

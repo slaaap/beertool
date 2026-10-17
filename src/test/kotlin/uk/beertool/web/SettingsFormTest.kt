@@ -2,9 +2,11 @@ package uk.beertool.web
 
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.brewing.Whirlpool
 import uk.beertool.recipe.MashStep
 import uk.beertool.user.BrewerPreferences
+import uk.beertool.user.WaterSource
 
 class SettingsFormTest {
 
@@ -49,6 +51,29 @@ class SettingsFormTest {
         val merged = form.toPreferences(BrewerPreferences())
 
         merged.mashSteps shouldBe listOf(MashStep(66.0, 60))
+    }
+
+    @Test
+    fun `should save each named water source and drop a row left without a name`() {
+        val form = SettingsForm(
+            waterSources = listOf(
+                WaterSourceRow("London tap", calcium = 99.0, bicarbonate = 250.0),
+                WaterSourceRow("", calcium = 10.0),
+            ),
+        )
+
+        val merged = form.toPreferences(BrewerPreferences())
+
+        merged.waterSources shouldBe listOf(WaterSource("London tap", WaterProfile(calcium = 99.0, bicarbonate = 250.0)))
+    }
+
+    @Test
+    fun `should keep only the first of two water sources with the same name`() {
+        val form = SettingsForm(waterSources = listOf(WaterSourceRow("Tap", calcium = 99.0), WaterSourceRow("Tap", calcium = 50.0)))
+
+        val merged = form.toPreferences(BrewerPreferences())
+
+        merged.waterSources.single().profile.calcium shouldBe 99.0
     }
 
     @Test

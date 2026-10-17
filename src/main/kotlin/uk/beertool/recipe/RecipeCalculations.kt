@@ -87,7 +87,7 @@ private fun estimate(
     )
 }
 
-private fun RecipeFermentable.toCalcInput() = FermentableAddition(
+internal fun RecipeFermentable.toCalcInput() = FermentableAddition(
     extractPercent = extractPercent ?: type.guessExtractPercent(),
     colourEbc = colourEbc ?: type.guessColourEbc(),
     massKg = amountKg,

@@ -2,7 +2,9 @@ package uk.beertool.recipe
 
 import org.jetbrains.exposed.v1.core.dao.id.LongIdTable
 import org.jetbrains.exposed.v1.javatime.timestamp
+import org.jetbrains.exposed.v1.json.jsonb
 import uk.beertool.db.tsvector
+import uk.beertool.user.PrefsJson
 
 object Recipes : LongIdTable("recipes") {
     val userId = long("user_id")
@@ -15,6 +17,7 @@ object Recipes : LongIdTable("recipes") {
     val fermenterVolumeL = decimal("fermenter_volume_l", 6, 2)
     val efficiency = decimal("efficiency", 4, 3)
     val boilTimeMin = integer("boil_time_min")
+    val water = jsonb("water", PrefsJson, RecipeWater.serializer()).nullable()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at")
 

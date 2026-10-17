@@ -25,6 +25,7 @@ data class Recipe(
     val hops: List<RecipeHop>,
     val yeasts: List<RecipeYeast>,
     val extras: List<RecipeExtra>,
+    val water: RecipeWater? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

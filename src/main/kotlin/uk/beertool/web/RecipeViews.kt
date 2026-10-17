@@ -204,6 +204,8 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
             emptyCell()
         }
 
+        waterViewSection(recipe, user.preferences)
+
         sectionHead("Brews") {
             if (user.canWrite) btnLink("/recipes/${recipe.no}/batches/new", "Log a brew", Icon.BREW)
         }

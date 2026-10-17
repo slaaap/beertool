@@ -13,6 +13,7 @@ import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.RecipeExtra
 import uk.beertool.recipe.RecipeFermentable
 import uk.beertool.recipe.RecipeHop
+import uk.beertool.recipe.RecipeWater
 import uk.beertool.recipe.RecipeYeast
 import uk.beertool.recipe.YeastUsage
 import uk.beertool.user.BrewerPreferences
@@ -32,7 +33,39 @@ data class RecipeForm(
     val hops: List<HopRow> = emptyList(),
     val yeasts: List<YeastRow> = emptyList(),
     val extras: List<ExtraRow> = emptyList(),
+    val water: WaterForm = WaterForm(),
 )
+
+@Serializable
+data class WaterForm(
+    val source: String = "",
+    val blendSource: String = "",
+    @Serializable(with = BlankAsNullDouble::class) val blendPercent: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val gypsumG: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val calciumChlorideG: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val epsomG: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val tableSaltG: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val bakingSodaG: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val lacticMl: Double? = null,
+)
+
+fun WaterForm.toRecipeWater(): RecipeWater? {
+    val percent = (blendPercent ?: 0.0).coerceIn(0.0, 100.0)
+    val water = RecipeWater(
+        source = source.trim().ifBlank { null },
+        blendSource = blendSource.trim().ifBlank { null }?.takeIf { percent > 0.0 },
+        blendPercent = percent,
+        gypsumG = gypsumG.amount(),
+        calciumChlorideG = calciumChlorideG.amount(),
+        epsomG = epsomG.amount(),
+        tableSaltG = tableSaltG.amount(),
+        bakingSodaG = bakingSodaG.amount(),
+        lacticMl = lacticMl.amount(),
+    )
+    return water.takeUnless { it == RecipeWater() }
+}
+
+private fun Double?.amount() = (this ?: 0.0).coerceAtLeast(0.0)
 
 @Serializable
 data class MashStepRow(
@@ -132,6 +165,7 @@ fun RecipeForm.toNewRecipe(prefs: BrewerPreferences = BrewerPreferences()): NewR
                 boilTimeMin = it.usage.kettleTime(it.boilTimeMin, boilTime),
             )
         },
+        water = water.toRecipeWater(),
     )
 }
 

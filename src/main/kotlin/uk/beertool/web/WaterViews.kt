@@ -1,0 +1,137 @@
+package uk.beertool.web
+
+import kotlinx.html.*
+import kotlinx.html.stream.createHTML
+import uk.beertool.brewing.Salt
+import uk.beertool.recipe.DISTILLED_WATER
+import uk.beertool.recipe.NewRecipe
+import uk.beertool.recipe.Recipe
+import uk.beertool.recipe.RecipeStats
+import uk.beertool.recipe.RecipeWater
+import uk.beertool.recipe.TARGET_MASH_PH
+import uk.beertool.recipe.WaterReport
+import uk.beertool.recipe.defaultRecipeWater
+import uk.beertool.recipe.describe
+import uk.beertool.recipe.waterReport
+import uk.beertool.user.BrewerPreferences
+
+private class Addition(
+    val field: String,
+    val label: String,
+    val unit: String,
+    val of: (RecipeWater) -> Double,
+    val mashOnly: Boolean = false,
+)
+
+private val ADDITIONS = listOf(
+    Addition("gypsumG", prettify(Salt.GYPSUM.name), "g", RecipeWater::gypsumG),
+    Addition("calciumChlorideG", prettify(Salt.CALCIUM_CHLORIDE.name), "g", RecipeWater::calciumChlorideG),
+    Addition("epsomG", "Epsom salt", "g", RecipeWater::epsomG),
+    Addition("tableSaltG", prettify(Salt.TABLE_SALT.name), "g", RecipeWater::tableSaltG),
+    Addition("bakingSodaG", prettify(Salt.BAKING_SODA.name), "g", RecipeWater::bakingSodaG),
+    Addition("lacticMl", "Lactic acid 80%", "ml", RecipeWater::lacticMl, mashOnly = true),
+)
+
+internal fun FlowContent.waterFormSection(recipe: Recipe?, prefs: BrewerPreferences) {
+    val water = (if (recipe == null) prefs.defaultRecipeWater() else recipe.water) ?: RecipeWater()
+    val names = (prefs.waterSources.map { it.name } + listOfNotNull(water.source, water.blendSource)).distinct()
+
+    sectionHead("Water")
+    fieldGrid(columns = 3) {
+        field("Water") { waterSelect("water.source", names, water.source) }
+        field("Mixed with") { waterSelect("water.blendSource", names, water.blendSource) }
+        field("Mix (%)") {
+            numberInput(name = "water.blendPercent") {
+                value = if (water.blends) fmt(water.blendPercent, 0) else ""; numAttrs("5", max = "100")
+            }
+        }
+    }
+    fieldGrid(columns = 3) {
+        ADDITIONS.forEach { a ->
+            field("${a.label} (${a.unit})") {
+                numberInput(name = "water.${a.field}") {
+                    value = a.of(water).takeIf { it > 0.0 }?.toString() ?: ""; numAttrs("0.1")
+                }
+            }
+        }
+    }
+    val report = recipe?.waterReport(prefs) ?: NewRecipe(name = "", water = prefs.defaultRecipeWater()).waterReport(prefs)
+    div { id = "water"; waterResult(report) }
+}
+
+private fun FlowContent.waterSelect(name: String, names: List<String>, chosen: String?) {
+    select {
+        this.name = name
+        option { value = ""; if (chosen == null) selected = true; +DISTILLED_WATER }
+        names.forEach { n -> option { value = n; if (n == chosen) selected = true; +n } }
+    }
+}
+
+internal fun FlowContent.waterResult(report: WaterReport?) {
+    if (report == null) return
+    div("stats six chem") {
+        WATER_IONS.forEach { ion -> statTile(ion.label, fmt(ion.of(report.profile), 0), "mg/L") }
+    }
+    div("stats trio chem") {
+        statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label)
+        statTile("Mash pH", fmt(report.mashPh, 2), null, accent = true)
+        statTile("Lactic for $TARGET_MASH_PH", fmt(report.lacticForTargetMl, 1), "ml")
+    }
+    p("muted water-note") {
+        +"Salts dose ${fmt(report.totalL, 1)} L of water"
+        if (report.strikeL != null && report.spargeL != null) +": ${fmt(report.strikeL, 1)} L strike + ${fmt(report.spargeL, 1)} L sparge"
+        +". Lactic acid goes in the mash."
+    }
+    report.warnings.forEach { div("alert") { +it } }
+}
+
+internal fun FlowContent.waterViewSection(recipe: Recipe, prefs: BrewerPreferences) {
+    val water = recipe.water ?: return
+    val report = recipe.waterReport(prefs)
+    sectionHead("Water")
+    p { +water.describe() }
+    val used = ADDITIONS.filter { it.of(water) > 0.0 }
+    if (used.isNotEmpty()) scrollTable("bill") {
+        thead { tr { head("Addition", SLOT_NAME); numHead("Amount", slot = SLOT_AMOUNT); head("Unit", SLOT_WHAT) } }
+        tbody {
+            used.forEach { a ->
+                tr { td { +a.label }; numCell(a.of(water), decimals = 1); td { +a.unit } }
+            }
+        }
+    }
+    waterResult(report)
+}
+
+internal fun FlowContent.brewDayWater(recipe: Recipe, prefs: BrewerPreferences) {
+    val water = recipe.water ?: return
+    val report = recipe.waterReport(prefs)
+    val strike = report?.strikeL ?: return
+    val sparge = report.spargeL ?: return
+    val used = ADDITIONS.filter { it.of(water) > 0.0 }
+    if (used.isEmpty()) return
+    table("mash-plan water-plan") {
+        thead {
+            tr {
+                th { +"Water treatment" }
+                th(classes = "num") { +"Strike ${fmt(strike, 1)} L" }
+                th(classes = "num") { +"Sparge ${fmt(sparge, 1)} L" }
+            }
+        }
+        tbody {
+            used.forEach { a ->
+                val total = a.of(water)
+                val toStrike = if (a.mashOnly) total else total * strike / report.totalL
+                tr {
+                    td { +a.label }
+                    td("num") { +"${fmt(toStrike, 1)} ${a.unit}" }
+                    td("num") { +(if (a.mashOnly || sparge <= 0.0) MISSING else "${fmt(total - toStrike, 1)} ${a.unit}") }
+                }
+            }
+        }
+    }
+}
+
+fun estimatesFragmentHtml(stats: RecipeStats, water: WaterReport?): String = createHTML().div {
+    div { attributes["data-slot"] = "stats"; div("stats") { statsTiles(stats) } }
+    div { attributes["data-slot"] = "water"; waterResult(water) }
+}

@@ -14,6 +14,7 @@ import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.estimatedStats
 import uk.beertool.recipe.stats
+import uk.beertool.recipe.waterReport
 
 @Resource("/recipes")
 class RecipesRes(val q: String? = null, val page: Int = 1)
@@ -63,8 +64,9 @@ fun Route.recipeRoutes() {
 
     post<RecipeCalcRes> {
         withUser(write = true) { call, user ->
-            val stats = call.receiveForm<RecipeForm>().toNewRecipe(user.preferences).estimatedStats(user.preferences.whirlpool)
-            call.respondText(statsFragmentHtml(stats), ContentType.Text.Html)
+            val draft = call.receiveForm<RecipeForm>().toNewRecipe(user.preferences)
+            val html = estimatesFragmentHtml(draft.estimatedStats(user.preferences.whirlpool), draft.waterReport(user.preferences))
+            call.respondText(html, ContentType.Text.Html)
         }
     }
 

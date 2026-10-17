@@ -14,4 +14,5 @@ data class NewRecipe(
     val hops: List<RecipeHop> = emptyList(),
     val yeasts: List<RecipeYeast> = emptyList(),
     val extras: List<RecipeExtra> = emptyList(),
+    val water: RecipeWater? = null,
 )

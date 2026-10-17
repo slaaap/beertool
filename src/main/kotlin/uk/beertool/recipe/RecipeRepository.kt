@@ -47,6 +47,7 @@ object RecipeRepository {
             it[fermenterVolumeL] = draft.fermenterVolumeL.toBigDecimal()
             it[efficiency] = draft.efficiency.toBigDecimal()
             it[boilTimeMin] = draft.boilTimeMin
+            it[water] = draft.water
             it[createdAt] = now
             it[updatedAt] = now
         }.value
@@ -104,6 +105,7 @@ object RecipeRepository {
             it[fermenterVolumeL] = draft.fermenterVolumeL.toBigDecimal()
             it[efficiency] = draft.efficiency.toBigDecimal()
             it[boilTimeMin] = draft.boilTimeMin
+            it[water] = draft.water
             it[updatedAt] = now
         }
         if (rows == 0) return@transaction null
@@ -266,6 +268,7 @@ object RecipeRepository {
             hops = lines.hops[id].orEmpty(),
             yeasts = lines.yeasts[id].orEmpty(),
             extras = lines.extras[id].orEmpty(),
+            water = row[Recipes.water],
             createdAt = row[Recipes.createdAt],
             updatedAt = row[Recipes.updatedAt],
         )

@@ -37,6 +37,11 @@ data class MashRest(
     val minutes: Int,
 )
 
+data class MashVolumes(
+    val strikeL: Double,
+    val spargeL: Double,
+)
+
 data class MashWater(
     val strikeVolumeL: Double,
     val strikeTempC: Double,
@@ -88,10 +93,14 @@ object Calculators {
         thicknessLPerKg: Double,
         absorptionLPerKg: Double,
     ): MashWater {
+        val (strike, sparge) = mashVolumes(grainKg, preBoilVolumeL, thicknessLPerKg, absorptionLPerKg)
+        return MashWater(strike, strikeTempC(thicknessLPerKg, firstRestTempC, grainTempC), sparge)
+    }
+
+    fun mashVolumes(grainKg: Double, preBoilVolumeL: Double, thicknessLPerKg: Double, absorptionLPerKg: Double): MashVolumes {
         val strike = grainKg * thicknessLPerKg
         val absorbed = grainKg * absorptionLPerKg
-        val sparge = (preBoilVolumeL + absorbed - strike).coerceAtLeast(0.0)
-        return MashWater(strike, strikeTempC(thicknessLPerKg, firstRestTempC, grainTempC), sparge)
+        return MashVolumes(strike, (preBoilVolumeL + absorbed - strike).coerceAtLeast(0.0))
     }
 
     fun abv(og: Double, fg: Double) = (og - fg) * ABV_PER_GRAVITY_POINT

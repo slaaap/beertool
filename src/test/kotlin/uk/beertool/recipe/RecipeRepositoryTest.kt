@@ -33,6 +33,18 @@ class RecipeRepositoryTest {
     }
 
     @Test
+    fun `should keep a recipe's water through a save and an update`() {
+        val userId = newUser()
+        val water = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0, gypsumG = 3.0, lacticMl = 4.5)
+
+        val created = RecipeRepository.create(userId, sampleDraft().copy(water = water))
+        RecipeRepository.update(created.id, userId, sampleDraft().copy(water = null))
+
+        created.water shouldBe water
+        RecipeRepository.findById(created.id, userId)!!.water.shouldBeNull()
+    }
+
+    @Test
     fun `should not return a recipe owned by a different user`() {
         val owner = newUser()
         val other = newUser()

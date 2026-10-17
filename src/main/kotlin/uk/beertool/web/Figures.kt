@@ -1,7 +1,7 @@
 package uk.beertool.web
 
 import kotlinx.html.*
-import kotlinx.html.stream.createHTML
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
@@ -135,6 +135,17 @@ internal fun TR.extraHead() {
     propertySpacer()
 }
 
+internal class Ion(val field: String, val label: String, val of: (WaterProfile) -> Double)
+
+internal val WATER_IONS = listOf(
+    Ion("calcium", "Ca", WaterProfile::calcium),
+    Ion("magnesium", "Mg", WaterProfile::magnesium),
+    Ion("sodium", "Na", WaterProfile::sodium),
+    Ion("chloride", "Cl", WaterProfile::chloride),
+    Ion("sulphate", "SO₄", WaterProfile::sulphate),
+    Ion("bicarbonate", "HCO₃", WaterProfile::bicarbonate),
+)
+
 internal fun TR.actionSlot() = th(classes = "right c-act") {}
 
 internal fun TR.head(label: String, slot: String) = th(classes = slot) { +label }
@@ -207,5 +218,3 @@ internal fun FlowContent.unmaltedWarning(unmalted: Double) {
         +"${fmt(unmalted.asPercent(), 0)}% of the grist is unmalted — the malt may not convert it all."
     }
 }
-
-fun statsFragmentHtml(stats: RecipeStats): String = createHTML().div("stats") { statsTiles(stats) }

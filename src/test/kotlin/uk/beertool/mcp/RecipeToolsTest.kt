@@ -3,6 +3,8 @@ package uk.beertool.mcp
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.doubles.shouldBeGreaterThan
+import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.Json
@@ -17,12 +19,15 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import uk.beertool.db.TestDatabase
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.RecipeRepository
+import uk.beertool.recipe.RecipeWater
 import uk.beertool.recipe.stats
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
+import uk.beertool.user.WaterSource
 import java.util.UUID
 
 class RecipeToolsTest {
@@ -152,6 +157,43 @@ class RecipeToolsTest {
         val warnings = tools.estimateRecipe(args("recipe" to draft)).jsonObject["warnings"]!!.jsonArray.map { it.jsonPrimitive.content }
 
         warnings shouldContain "Style \"Hoppy Thing\" is not a BJCP 2021 name; find_styles lists them."
+    }
+
+    @Test
+    fun `should estimate the water and mash pH of a draft using the brewer's saved sources`() {
+        val tap = WaterSource("London tap", WaterProfile(calcium = 99.0, magnesium = 4.5, sodium = 30.0, chloride = 45.0, sulphate = 47.0, bicarbonate = 250.0))
+        val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(tap)))!!
+        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"source\": \"London tap\", \"gypsumG\": 4, \"lacticMl\": 6}, \"yeasts\"")
+
+        val water = RecipeTools(user, null).estimateRecipe(args("recipe" to draft)).jsonObject["water"]!!.jsonObject
+
+        water["mgPerL"]!!.jsonObject["calcium"]!!.jsonPrimitive.double shouldBeGreaterThan 99.0
+        water["mashPh"]!!.jsonPrimitive.double shouldBeLessThan 5.9
+        water["lacticMlForTarget"]!!.jsonPrimitive.double shouldBeGreaterThan 0.0
+    }
+
+    @Test
+    fun `should name the saved sources when a draft asks for a water the brewer does not have`() {
+        val tap = WaterSource("London tap", WaterProfile(calcium = 99.0))
+        val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(tap)))!!
+        val draft = """{"name": "X", "water": {"source": "Burton"}}"""
+
+        val error = shouldThrow<ToolError> { RecipeTools(user, null).estimateRecipe(args("recipe" to draft)) }
+
+        error.message shouldContain "water.source \"Burton\" is not a saved water source; known sources: London tap"
+    }
+
+    @Test
+    fun `should round-trip a recipe's water through get and update`() {
+        val user = newUser()
+        val tools = RecipeTools(user, null)
+        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"blendPercent\": 0, \"gypsumG\": 2.5, \"lacticMl\": 3}, \"yeasts\"")
+        val no = tools.createRecipe(args("recipe" to draft)).jsonObject["no"]!!.jsonPrimitive.int
+        val fetched = tools.getRecipe(args("no" to "$no")).withoutNulls().jsonObject
+
+        tools.updateRecipe(buildJsonObject { put("no", no); put("recipe", fetched["recipe"]!!) })
+
+        RecipeRepository.findByNo(no, user.id)!!.water shouldBe RecipeWater(gypsumG = 2.5, lacticMl = 3.0)
     }
 
     private fun RecipeTools.draftFor(json: String) = draftArg(args("recipe" to json))

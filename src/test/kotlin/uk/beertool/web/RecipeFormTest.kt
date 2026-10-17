@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
+import uk.beertool.recipe.RecipeWater
 
 class RecipeFormTest {
 
@@ -206,6 +207,41 @@ class RecipeFormTest {
         recipe.fermentables.map { it.type } shouldBe
             listOf(FermentableType.MALT, FermentableType.SUGAR, FermentableType.FRUIT)
         recipe.fermentables.map { it.boilTimeMin } shouldBe listOf(null, 10, null)
+    }
+
+    @Test
+    fun `should read the water, its mix and its additions`() {
+        val form = form(
+            "water.source" to "London tap", "water.blendSource" to "Ashbeck", "water.blendPercent" to "40",
+            "water.gypsumG" to "3.5", "water.calciumChlorideG" to "", "water.lacticMl" to "4",
+        )
+
+        val water = form.toNewRecipe().water
+
+        water shouldBe RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0, gypsumG = 3.5, lacticMl = 4.0)
+    }
+
+    @Test
+    fun `should forget the second water when none of it goes in the mix`() {
+        val form = form("water.source" to "London tap", "water.blendSource" to "Ashbeck", "water.blendPercent" to "")
+
+        val water = form.toNewRecipe().water
+
+        water shouldBe RecipeWater(source = "London tap")
+    }
+
+    @Test
+    fun `should leave a recipe without water when it names none and treats none`() {
+        val form = form("water.source" to "", "water.blendSource" to "Ashbeck", "water.gypsumG" to "")
+
+        form.toNewRecipe().water shouldBe null
+    }
+
+    @Test
+    fun `should keep distilled water when it is treated`() {
+        val form = form("water.source" to "", "water.lacticMl" to "2")
+
+        form.toNewRecipe().water shouldBe RecipeWater(lacticMl = 2.0)
     }
 
     @OptIn(ExperimentalSerializationApi::class)

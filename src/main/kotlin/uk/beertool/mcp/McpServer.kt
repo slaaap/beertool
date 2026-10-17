@@ -90,7 +90,8 @@ private val McpUser = AttributeKey<User>("McpUser")
 private val INSTRUCTIONS = """
     beertool holds this brewer's beer recipes and brew log, and does the brewing maths.
     - Call get_brewer_profile before drafting, so volumes, efficiency and the default mash fit their kit.
-    - Never compute OG, FG, ABV, IBU or colour yourself: call estimate_recipe, which uses the same formulas as the app.
+    - Never compute OG, FG, ABV, IBU, colour, water minerals or mash pH yourself: call estimate_recipe, which uses the same formulas as the app.
+    - Water: pick sources by name from the profile's waterSources (omit source for distilled/RO), add salts in grams and lactic acid in ml, and aim for the mash pH range estimate_recipe reports.
     - Iterate with estimate_recipe; only call create_recipe or update_recipe once the brewer has agreed to save.
     - update_recipe replaces the whole recipe: start from get_recipe and send back every ingredient you want to keep.
     - Units: kg for fermentables, g for hops, litres, °C, minutes. Efficiency and attenuation are percentages.
@@ -164,7 +165,7 @@ fun beertoolMcpServer(user: User, publicUrl: String?): Server {
     )
     val tools = RecipeTools(user, publicUrl)
 
-    server.tool("get_brewer_profile", "The brewer's kit and defaults: volumes, efficiency, boil time, default mash, water ratios.", NO_ARGS) {
+    server.tool("get_brewer_profile", "The brewer's kit and defaults: volumes, efficiency, boil time, default mash, water ratios and saved water sources.", NO_ARGS) {
         tools.brewerProfile()
     }
     server.tool("search_recipes", "Find the brewer's recipes by name or ingredient, newest first, with estimated OG/ABV/IBU/colour and how often each was brewed.", SEARCH_ARGS) {
@@ -179,7 +180,7 @@ fun beertoolMcpServer(user: User, publicUrl: String?): Server {
     server.tool("find_styles", "BJCP 2021 style names matching a query, with links to their guidelines.", STYLE_ARGS) {
         tools.findStyles(it)
     }
-    server.tool("estimate_recipe", "Estimate OG, FG, ABV, IBU and colour for a draft recipe without saving it, with warnings about likely problems.", RECIPE_ARGS) {
+    server.tool("estimate_recipe", "Estimate OG, FG, ABV, IBU and colour for a draft recipe without saving it, plus its water profile and mash pH, with warnings about likely problems.", RECIPE_ARGS) {
         tools.estimateRecipe(it)
     }
     server.tool("create_recipe", "Save a new recipe. Returns its number and link. Only call once the brewer agreed to save.", RECIPE_ARGS, readOnly = false) {

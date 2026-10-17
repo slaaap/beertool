@@ -14,6 +14,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.recipe.AmountUnit
 import uk.beertool.recipe.Coded
 import uk.beertool.recipe.CodeLookup
@@ -21,16 +22,21 @@ import uk.beertool.recipe.ExtraUsage
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
+import uk.beertool.recipe.MAX_MASH_PH
 import uk.beertool.recipe.MAX_UNMALTED_FRACTION
+import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.RecipeStats
+import uk.beertool.recipe.TARGET_MASH_PH
+import uk.beertool.recipe.WaterReport
 import uk.beertool.recipe.YeastUsage
 import uk.beertool.recipe.estimatedStats
 import uk.beertool.recipe.inBrewOrder
 import uk.beertool.recipe.stats
 import uk.beertool.recipe.unmaltedFraction
+import uk.beertool.recipe.waterReport
 import uk.beertool.user.User
 import uk.beertool.web.BeerStyles
 import uk.beertool.web.RecipeForm
@@ -73,6 +79,9 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         put("mashThicknessLPerKg", prefs.mashThicknessLPerKg)
         put("grainAbsorptionLPerKg", prefs.grainAbsorptionLPerKg)
         putJsonArray("defaultMashSteps") { prefs.mashSteps.forEach { add(mashStep(it.tempC, it.timeMin)) } }
+        putJsonArray("waterSources") {
+            prefs.waterSources.forEach { add(buildJsonObject { put("name", it.name); put("mgPerL", ions(it.profile)) }) }
+        }
     }
 
     fun searchRecipes(args: JsonObject): JsonElement {
@@ -105,6 +114,7 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
             put("url", recipeUrl(recipe.no))
             put("recipe", recipeJson(recipe))
             put("estimate", estimate(recipe.stats(whirlpool)))
+            recipe.waterReport(prefs)?.let { put("water", waterJson(it)) }
             putJsonArray("brews") { BatchRepository.listByRecipe(recipe.id, user.id).forEach { add(brewJson(recipe, it)) } }
         }
     }
@@ -124,9 +134,11 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
 
     fun estimateRecipe(args: JsonObject): JsonElement {
         val draft = draftArg(args)
+        val water = draft.waterReport(prefs)
         return buildJsonObject {
             put("estimate", estimate(draft.estimatedStats(whirlpool)))
-            putJsonArray("warnings") { warnings(draft).forEach { add(JsonPrimitive(it)) } }
+            water?.let { put("water", waterJson(it)) }
+            putJsonArray("warnings") { (warnings(draft) + water?.warnings.orEmpty()).forEach { add(JsonPrimitive(it)) } }
         }
     }
 
@@ -165,12 +177,22 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
     internal fun draftArg(args: JsonObject): NewRecipe {
         val json = args["recipe"] as? JsonObject ?: throw ToolError("Give the recipe as a \"recipe\" object.")
         validate(json)
+        validateWater(json["water"] as? JsonObject)
         val form = ToolJson.decodeFromJsonElement(RecipeForm.serializer(), json)
         val draft = form.toNewRecipe(prefs)
         return draft.copy(
             preBoilVolumeL = draft.preBoilVolumeL ?: prefs.preBoilVolumeL,
             mashSteps = if ("mashSteps" in json) draft.mashSteps else prefs.mashSteps,
         )
+    }
+
+    private fun validateWater(water: JsonObject?) {
+        if (water == null) return
+        val known = prefs.waterSources.map { it.name }
+        val unknown = listOf("source", "blendSource").mapNotNull { key -> water.string(key)?.takeIf { it.isNotBlank() && it !in known }?.let { key to it } }
+        if (unknown.isEmpty()) return
+        val choices = if (known.isEmpty()) "the brewer has no saved water sources, so omit it for distilled water" else "known sources: ${known.joinToString()}"
+        throw ToolError(unknown.joinToString("\n") { (key, name) -> "water.$key \"$name\" is not a saved water source; $choices" })
     }
 
     private fun warnings(draft: NewRecipe) = buildList {
@@ -223,6 +245,13 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
                 })
             }
         }
+        r.water?.let { w ->
+            put("water", buildJsonObject {
+                put("source", w.source); put("blendSource", w.blendSource); put("blendPercent", w.blendPercent)
+                put("gypsumG", w.gypsumG); put("calciumChlorideG", w.calciumChlorideG); put("epsomG", w.epsomG)
+                put("tableSaltG", w.tableSaltG); put("bakingSodaG", w.bakingSodaG); put("lacticMl", w.lacticMl)
+            })
+        }
     }
 
     private fun brewJson(recipe: Recipe, b: Batch) = buildJsonObject {
@@ -251,6 +280,28 @@ private fun estimate(s: RecipeStats) = buildJsonObject {
     put("abv", round(s.abv, 2))
     put("ibu", round(s.ibu, 1))
     put("colourEbc", round(s.colourEbc, 1))
+}
+
+private fun ions(p: WaterProfile) = buildJsonObject {
+    put("calcium", round(p.calcium, 1))
+    put("magnesium", round(p.magnesium, 1))
+    put("sodium", round(p.sodium, 1))
+    put("chloride", round(p.chloride, 1))
+    put("sulphate", round(p.sulphate, 1))
+    put("bicarbonate", round(p.bicarbonate, 1))
+}
+
+private fun waterJson(r: WaterReport) = buildJsonObject {
+    put("mgPerL", ions(r.profile))
+    put("chlorideToSulphate", r.profile.chlorideToSulphate?.let { round(it, 2) })
+    put("balance", r.balance?.label)
+    put("mashPh", r.mashPh?.let { round(it, 2) })
+    put("mashPhRange", "$MIN_MASH_PH-$MAX_MASH_PH")
+    put("targetMashPh", TARGET_MASH_PH)
+    put("lacticMlForTarget", r.lacticForTargetMl?.let { round(it, 1) })
+    put("waterL", round(r.totalL, 1))
+    put("strikeL", r.strikeL?.let { round(it, 1) })
+    put("spargeL", r.spargeL?.let { round(it, 1) })
 }
 
 private fun round(v: Double, decimals: Int): Double {
@@ -288,6 +339,11 @@ private fun validate(recipe: JsonObject) {
         if (value != null && value !is JsonNull && (value as? JsonPrimitive)?.doubleOrNull == null) problems += "$where$field must be a number"
     }
 
+    (recipe["water"] as? JsonObject)?.let { water ->
+        val fields = listOf("blendPercent", "gypsumG", "calciumChlorideG", "epsomG", "tableSaltG", "bakingSodaG", "lacticMl")
+        numbers("water.", water, *fields.toTypedArray())
+        fields.forEach { field -> (water[field] as? JsonPrimitive)?.doubleOrNull?.let { if (it < 0.0) problems += "water.$field must not be negative" } }
+    }
     numbers("", recipe, "preBoilVolumeL", "postBoilVolumeL", "fermenterVolumeL", "efficiency", "boilTimeMin")
     rows("mashSteps").forEach { row ->
         listOf("tempC", "timeMin").forEach { if (row.third[it] == null) problems += "mashSteps[${row.second}].$it is required" }

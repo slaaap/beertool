@@ -33,9 +33,18 @@ class RecipeFormNamesTest {
     fun `should post every top-level field under the name the DTO decodes it from`() {
         val posted = renderedFormNames()
 
-        val scalars = serializer<RecipeForm>().descriptor.elementNames.filter { it !in LISTS }
+        val scalars = serializer<RecipeForm>().descriptor.elementNames.filter { it !in LISTS && it != "water" }
 
         posted shouldContainAll scalars
+    }
+
+    @Test
+    fun `should post every water field under the name the DTO decodes it from`() {
+        val posted = renderedFormNames()
+
+        val water = serializer<WaterForm>().descriptor.elementNames.map { "water.$it" }
+
+        posted shouldContainAll water
     }
 
     @Test

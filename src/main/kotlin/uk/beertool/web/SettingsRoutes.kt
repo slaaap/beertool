@@ -11,6 +11,7 @@ import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.mcp.ApiToken
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
@@ -21,6 +22,7 @@ import uk.beertool.telegram.Telegram
 import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
+import uk.beertool.user.WaterSource
 import uk.beertool.user.UserRepository
 import java.time.Instant
 import java.time.LocalDate
@@ -38,6 +40,30 @@ data class SettingsForm(
     @Serializable(with = BlankAsNullDouble::class) val mashThicknessLPerKg: Double? = null,
     @Serializable(with = BlankAsNullDouble::class) val grainAbsorptionLPerKg: Double? = null,
     val mashSteps: List<MashStepRow> = emptyList(),
+    val waterSources: List<WaterSourceRow> = emptyList(),
+)
+
+@Serializable
+data class WaterSourceRow(
+    val name: String = "",
+    @Serializable(with = BlankAsNullDouble::class) val calcium: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val magnesium: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val sodium: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val chloride: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val sulphate: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val bicarbonate: Double? = null,
+)
+
+private fun WaterSourceRow.toWaterSource() = WaterSource(
+    name = name.trim(),
+    profile = WaterProfile(
+        calcium = calcium ?: 0.0,
+        magnesium = magnesium ?: 0.0,
+        sodium = sodium ?: 0.0,
+        chloride = chloride ?: 0.0,
+        sulphate = sulphate ?: 0.0,
+        bicarbonate = bicarbonate ?: 0.0,
+    ),
 )
 
 fun SettingsForm.toPreferences(current: BrewerPreferences) = current.copy(
@@ -53,6 +79,7 @@ fun SettingsForm.toPreferences(current: BrewerPreferences) = current.copy(
     mashSteps = mashSteps.mapNotNull { row ->
         MashStep(tempC = row.tempC ?: return@mapNotNull null, timeMin = row.timeMin ?: return@mapNotNull null)
     },
+    waterSources = waterSources.filter { it.name.isNotBlank() }.map { it.toWaterSource() }.distinctBy { it.name },
 )
 
 fun Route.settingsRoutes() {
@@ -211,7 +238,7 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
 
             sectionHead("Default mash") {
                 button(type = ButtonType.button, classes = "btn small") {
-                    onClick = "smAdd()"
+                    onClick = "rowAdd('sm')"
                     span("ico") { unsafe { +Icon.PLUS.markup() } }
                     span { +"Add rest" }
                 }
@@ -219,6 +246,28 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
             table("mash") {
                 thead { tr { head("Rest", "c-name"); numHead("Temp", "°C"); numHead("Time", "min"); actionSlot() } }
                 tbody { id = "sm-body"; prefs.mashSteps.forEachIndexed { i, m -> mashPrefRow(i, m) } }
+            }
+
+            sectionHead("Water sources") {
+                button(type = ButtonType.button, classes = "btn small") {
+                    onClick = "rowAdd('ws')"
+                    span("ico") { unsafe { +Icon.PLUS.markup() } }
+                    span { +"Add water" }
+                }
+            }
+            scrollTable("water-sources") {
+                thead {
+                    tr {
+                        head("Name", "c-name")
+                        WATER_IONS.forEach { numHead(it.label, "mg/L") }
+                        actionSlot()
+                    }
+                }
+                tbody { id = "ws-body"; prefs.waterSources.forEachIndexed { i, w -> waterSourceRow(i, w) } }
+            }
+            p("muted") {
+                +"From your water report or the bottle label. Bicarbonate = alkalinity as CaCO₃ × 1.22. "
+                +"If calcium is missing: (total hardness as CaCO₃ − 4.12 × magnesium) ÷ 2.5."
             }
 
             actionBar {
@@ -229,6 +278,7 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
         }
 
         table { style = "display:none"; tbody { id = "sm-proto"; mashPrefRow(0, null) } }
+        table { style = "display:none"; tbody { id = "ws-proto"; waterSourceRow(0, null) } }
 
         js("settings.js")
         js("ui.js")
@@ -332,6 +382,20 @@ private fun TBODY.mashPrefRow(i: Int, step: MashStep?) {
         td("c-name") {}
         td("num") { numberInput(name = "mashSteps.$i.tempC") { value = step?.tempC?.toString() ?: ""; numAttrs("0.5") } }
         td("num") { numberInput(name = "mashSteps.$i.timeMin") { value = step?.timeMin?.toString() ?: ""; numAttrs("1") } }
-        td("right") { rowRemoveButton("smRemove(this)", "Remove rest") }
+        td("right") { rowRemoveButton("rowRemove(this)", "Remove rest") }
+    }
+}
+
+private fun TBODY.waterSourceRow(i: Int, source: WaterSource?) {
+    tr {
+        td("c-name") { textInput(name = "waterSources.$i.name") { value = source?.name ?: ""; placeholder = "e.g. Tap" } }
+        WATER_IONS.forEach { ion ->
+            td("num") {
+                numberInput(name = "waterSources.$i.${ion.field}") {
+                    value = source?.profile?.let { fmt(ion.of(it), 1) } ?: ""; numAttrs("0.1")
+                }
+            }
+        }
+        td("right") { rowRemoveButton("rowRemove(this)", "Remove water") }
     }
 }

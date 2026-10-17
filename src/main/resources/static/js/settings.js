@@ -13,15 +13,21 @@
 })();
 
 (function () {
-  var body = document.getElementById('sm-body');
-  if (!body) return;
-  function renumber() {
+  function renumber(body) {
     Array.prototype.forEach.call(body.rows, function (row, i) {
       row.querySelectorAll('[name]').forEach(function (inp) {
-        inp.name = inp.name.replace(/^mashSteps\.\d+\./, 'mashSteps.' + i + '.');
+        inp.name = inp.name.replace(/^([A-Za-z]+)\.\d+\./, '$1.' + i + '.');
       });
     });
   }
-  window.smAdd = function () { body.appendChild(document.querySelector('#sm-proto tr').cloneNode(true)); renumber(); };
-  window.smRemove = function (btn) { btn.closest('tr').remove(); renumber(); };
+  window.rowAdd = function (key) {
+    var body = document.getElementById(key + '-body');
+    body.appendChild(document.querySelector('#' + key + '-proto tr').cloneNode(true));
+    renumber(body);
+  };
+  window.rowRemove = function (btn) {
+    var body = btn.closest('tbody');
+    btn.closest('tr').remove();
+    renumber(body);
+  };
 })();

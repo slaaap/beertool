@@ -9,7 +9,13 @@
     debounce = setTimeout(function () {
       fetch('/recipes/calculate', { method: 'POST', body: new FormData(form) })
         .then(function (r) { return r.text(); })
-        .then(function (html) { document.getElementById('stats').innerHTML = html; });
+        .then(function (html) {
+          var t = document.createElement('template');
+          t.innerHTML = html;
+          t.content.querySelectorAll('[data-slot]').forEach(function (slot) {
+            document.getElementById(slot.dataset.slot).innerHTML = slot.innerHTML;
+          });
+        });
     }, 400);
   };
 
