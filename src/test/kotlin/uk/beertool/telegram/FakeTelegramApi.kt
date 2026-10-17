@@ -12,12 +12,15 @@ class FakeTelegramApi : TelegramApi {
 
     val last get() = sent.last()
 
+    var blocked = false
+
     override suspend fun getMe() = TgUser(id = 1, isBot = true, firstName = "beertool", username = "beertool_test_bot")
     override suspend fun getUpdates(offset: Long?, timeoutSeconds: Int) = emptyList<Update>()
     override suspend fun deleteWebhook() {}
     override suspend fun setMyCommands(commands: List<BotCommand>) {}
 
     override suspend fun sendMessage(chatId: Long, text: String, keyboard: InlineKeyboardMarkup?) {
+        if (blocked) throw TelegramException(403, "Forbidden: bot was blocked by the user")
         sent += Sent(chatId, text, keyboard)
     }
 

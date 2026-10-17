@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.configureSecurity
 import uk.beertool.db.TestDatabase
+import uk.beertool.mcp.Mcp
 import uk.beertool.telegram.Telegram
 import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.User
@@ -42,13 +43,17 @@ class SettingsTelegramTest {
     @AfterEach
     fun tearDown() {
         Telegram.botUsername = null
+        Mcp.enabled = false
     }
 
     @Test
-    fun `should not mention Telegram when the bot is off`() = settingsApp { client, _ ->
-        val page = client.get("/settings").bodyAsText()
+    fun `should not offer Telegram on the connections page when the bot is off`() = settingsApp { client, _ ->
+        Mcp.enabled = true
 
-        page shouldNotContain "Connect Telegram"
+        val page = client.get("/settings/connections").bodyAsText()
+
+        page shouldContain "AI assistant"
+        page shouldNotContain "Telegram"
     }
 
     @Test

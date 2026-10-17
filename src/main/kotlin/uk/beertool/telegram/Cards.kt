@@ -12,10 +12,10 @@ import uk.beertool.recipe.YeastUsage
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
 import uk.beertool.recipe.boilAdditions
+import uk.beertool.recipe.formatAmount
 import uk.beertool.recipe.inBrewOrder
 import uk.beertool.recipe.mashWater
 import uk.beertool.user.BrewerPreferences
-import uk.beertool.web.MISSING
 import uk.beertool.web.fmt
 import uk.beertool.web.prettify
 import java.time.LocalDate
@@ -29,8 +29,6 @@ private const val MAX_MESSAGE = 4000
 fun String.escapeHtml() = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 private fun bold(s: String) = "<b>${s.escapeHtml()}</b>"
-
-private fun num(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else "%.2f".format(v).trimEnd('0')
 
 private fun stage(usage: BrewStage, minutes: Int?) =
     prettify((usage as Enum<*>).name).lowercase() + if (usage.inBoil && minutes != null) " $minutes min" else ""
@@ -68,7 +66,7 @@ fun recipeCard(recipe: Recipe, stats: RecipeStats, publicUrl: String? = null): S
     lines += ""
     lines += "<b>${statsLine(stats)}</b>"
     lines += "OG ${fmt(stats.og, 3)} → FG ${fmt(stats.fg, 3)}"
-    lines += "${num(recipe.fermenterVolumeL)} L · ${recipe.boilTimeMin} min boil · ${fmt(recipe.efficiency * 100, 0)}% efficiency"
+    lines += "${formatAmount(recipe.fermenterVolumeL)} L · ${recipe.boilTimeMin} min boil · ${fmt(recipe.efficiency * 100, 0)}% efficiency"
 
     fun section(heading: String, items: List<String>) {
         if (items.isEmpty()) return
@@ -78,31 +76,38 @@ fun recipeCard(recipe: Recipe, stats: RecipeStats, publicUrl: String? = null): S
     }
     section("Mash", mashLines(recipe))
     section("Fermentables", recipe.fermentables.inBrewOrder().map {
-        "• ${num(it.amountKg)} kg ${it.name.escapeHtml()}" + if (it.usage == FermentableUsage.MASH) "" else " · ${stage(it.usage, it.boilTimeMin)}"
+        "• ${formatAmount(it.amountKg)} kg ${it.name.escapeHtml()}" + if (it.usage == FermentableUsage.MASH) "" else " · ${stage(it.usage, it.boilTimeMin)}"
     })
     section("Hops", recipe.hops.inBrewOrder().map {
         val use = if (it.usage == HopUsage.DRY_HOP && it.dryHopDays != null) "dry hop ${days(it.dryHopDays.toLong())}" else stage(it.usage, it.boilTimeMin)
-        "• ${num(it.amountG)} g ${it.name.escapeHtml()} ${num(it.alphaAcid)}% · $use"
+        "• ${formatAmount(it.amountG)} g ${it.name.escapeHtml()} ${formatAmount(it.alphaAcid)}% · $use"
     })
     section("Yeast", recipe.yeasts.inBrewOrder().map {
         "• ${it.name.escapeHtml()}" + if (it.usage == YeastUsage.PRIMARY) "" else " · ${stage(it.usage, null)}"
     })
     section("Extras", recipe.extras.inBrewOrder().map {
-        "• ${num(it.amount)} ${it.unit.code} ${it.name.escapeHtml()} · ${stage(it.usage, it.boilTimeMin)}"
+        "• ${formatAmount(it.amount)} ${it.unit.code} ${it.name.escapeHtml()} · ${stage(it.usage, it.boilTimeMin)}"
     })
     return clip(lines)
 }
 
-private fun mashLines(recipe: Recipe) = recipe.mashSteps.mapIndexed { i, step -> "${i + 1}. ${num(step.tempC)} °C · ${step.timeMin} min" }
+private fun mashLines(recipe: Recipe) = recipe.mashSteps.mapIndexed { i, step -> "${i + 1}. ${formatAmount(step.tempC)} °C · ${step.timeMin} min" }
 
 private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
 private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 private const val MAX_NOTES = 1500
 
 fun friendlyDate(date: LocalDate?, today: LocalDate): String = when {
-    date == null -> MISSING
+    date == null -> "no date"
     date.year == today.year -> date.format(DAY_MONTH)
     else -> date.format(DAY_MONTH_YEAR)
+}
+
+// Cuts on a whole character, so an emoji's surrogate pair is never split into an invalid half.
+fun String.shortened(max: Int): String {
+    if (length <= max) return this
+    val end = if (this[max - 2].isHighSurrogate()) max - 2 else max - 1
+    return take(end) + "…"
 }
 
 internal fun String.escapeAttribute() = escapeHtml().replace("\"", "&quot;")
@@ -136,7 +141,7 @@ private class Reading(val label: String, val key: String, val example: String, v
 
 private fun gravity(v: Double) = fmt(v, 3)
 
-private fun volume(v: Double) = num(Math.round(v * 10) / 10.0)
+private fun volume(v: Double) = formatAmount(Math.round(v * 10) / 10.0)
 
 private fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
     Reading("OG", "og", "og 1.052", batch.measuredOg, estimate.og, "", ::gravity),
@@ -180,7 +185,7 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
     }
 
     batch.notes?.let {
-        val notes = if (it.length > MAX_NOTES) it.take(MAX_NOTES) + "…" else it
+        val notes = it.shortened(MAX_NOTES)
         lines += ""
         lines += "<blockquote expandable>${notes.escapeHtml()}</blockquote>"
     }
@@ -241,9 +246,9 @@ fun readingsSaved(readings: Readings): String {
     val parts = listOfNotNull(
         readings.og?.let { "OG ${fmt(it, 3)}" },
         readings.fg?.let { "FG ${fmt(it, 3)}" },
-        readings.preBoilL?.let { "pre-boil ${num(it)} L" },
-        readings.postBoilL?.let { "post-boil ${num(it)} L" },
-        readings.fermenterL?.let { "fermenter ${num(it)} L" },
+        readings.preBoilL?.let { "pre-boil ${formatAmount(it)} L" },
+        readings.postBoilL?.let { "post-boil ${formatAmount(it)} L" },
+        readings.fermenterL?.let { "fermenter ${formatAmount(it)} L" },
         readings.note?.let { "a note" },
     )
     return "✅ Saved ${parts.joinToString(", ")}"

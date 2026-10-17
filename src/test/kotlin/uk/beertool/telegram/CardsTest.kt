@@ -1,5 +1,6 @@
 package uk.beertool.telegram
 
+import uk.beertool.recipe.formatAmount
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -154,6 +155,24 @@ class CardsTest {
         val lines = listOf(batchLine(packaged, today), batchLine(fermenting, today))
 
         lines shouldBe listOf("1 Sep · Pale Ale", "7 Oct · Stout •")
+    }
+
+    @Test
+    fun `should write amounts without stray zeros or a dangling dot`() {
+        val amounts = listOf(20.0, 4.25, 2.9999, 0.004, 0.1 + 0.2)
+
+        val written = amounts.map { formatAmount(it) }
+
+        written shouldBe listOf("20", "4.25", "3", "0.004", "0.3")
+    }
+
+    @Test
+    fun `should shorten text without splitting an emoji`() {
+        val text = "ab🍺cd"
+
+        val short = text.shortened(4)
+
+        short shouldBe "ab…"
     }
 
     private val today = LocalDate.of(2026, 10, 16)

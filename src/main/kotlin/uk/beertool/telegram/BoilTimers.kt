@@ -2,6 +2,7 @@ package uk.beertool.telegram
 
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.javatime.timestamp
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -75,8 +76,11 @@ object BoilTimerRepository {
 
     fun all(): List<BoilTimer> = transaction { BoilTimers.selectAll().map { it.toTimer() } }
 
-    fun advance(batchId: Long, announcedDownTo: Int) = transaction {
-        BoilTimers.update({ BoilTimers.batchId eq batchId }) { it[BoilTimers.announcedDownTo] = announcedDownTo }
+    // Only the caller that moves the mark from where it read it may send, so two ticks never announce the same addition.
+    fun claim(batchId: Long, from: Int, to: Int): Boolean = transaction {
+        BoilTimers.update({ (BoilTimers.batchId eq batchId) and (BoilTimers.announcedDownTo eq from) }) {
+            it[announcedDownTo] = to
+        } == 1
     }
 
     fun stop(batchId: Long): Boolean = transaction {

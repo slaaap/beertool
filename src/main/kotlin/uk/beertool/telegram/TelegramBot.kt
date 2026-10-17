@@ -55,10 +55,10 @@ class TelegramBot(
 
     private class Chatter(val telegramUserId: Long, val chatId: Long, val user: User?, val link: TelegramLink?)
 
-    private fun chatter(from: TgUser, chatId: Long): Chatter {
-        val link = TelegramLinkRepository.findByTelegramUser(from.id)
+    private fun chatter(telegramUserId: Long, chatId: Long): Chatter {
+        val link = TelegramLinkRepository.findByTelegramUser(telegramUserId)
         val user = link?.let { UserRepository.findById(it.userId) } ?: SingleUser.defaultUser()?.readOnly()
-        return Chatter(from.id, chatId, user, link?.takeIf { user?.canWrite == true })
+        return Chatter(telegramUserId, chatId, user, link?.takeIf { user?.canWrite == true })
     }
 
     suspend fun handle(update: Update) {
@@ -72,7 +72,7 @@ class TelegramBot(
         val from = message.from ?: return
         val text = message.text?.trim() ?: return
         if (!message.chat.isPrivate || from.isBot) return
-        val who = chatter(from, message.chat.id)
+        val who = chatter(from.id, message.chat.id)
 
         if (!text.startsWith("/")) return onReadings(who, text)
         val command = text.substringBefore(' ').drop(1).substringBefore('@').lowercase()
@@ -100,7 +100,7 @@ class TelegramBot(
         val link = TelegramLinkRepository.redeem(token, who.telegramUserId, who.chatId, clock())
         val user = link?.let { UserRepository.findById(it.userId) }
         if (user == null) say(who, "⚠️ That link has expired or was already used. Get a fresh one from ${settings()} → <b>Connect Telegram</b>.")
-        else say(who, "✅ <b>Connected</b>\n" + helpText(chatter(TgUser(who.telegramUserId), who.chatId)))
+        else say(who, "✅ <b>Connected</b>\n" + helpText(chatter(who.telegramUserId, who.chatId)))
     }
 
     private suspend fun onUnlink(who: Chatter) {
@@ -172,7 +172,8 @@ class TelegramBot(
         if (!user.canWrite) return say(who, READ_ONLY)
         val (recipe, batch) = currentBatch(who, user)
             ?: return say(who, if (openBatches(user).isEmpty()) "Nothing is brewing. Start a brew day from /recipes first." else "Which brew is that for? Pick one in /brew, then send it again.")
-        val saved = BatchRepository.update(batch.id, user.id, readings.applyTo(batch.toDraft())) ?: return
+        val saved = BatchRepository.update(batch.id, user.id, readings.applyTo(batch.toDraft()))
+            ?: return say(who, "⚠️ That didn't save. Please send it again.")
         TelegramLinkRepository.setCurrentBatch(who.telegramUserId, saved.id)
         say(who, readingsSaved(readings) + "\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, saved))
     }
@@ -182,7 +183,6 @@ class TelegramBot(
             .filter { it.batch.packagedDate == null }
             .mapNotNull { s -> RecipeRepository.findById(s.batch.recipeId, user.id)?.let { it to s.batch } }
 
-    // The chosen brew, or the only one on the go when nothing has been chosen.
     private fun currentBatch(who: Chatter, user: User): Pair<Recipe, Batch>? {
         val chosen = who.link?.currentBatchId?.let { BatchRepository.findById(it, user.id) }?.takeIf { it.packagedDate == null }
         val batch = chosen ?: openBatches(user).singleOrNull()?.second ?: return null
@@ -194,7 +194,7 @@ class TelegramBot(
         try {
             val message = query.message ?: return
             if (!message.chat.isPrivate) return
-            val who = chatter(query.from, message.chat.id)
+            val who = chatter(query.from.id, message.chat.id)
             val user = who.user ?: return say(who, notLinked())
             val parts = query.data.orEmpty().split(':')
             val n1 = parts.getOrNull(1)?.toIntOrNull()
@@ -239,6 +239,7 @@ class TelegramBot(
                 "pkg" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
                     if (batch.measuredFg == null) return say(who, "⚠️ Send the final gravity first, e.g. <code>fg 1.010</code>")
                     val packaged = BatchRepository.markPackaged(batch.id, user.id, today()) ?: return
+                    BoilTimerRepository.stop(batch.id)
                     notice = "Packaged 🍻"
                     showBatch(who, user, recipe, packaged)
                 }
@@ -249,7 +250,7 @@ class TelegramBot(
     }
 
     private suspend fun onInlineQuery(query: InlineQuery) {
-        val user = chatter(query.from, query.from.id).user ?: return api.answerInlineQuery(query.id, emptyList())
+        val user = chatter(query.from.id, query.from.id).user ?: return api.answerInlineQuery(query.id, emptyList())
         val term = query.query.trim()
         val summaries = if (term.isEmpty()) RecipeRepository.listByUser(user.id, user.preferences.whirlpool)
         else RecipeRepository.search(user.id, term, user.preferences.whirlpool)
@@ -269,14 +270,14 @@ class TelegramBot(
         val now = clock()
         for (timer in BoilTimerRepository.all()) {
             try {
-                val recipe = BatchRepository.findById(timer.batchId, timer.userId)
-                    ?.let { RecipeRepository.findById(it.recipeId, timer.userId) }
+                val batch = BatchRepository.findById(timer.batchId, timer.userId)?.takeIf { it.packagedDate == null }
+                val recipe = batch?.let { RecipeRepository.findById(it.recipeId, timer.userId) }
                     ?: run { BoilTimerRepository.stop(timer.batchId); null }
                     ?: continue
                 val alert = timer.alertAt(now, recipe.boilAdditions()) ?: continue
-                api.sendMessage(timer.chatId, boilAlertText(recipe, alert, timer.minutesLeft(now)))
-                if (alert.flameOut) BoilTimerRepository.stop(timer.batchId)
-                else BoilTimerRepository.advance(timer.batchId, alert.announcedDownTo)
+                val claimed = if (alert.flameOut) BoilTimerRepository.stop(timer.batchId)
+                else BoilTimerRepository.claim(timer.batchId, timer.announcedDownTo, alert.announcedDownTo)
+                if (claimed) api.sendMessage(timer.chatId, boilAlertText(recipe, alert, timer.minutesLeft(now)))
             } catch (e: Exception) {
                 log.warn("Boil timer for batch {} failed: {}", timer.batchId, e.message)
             }
@@ -352,7 +353,7 @@ class TelegramBot(
 
     private fun today(): LocalDate = clock().atZone(zone).toLocalDate()
 
-    private fun String.short() = if (length <= BUTTON_TEXT_MAX) this else take(BUTTON_TEXT_MAX - 1) + "…"
+    private fun String.short() = shortened(BUTTON_TEXT_MAX)
 
     private companion object {
         val WRITE_ACTIONS = setOf("sb", "cur", "boil", "stop", "pkg")

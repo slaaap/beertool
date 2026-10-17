@@ -98,7 +98,7 @@ no webhook, no open port, and it works the same on a laptop as on a server.
    ./gradlew run
    ```
 
-4. In beertool, open **Settings → Telegram → Connect Telegram**. That opens the bot with a one-time link
+4. In beertool, open **Settings → Connections → Connect Telegram**. That opens the bot with a one-time link
    (valid for 15 minutes); tap **Start** and your Telegram account is linked.
 
 What it does:

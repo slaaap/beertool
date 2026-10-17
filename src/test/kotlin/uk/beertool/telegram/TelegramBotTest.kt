@@ -1,5 +1,6 @@
 package uk.beertool.telegram
 
+import io.kotest.inspectors.forAll
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
@@ -246,6 +247,92 @@ class TelegramBotTest {
         api.edited.single().text shouldBe "📚 <b>Recipes</b>\n<i>Page 2 of 2</i>"
         api.edited.single().buttons.map { it.text } shouldContain "« Prev"
     }
+
+    @Test
+    fun `should give up on a boil timer whose chat has blocked the bot`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = boilRecipe(user)
+        val batch = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.of(2026, 10, 16))!!
+        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+        api.blocked = true
+
+        now = now.plusSeconds(61 * 60)
+        bot.tickBoilTimers()
+
+        BoilTimerRepository.find(batch.id).shouldBeNull()
+    }
+
+    @Test
+    fun `should disconnect and silence running boil timers on unlink`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = boilRecipe(user)
+        val batch = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.of(2026, 10, 16))!!
+        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+
+        send("/unlink")
+
+        TelegramLinkRepository.findByTelegramUser(telegramId).shouldBeNull()
+        BoilTimerRepository.find(batch.id).shouldBeNull()
+        api.last.text shouldContain "Disconnected"
+    }
+
+    @Test
+    fun `should ask for the final gravity before packaging`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id, measuredOg = 1.050))!!
+
+        press("pkg:${recipe.no}:${batch.no}")
+
+        BatchRepository.findById(batch.id, user.id)!!.packagedDate.shouldBeNull()
+        api.last.text shouldContain "fg 1.010"
+    }
+
+    @Test
+    fun `should package a finished batch and stop its boil timer`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = boilRecipe(user)
+        val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id, measuredOg = 1.050, measuredFg = 1.010))!!
+        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+
+        press("pkg:${recipe.no}:${batch.no}")
+
+        BatchRepository.findById(batch.id, user.id)!!.packagedDate shouldBe LocalDate.of(2026, 10, 16)
+        BoilTimerRepository.find(batch.id).shouldBeNull()
+        api.callbackAnswers.last().second shouldBe "Packaged 🍻"
+    }
+
+    @Test
+    fun `should stop a boil timer on request`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = boilRecipe(user)
+        val batch = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.of(2026, 10, 16))!!
+        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+
+        press("stop:${recipe.no}:${batch.no}")
+
+        BoilTimerRepository.find(batch.id).shouldBeNull()
+        api.callbackAnswers.last().second shouldBe "Boil timer stopped"
+    }
+
+    @Test
+    fun `should refuse every write button to a showcase visitor`() = runBlocking<Unit> {
+        val owner = newUser()
+        val recipe = boilRecipe(owner)
+        val batch = BatchRepository.create(owner.id, NewBatch(recipeId = recipe.id, measuredOg = 1.050, measuredFg = 1.010))!!
+        SingleUser.email = owner.email
+
+        listOf("boil", "pkg", "cur", "stop").forEach { press("$it:${recipe.no}:${batch.no}") }
+
+        BoilTimerRepository.find(batch.id).shouldBeNull()
+        BatchRepository.findById(batch.id, owner.id)!!.packagedDate.shouldBeNull()
+        api.sent.map { it.text }.forAll { it shouldContain "read-only showcase" }
+    }
+
+    private fun boilRecipe(user: User) = newRecipe(
+        user,
+        hops = listOf(RecipeHop(name = "Magnum", amountG = 20.0, alphaAcid = 12.0, usage = HopUsage.BOIL, boilTimeMin = 60)),
+    )
 
     private suspend fun send(text: String, chatType: String = "private") = bot.handle(
         Update(updateId = 1, message = Message(1, Chat(telegramId, chatType), TgUser(telegramId), text)),

@@ -119,7 +119,7 @@ private fun FlowContent.mashWaterGuide(recipe: Recipe, user: User) {
     val prefs = user.preferences
     val water = recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg) ?: return
     val grainKg = recipe.mashGrainKg()
-    val preBoil = recipe.preBoilVolumeL!!
+    val preBoil = recipe.preBoilVolumeL ?: return
     val firstRest = recipe.mashSteps.first().tempC
     div("mash-water") {
         id = "mash-water"

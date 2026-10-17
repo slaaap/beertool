@@ -10,6 +10,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -94,7 +95,12 @@ class HttpTelegramApi(private val token: String, pollTimeoutSeconds: Int) : Tele
             // Transport errors can quote the request URL, and the URL carries the bot token.
             throw TelegramException(null, "$method failed: ${e::class.simpleName}: ${e.message?.replace(token, "<token>")}")
         }
-        val response = TelegramJson.decodeFromString(Response.serializer(resultSerializer), body)
+        // An outage page from a proxy is not JSON; treated like a transport failure, it is retried rather than fatal.
+        val response = try {
+            TelegramJson.decodeFromString(Response.serializer(resultSerializer), body)
+        } catch (e: SerializationException) {
+            throw TelegramException(null, "$method returned an unreadable response")
+        }
         return response.result.takeIf { response.ok }
             ?: throw TelegramException(response.errorCode, "$method failed: ${response.description}")
     }
