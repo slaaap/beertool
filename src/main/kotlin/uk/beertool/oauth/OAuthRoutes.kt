@@ -146,10 +146,7 @@ private sealed interface Authorization {
     class Refused(val redirectUri: String, val state: String?, val error: String, val description: String) : Authorization
 }
 
-/**
- * Checks an authorization request. Until the client and its redirect URI are verified, errors are shown on a page
- * and never redirected, so this endpoint can't be used to bounce users to an arbitrary site.
- */
+// Until the client and its redirect URI are verified, errors stay on beertool's page so they can't bounce users elsewhere.
 private suspend fun checkAuthorization(params: Parameters, config: OAuthConfig, clients: ClientRegistry): Authorization {
     val client = params["client_id"]?.let { clients.find(it) }
         ?: return Authorization.Problem("This app isn't recognised, so beertool can't connect it. Only trusted apps such as Claude can connect.")
@@ -171,7 +168,6 @@ private suspend fun checkAuthorization(params: Parameters, config: OAuthConfig, 
     }
 }
 
-// Responds to anything but a valid request, and returns the request when it is valid.
 private suspend fun ApplicationCall.parseAuthorization(params: Parameters, config: OAuthConfig, clients: ClientRegistry): ParsedAuthorization? =
     when (val result = checkAuthorization(params, config, clients)) {
         is Authorization.Ok -> result.parsed

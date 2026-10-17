@@ -4,12 +4,12 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
-import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.request.header
-import io.ktor.server.request.path
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.util.AttributeKey
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -21,12 +21,15 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 import uk.beertool.oauth.ClientRegistry
+import uk.beertool.oauth.LOOPBACK_HOSTS
 import uk.beertool.oauth.MetadataDocumentClients
 import uk.beertool.oauth.OAuthConfig
 import uk.beertool.oauth.OAuthStore
@@ -39,7 +42,7 @@ const val MCP_PATH = "/mcp"
 data class McpConfig(val publicUrl: String?, val trustedClientHosts: Set<String> = DEFAULT_CLIENT_HOSTS) {
     // OAuth needs an issuer address clients can reach, and the spec wants it on HTTPS outside a developer's machine.
     val oauth: OAuthConfig?
-        get() = publicUrl?.takeIf { it.startsWith("https://") || URI(it).host in setOf("localhost", "127.0.0.1") }
+        get() = publicUrl?.takeIf { it.startsWith("https://") || URI(it).host in LOOPBACK_HOSTS }
             ?.let { OAuthConfig(it, MCP_PATH) }
 
     companion object {
@@ -88,14 +91,14 @@ fun Application.configureMcp(
         return
     }
     val oauth = config.oauth
-    install(McpAuth) { this.oauth = oauth }
+    routing { route(MCP_PATH) { install(McpAuth) { this.oauth = oauth } } }
     if (oauth != null) {
         val clients = clientRegistry(config)
         routing { oauthRoutes(oauth, clients) }
         monitor.subscribe(ApplicationStopped) { (clients as? AutoCloseable)?.close() }
         log.info("MCP OAuth enabled for clients from {}", config.trustedClientHosts)
     }
-    val hosts = listOfNotNull(config.publicUrl?.let { URI(it).host }) + listOf("localhost", "127.0.0.1", "[::1]")
+    val hosts = listOfNotNull(config.publicUrl?.let { URI(it).host }) + LOOPBACK_HOSTS
     mcpStatelessStreamableHttp(path = MCP_PATH, allowedHosts = hosts) {
         beertoolMcpServer(call.attributes[McpUser], config.publicUrl)
     }
@@ -108,12 +111,11 @@ class McpAuthConfig {
     var oauth: OAuthConfig? = null
 }
 
-// Every MCP request carries a bearer token; each one gets a server bound to that token's user, so data never crosses users.
-private val McpAuth = createApplicationPlugin("McpAuth", ::McpAuthConfig) {
+// Scoped to the routed /mcp node, so no spelling of the URL (such as /%6Dcp) reaches the tools without a token.
+private val McpAuth = createRouteScopedPlugin("McpAuth", ::McpAuthConfig) {
     val oauth = pluginConfig.oauth
     val challenge = "Bearer realm=\"beertool\"" + (oauth?.let { ", resource_metadata=\"${it.resourceMetadataUrl}\"" } ?: "")
     onCall { call ->
-        if (call.request.path() != MCP_PATH) return@onCall
         val token = call.request.header(HttpHeaders.Authorization)
             ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
             ?.substring("Bearer ".length)?.trim()
@@ -170,6 +172,8 @@ fun beertoolMcpServer(user: User, publicUrl: String?): Server {
     return server
 }
 
+private fun toolError(message: String) = CallToolResult(content = listOf(TextContent(message)), isError = true)
+
 private fun Server.tool(
     name: String,
     description: String,
@@ -187,6 +191,13 @@ private fun Server.tool(
         val result = withContext(Dispatchers.IO) { run(request.arguments ?: JsonObject(emptyMap())) }.withoutNulls()
         CallToolResult(content = listOf(TextContent(result.toString())))
     } catch (e: ToolError) {
-        CallToolResult(content = listOf(TextContent(e.message.orEmpty())), isError = true)
+        toolError(e.message.orEmpty())
+    } catch (e: SerializationException) {
+        toolError("The arguments don't fit the tool's input schema: ${e.message.orEmpty().substringBefore("\nJSON input")}")
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log.warn("MCP tool {} failed", name, e)
+        toolError("beertool hit an internal error running $name.")
     }
 }

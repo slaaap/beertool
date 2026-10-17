@@ -3,7 +3,7 @@ package uk.beertool.oauth
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readRemaining
@@ -29,7 +29,7 @@ data class OAuthClient(
     val loopbackOnly get() = redirectUris.all { isLoopback(URI(it)) }
 }
 
-private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
+val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
 
 private fun isLoopback(uri: URI) = uri.scheme == "http" && uri.host?.lowercase() in LOOPBACK_HOSTS
 
@@ -61,29 +61,33 @@ private class ClientMetadataDocument(
 
 private const val MAX_DOCUMENT_BYTES = 64 * 1024L
 private val CACHE_FOR: Duration = Duration.ofHours(1)
+private val REMEMBER_FAILURE_FOR: Duration = Duration.ofMinutes(5)
+private const val MAX_CACHED = 200
+private const val FETCHES_PER_MINUTE = 30
 
-/**
- * Clients identify themselves with an HTTPS URL that serves their metadata (OAuth Client ID Metadata Documents).
- * Only URLs on trusted hosts are fetched: fetching any URL a stranger supplies would let them aim the server at
- * internal addresses.
- */
+// Only documents on trusted hosts are fetched, so a stranger can't point the server at arbitrary or internal addresses.
 class MetadataDocumentClients(private val trustedHosts: Set<String>) : ClientRegistry, AutoCloseable {
     private val log = LoggerFactory.getLogger(MetadataDocumentClients::class.java)
     private val json = Json { ignoreUnknownKeys = true }
-    private val cache = ConcurrentHashMap<String, Pair<OAuthClient, Instant>>()
+    private val cache = ConcurrentHashMap<String, Pair<OAuthClient?, Instant>>()
+    private val budget = FetchBudget(FETCHES_PER_MINUTE)
     private val http = HttpClient(CIO) {
         followRedirects = false
         expectSuccess = false
         install(HttpTimeout) { requestTimeoutMillis = 5_000 }
     }
 
+    // Failures are remembered and fetches rationed, so anonymous requests can't hammer the trusted hosts from here.
     override suspend fun find(clientId: String): OAuthClient? {
         if (!isTrustedClientId(clientId)) return null
-        cache[clientId]?.let { (client, fetchedAt) -> if (fetchedAt.plus(CACHE_FOR).isAfter(Instant.now())) return client }
+        val now = Instant.now()
+        cache[clientId]?.let { (client, at) -> if (at.plus(if (client == null) REMEMBER_FAILURE_FOR else CACHE_FOR).isAfter(now)) return client }
+        if (!budget.take(now)) return null
         val client = runCatching { fetch(clientId) }
             .onFailure { log.warn("Client metadata {} could not be fetched: {}", clientId, it.message) }
-            .getOrNull() ?: return null
-        cache[clientId] = client to Instant.now()
+            .getOrNull()
+        if (cache.size >= MAX_CACHED) cache.clear()
+        cache[clientId] = client to now
         return client
     }
 
@@ -93,15 +97,30 @@ class MetadataDocumentClients(private val trustedHosts: Set<String>) : ClientReg
             uri.rawPath != "/" && uri.rawFragment == null && uri.userInfo == null
     }
 
-    private suspend fun fetch(clientId: String): OAuthClient? {
-        val response = http.get(clientId)
-        if (!response.status.isSuccess()) return null
+    // Streamed, so the size cap holds before the body is buffered.
+    private suspend fun fetch(clientId: String): OAuthClient? = http.prepareGet(clientId).execute { response ->
+        if (!response.status.isSuccess()) return@execute null
         val bytes = response.bodyAsChannel().readRemaining(MAX_DOCUMENT_BYTES + 1).readByteArray()
-        if (bytes.size > MAX_DOCUMENT_BYTES) return null
+        if (bytes.size > MAX_DOCUMENT_BYTES) return@execute null
         val doc = json.decodeFromString(ClientMetadataDocument.serializer(), bytes.decodeToString())
-        if (doc.clientId != clientId || doc.redirectUris.isEmpty()) return null
-        return OAuthClient(clientId, doc.clientName?.takeIf { it.isNotBlank() } ?: URI(clientId).host, doc.redirectUris)
+        val redirects = doc.redirectUris.filter { runCatching { URI(it).host }.getOrNull() != null }
+        if (doc.clientId != clientId || redirects.isEmpty()) return@execute null
+        OAuthClient(clientId, doc.clientName?.takeIf { it.isNotBlank() } ?: URI(clientId).host, redirects)
     }
 
     override fun close() = http.close()
+}
+
+internal class FetchBudget(private val perMinute: Int) {
+    private var windowStart = Instant.EPOCH
+    private var used = 0
+
+    @Synchronized
+    fun take(now: Instant): Boolean {
+        if (Duration.between(windowStart, now) >= Duration.ofMinutes(1)) {
+            windowStart = now
+            used = 0
+        }
+        return (used < perMinute).also { if (it) used++ }
+    }
 }

@@ -1,6 +1,7 @@
 package uk.beertool.mcp
 
 import io.kotest.inspectors.forNone
+import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -65,7 +66,7 @@ class ApiTokenRepositoryTest {
 
         val revoked = ApiTokenRepository.revoke(id, newUser())
 
-        revoked shouldBe false
+        revoked.shouldBeFalse()
         ApiTokenRepository.userFor(token).shouldNotBeNull()
     }
 

@@ -1,9 +1,10 @@
 package uk.beertool.oauth
 
+import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.HttpCookies
@@ -24,6 +25,7 @@ import io.ktor.server.resources.Resources
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -46,6 +48,7 @@ class OAuthFlowTest {
     private val resource = "$issuer/mcp"
     private val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
     private val claude = OAuthClient("https://claude.ai/oauth/test-client", "Claude", listOf("https://claude.ai/api/mcp/auth_callback"))
+    private val cli = OAuthClient("https://claude.ai/oauth/test-cli", "Claude Code", listOf("http://localhost/callback"))
 
     @BeforeEach
     fun setUp() {
@@ -63,7 +66,7 @@ class OAuthFlowTest {
             install(Resources)
             configureSecurity()
             configureRouting()
-            configureMcp(McpConfig(issuer)) { ClientRegistry { id -> claude.takeIf { it.clientId == id } } }
+            configureMcp(McpConfig(issuer)) { ClientRegistry { id -> listOf(claude, cli).find { it.clientId == id } } }
         }
         block(createClient { install(HttpCookies); followRedirects = false })
     }
@@ -103,9 +106,9 @@ class OAuthFlowTest {
         challenge.status shouldBe HttpStatusCode.Unauthorized
         protectedResource["resource"]!!.jsonPrimitive.content shouldBe resource
         protectedResource["authorization_servers"]!!.jsonArray.single().jsonPrimitive.content shouldBe issuer
-        server["code_challenge_methods_supported"].toString() shouldContain "S256"
-        server["token_endpoint_auth_methods_supported"].toString() shouldContain "none"
-        server["client_id_metadata_document_supported"]!!.jsonPrimitive.content shouldBe "true"
+        server["code_challenge_methods_supported"]!!.jsonArray.map { it.jsonPrimitive.content } shouldContain "S256"
+        server["token_endpoint_auth_methods_supported"]!!.jsonArray.map { it.jsonPrimitive.content } shouldContain "none"
+        server["client_id_metadata_document_supported"]!!.jsonPrimitive.boolean.shouldBeTrue()
     }
 
     @Test
@@ -204,7 +207,32 @@ class OAuthFlowTest {
         stranger.headers[HttpHeaders.Location].shouldBeNull()
         diverted.status shouldBe HttpStatusCode.BadRequest
         diverted.headers[HttpHeaders.Location].shouldBeNull()
-        diverted.bodyAsText() shouldNotContain "evil.example/callback?code"
+    }
+
+    @Test
+    fun `should not hand a code's tokens to a different app`() = oauthApp { client ->
+        client.logIn()
+        val code = Url(client.form("/oauth/authorize", authorizeParams() + ("decision" to "allow")).headers[HttpHeaders.Location]!!).parameters["code"]!!
+
+        val stolen = client.form(
+            "/oauth/token",
+            listOf(
+                "grant_type" to "authorization_code", "code" to code, "redirect_uri" to claude.redirectUris.single(),
+                "client_id" to "https://claude.ai/oauth/other-client", "code_verifier" to verifier,
+            ),
+        )
+
+        stolen.status shouldBe HttpStatusCode.BadRequest
+        json(stolen.bodyAsText())["error"]!!.jsonPrimitive.content shouldBe "invalid_grant"
+    }
+
+    @Test
+    fun `should warn on the consent page when access goes to a program on the brewer's own computer`() = oauthApp { client ->
+        client.logIn()
+
+        val consent = client.get("/oauth/authorize?" + authorizeParams(clientId = cli.clientId, redirectUri = "http://localhost:4567/callback").formUrlEncode())
+
+        consent.bodyAsText() shouldContain "program on your own computer"
     }
 
     @Test

@@ -121,6 +121,18 @@ class RecipeToolsTest {
     }
 
     @Test
+    fun `should refuse a number field that holds text instead of quietly using a default`() {
+        val tools = RecipeTools(newUser(), null)
+        val draft = """{"name": "X", "efficiency": "abc", "mashSteps": [{"tempC": 66}], "yeasts": [{"name": "US-05", "attenuation": "high"}]}"""
+
+        val error = shouldThrow<ToolError> { tools.estimateRecipe(args("recipe" to draft)) }
+
+        error.message shouldContain "efficiency must be a number"
+        error.message shouldContain "mashSteps[0].timeMin is required"
+        error.message shouldContain "yeasts[0].attenuation must be a number"
+    }
+
+    @Test
     fun `should only ever see the token owner's recipes`() {
         val owner = newUser()
         RecipeTools(owner, null).createRecipe(args("recipe" to paleAle))

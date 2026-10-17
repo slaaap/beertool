@@ -1,5 +1,7 @@
 package uk.beertool.mcp
 
+import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -17,6 +19,7 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -62,6 +65,17 @@ class McpEndpointTest {
     }
 
     @Test
+    fun `should demand a token however the endpoint's address is spelled`() = mcpApp {
+        val response = client.post("/%6Dcp") {
+            header(HttpHeaders.Host, "beer.example")
+            contentType(ContentType.Application.Json)
+            setBody("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""")
+        }
+
+        response.status shouldBe HttpStatusCode.Unauthorized
+    }
+
+    @Test
     fun `should refuse a request addressed to a host it does not serve`() = mcpApp {
         val (_, token) = newToken()
 
@@ -102,6 +116,20 @@ class McpEndpointTest {
     }
 
     @Test
+    fun `should explain a malformed argument without exposing internals`() = mcpApp {
+        val (_, token) = newToken()
+
+        val response = client.rpc(
+            """{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"estimate_recipe","arguments":{"recipe":{"name":"X","fermentables":"lots"}}}}""",
+            token,
+        )
+
+        val text = response.bodyAsText()
+        text shouldContain "don't fit the tool's input schema"
+        text shouldNotContain "JSON input"
+    }
+
+    @Test
     fun `should report a bad draft as a tool error the agent can read`() = mcpApp {
         val (_, token) = newToken()
 
@@ -111,7 +139,7 @@ class McpEndpointTest {
         )
 
         val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject["result"]!!.jsonObject
-        result["isError"]!!.jsonPrimitive.content shouldBe "true"
+        result["isError"]!!.jsonPrimitive.boolean.shouldBeTrue()
         result.toString() shouldContain "name is required"
     }
 }

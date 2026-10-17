@@ -84,8 +84,6 @@ fun pkceChallenge(verifier: String): String =
 
 private val VERIFIER = Regex("[A-Za-z0-9._~-]{43,128}")
 
-private fun Instant.micros() = truncatedTo(ChronoUnit.MICROS)
-
 object OAuthStore {
 
     fun issueCode(userId: Long, request: AuthorizationRequest, now: Instant = Instant.now()): String = transaction {
@@ -100,18 +98,17 @@ object OAuthStore {
             it[codeChallenge] = request.codeChallenge
             it[scope] = request.scope
             it[resource] = request.resource
-            it[expiresAt] = now.plus(CODE_TTL).micros()
+            it[expiresAt] = now.plus(CODE_TTL).truncatedTo(ChronoUnit.MICROS)
         }
         code
     }
 
-    // A code works once. It is consumed in its own transaction first, so a failed exchange (a wrong verifier,
-    // say) cannot roll the deletion back and leave the code open to another try.
+    // Consumed in its own transaction, by whoever deletes the row, so neither a rollback nor a racing request can reuse it.
     fun redeemCode(code: String, clientId: String, redirectUri: String, verifier: String, resource: String?, now: Instant = Instant.now()): Tokens {
         val hash = Secrets.sha256(code)
         val row = transaction {
             OAuthCodes.selectAll().where { OAuthCodes.codeHash eq hash }.singleOrNull()
-                ?.also { OAuthCodes.deleteWhere { OAuthCodes.codeHash eq hash } }
+                ?.takeIf { OAuthCodes.deleteWhere { OAuthCodes.codeHash eq hash } == 1 }
         } ?: throw OAuthException("invalid_grant", "The authorization code is unknown or already used.")
         when {
             !row[OAuthCodes.expiresAt].isAfter(now) -> throw OAuthException("invalid_grant", "The authorization code has expired.")
@@ -123,7 +120,6 @@ object OAuthStore {
         }
         return transaction {
             val userId = row[OAuthCodes.userId]
-            OAuthGrants.deleteWhere { (OAuthGrants.userId eq userId) and (OAuthGrants.clientId eq clientId) }
             val refresh = newRefresh()
             val grantId = OAuthGrants.insertAndGetId {
                 it[OAuthGrants.userId] = userId
@@ -132,26 +128,28 @@ object OAuthStore {
                 it[scope] = row[OAuthCodes.scope]
                 it[OAuthGrants.resource] = row[OAuthCodes.resource]
                 it[refreshHash] = Secrets.sha256(refresh)
-                it[refreshExpiresAt] = now.plus(REFRESH_TTL).micros()
-                it[createdAt] = now.micros()
+                it[refreshExpiresAt] = now.plus(REFRESH_TTL).truncatedTo(ChronoUnit.MICROS)
+                it[createdAt] = now.truncatedTo(ChronoUnit.MICROS)
             }.value
             Tokens(issueAccess(grantId, now), refresh, ACCESS_TTL.seconds, row[OAuthCodes.scope])
         }
     }
 
-    // Refresh tokens rotate: each one works once, and the response carries its replacement.
+    // Refresh tokens rotate: each works once, and only the request that swaps the stored hash gets the replacement.
     fun refresh(refreshToken: String, clientId: String, now: Instant = Instant.now()): Tokens = transaction {
-        val row = OAuthGrants.selectAll().where { OAuthGrants.refreshHash eq Secrets.sha256(refreshToken) }.singleOrNull()
+        val presented = Secrets.sha256(refreshToken)
+        val row = OAuthGrants.selectAll().where { OAuthGrants.refreshHash eq presented }.singleOrNull()
         if (row == null || row[OAuthGrants.clientId] != clientId || row[OAuthGrants.refreshExpiresAt]?.isAfter(now) != true) {
             throw OAuthException("invalid_grant", "The refresh token is invalid or expired.")
         }
         val grantId = row[OAuthGrants.id].value
         val refresh = newRefresh()
-        OAuthGrants.update({ OAuthGrants.id eq grantId }) {
+        val swapped = OAuthGrants.update({ (OAuthGrants.id eq grantId) and (OAuthGrants.refreshHash eq presented) }) {
             it[refreshHash] = Secrets.sha256(refresh)
-            it[refreshExpiresAt] = now.plus(REFRESH_TTL).micros()
-            it[lastUsedAt] = now.micros()
+            it[refreshExpiresAt] = now.plus(REFRESH_TTL).truncatedTo(ChronoUnit.MICROS)
+            it[lastUsedAt] = now.truncatedTo(ChronoUnit.MICROS)
         }
+        if (swapped != 1) throw OAuthException("invalid_grant", "The refresh token was already used.")
         Tokens(issueAccess(grantId, now), refresh, ACCESS_TTL.seconds, row[OAuthGrants.scope])
     }
 
@@ -160,7 +158,7 @@ object OAuthStore {
             ?.takeIf { it[OAuthAccessTokens.expiresAt].isAfter(now) } ?: return@transaction null
         val grant = OAuthGrants.selectAll().where { OAuthGrants.id eq access[OAuthAccessTokens.grantId] }.singleOrNull()
             ?.takeIf { it[OAuthGrants.resource] == resource } ?: return@transaction null
-        OAuthGrants.update({ OAuthGrants.id eq grant[OAuthGrants.id] }) { it[lastUsedAt] = now.micros() }
+        OAuthGrants.update({ OAuthGrants.id eq grant[OAuthGrants.id] }) { it[lastUsedAt] = now.truncatedTo(ChronoUnit.MICROS) }
         UserRepository.findById(grant[OAuthGrants.userId])
     }
 
@@ -183,7 +181,7 @@ object OAuthStore {
         OAuthAccessTokens.insert {
             it[tokenHash] = Secrets.sha256(token)
             it[OAuthAccessTokens.grantId] = grantId
-            it[expiresAt] = now.plus(ACCESS_TTL).micros()
+            it[expiresAt] = now.plus(ACCESS_TTL).truncatedTo(ChronoUnit.MICROS)
         }
         return token
     }

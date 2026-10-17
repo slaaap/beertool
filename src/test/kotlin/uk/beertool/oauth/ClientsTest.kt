@@ -1,5 +1,6 @@
 package uk.beertool.oauth
 
+import java.time.Instant
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -59,6 +60,16 @@ class ClientsTest {
 
         trusted shouldBe listOf(true, false, false, false, false, false)
         clients.close()
+    }
+
+    @Test
+    fun `should ration document fetches to a budget per minute`() {
+        val budget = FetchBudget(perMinute = 2)
+        val start = Instant.parse("2026-10-17T10:00:00Z")
+
+        val takes = listOf(start, start, start, start.plusSeconds(61)).map { budget.take(it) }
+
+        takes shouldBe listOf(true, true, false, true)
     }
 
     @Test

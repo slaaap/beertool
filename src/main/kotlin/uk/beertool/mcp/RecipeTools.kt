@@ -283,21 +283,36 @@ private fun validate(recipe: JsonObject) {
     fun named(row: Triple<String, Int, JsonObject>) {
         if (row.third.string("name").isNullOrBlank()) problems += "${row.first}[${row.second}].name is required"
     }
+    fun numbers(where: String, obj: JsonObject, vararg fields: String) = fields.forEach { field ->
+        val value = obj[field]
+        if (value != null && value !is JsonNull && (value as? JsonPrimitive)?.doubleOrNull == null) problems += "$where$field must be a number"
+    }
+
+    numbers("", recipe, "preBoilVolumeL", "postBoilVolumeL", "fermenterVolumeL", "efficiency", "boilTimeMin")
+    rows("mashSteps").forEach { row ->
+        listOf("tempC", "timeMin").forEach { if (row.third[it] == null) problems += "mashSteps[${row.second}].$it is required" }
+        numbers("mashSteps[${row.second}].", row.third, "tempC", "timeMin")
+    }
 
     rows("fermentables").forEach { row ->
         named(row); positive(row, "amountKg")
+        numbers("fermentables[${row.second}].", row.third, "colourEbc", "extractPercent", "boilTimeMin")
         val type = code(row, "type", FermentableType) ?: FermentableType.default
         val usage = code(row, "usage", FermentableUsage) ?: FermentableUsage.default
         if (usage !in type.usages) problems += "fermentables[${row.second}]: a ${type.code} can only be used in ${type.usages.joinToString { it.code }}"
     }
     rows("hops").forEach { row ->
         named(row); positive(row, "amountG"); positive(row, "alphaAcid")
+        numbers("hops[${row.second}].", row.third, "boilTimeMin", "dryHopDays")
         val usage = code(row, "usage", HopUsage) ?: HopUsage.default
         // Without a time the hop drops out of the IBU estimate unnoticed.
         if (usage.inBoil && row.third.int("boilTimeMin") == null) problems += "hops[${row.second}].boilTimeMin is required for a ${usage.code} hop"
     }
-    rows("yeasts").forEach { row -> named(row); code(row, "usage", YeastUsage) }
-    rows("extras").forEach { row -> named(row); positive(row, "amount"); code(row, "unit", AmountUnit); code(row, "usage", ExtraUsage) }
+    rows("yeasts").forEach { row -> named(row); code(row, "usage", YeastUsage); numbers("yeasts[${row.second}].", row.third, "attenuation") }
+    rows("extras").forEach { row ->
+        named(row); positive(row, "amount"); code(row, "unit", AmountUnit); code(row, "usage", ExtraUsage)
+        numbers("extras[${row.second}].", row.third, "boilTimeMin")
+    }
 
     if (problems.isNotEmpty()) throw ToolError("The recipe has problems:\n- " + problems.joinToString("\n- "))
 }

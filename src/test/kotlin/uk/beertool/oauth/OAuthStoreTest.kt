@@ -1,6 +1,7 @@
 package uk.beertool.oauth
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
@@ -98,13 +99,15 @@ class OAuthStoreTest {
     }
 
     @Test
-    fun `should keep one grant per app when the brewer connects it again`() {
+    fun `should keep each device connected when the same app connects from another`() {
         val userId = newUser()
-        redeem(OAuthStore.issueCode(userId, request(), now))
+        val laptop = redeem(OAuthStore.issueCode(userId, request(), now))
 
-        redeem(OAuthStore.issueCode(userId, request(), now))
+        val desktop = redeem(OAuthStore.issueCode(userId, request(), now))
 
-        OAuthStore.listGrants(userId) shouldHaveSize 1
+        OAuthStore.listGrants(userId) shouldHaveSize 2
+        OAuthStore.userForAccessToken(laptop.accessToken, resource, now).shouldNotBeNull()
+        OAuthStore.userForAccessToken(desktop.accessToken, resource, now).shouldNotBeNull()
     }
 
     @Test
@@ -115,7 +118,7 @@ class OAuthStoreTest {
 
         val revoked = OAuthStore.revokeGrant(grant.id, newUser())
 
-        revoked shouldBe false
+        revoked.shouldBeFalse()
         OAuthStore.userForAccessToken(tokens.accessToken, resource, now).shouldNotBeNull()
     }
 }

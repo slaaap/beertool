@@ -1,26 +1,28 @@
 package uk.beertool.web
 
+import io.ktor.http.HttpHeaders
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
+import io.ktor.server.response.header
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
-import uk.beertool.recipe.MashStep
-import io.ktor.server.application.ApplicationCall
-import io.ktor.server.plugins.origin
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
 import uk.beertool.mcp.Mcp
-import uk.beertool.telegram.Telegram
 import uk.beertool.oauth.OAuthStore
-import java.time.Instant
-import java.time.ZoneId
+import uk.beertool.recipe.MashStep
+import uk.beertool.telegram.Telegram
 import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
+import java.time.Instant
+import java.time.ZoneId
 
 @Serializable
 data class SettingsForm(
@@ -78,6 +80,7 @@ fun Route.settingsRoutes() {
             if (!Mcp.enabled) return@withUser call.respondRedirect(CONNECTIONS)
             val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
             val token = ApiTokenRepository.create(user.id, name)
+            call.response.header(HttpHeaders.CacheControl, "no-store")
             call.respondHtml { connectionsPage(user, call.mcpEndpoint(), NewToken(name, token)) }
         }
     }

@@ -1,7 +1,9 @@
 package uk.beertool.auth
 
 import io.ktor.server.application.Application
+import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
+import io.ktor.server.response.header
 import io.ktor.server.sessions.SessionSerializer
 import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.server.sessions.Sessions
@@ -17,6 +19,7 @@ fun Application.configureSecurity() {
         SecureRandom().generateSeed(32)
     }
 
+    install(FramingForbidden)
     install(Sessions) {
         cookie<UserSession>("BEERTOOL_SESSION") {
             cookie.path = "/"
@@ -26,6 +29,14 @@ fun Application.configureSecurity() {
             serializer = UserSessionSerializer
             transform(SessionTransportTransformerMessageAuthentication(secret))
         }
+    }
+}
+
+// No page is meant to be shown inside another site's frame, which keeps the OAuth consent page safe from clickjacking.
+private val FramingForbidden = createApplicationPlugin("FramingForbidden") {
+    onCall { call ->
+        call.response.header("X-Frame-Options", "DENY")
+        call.response.header("Content-Security-Policy", "frame-ancestors 'none'")
     }
 }
 
