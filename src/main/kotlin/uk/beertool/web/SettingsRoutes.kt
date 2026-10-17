@@ -265,10 +265,6 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
                 }
                 tbody { id = "ws-body"; prefs.waterSources.forEachIndexed { i, w -> waterSourceRow(i, w) } }
             }
-            p("muted") {
-                +"From your water report or the bottle label. Bicarbonate = alkalinity as CaCO₃ × 1.22. "
-                +"If calcium is missing: (total hardness as CaCO₃ − 4.12 × magnesium) ÷ 2.5."
-            }
 
             actionBar {
                 submitInput(classes = "btn primary") { value = "Save preferences" }
