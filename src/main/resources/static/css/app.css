@@ -1,7 +1,7 @@
 :root {
   --ground:#FBF8F2; --surface:#FFFFFF; --ink:#2A2018; --muted:#7C7063;
   --hairline:#E8DFCF; --accent:#AE6A2E; --accent-soft:#F3E4D2; --field:#FFFDF9;
-  --danger:#A8321F; --danger-soft:#F7E3DF;
+  --danger:#A8321F; --danger-soft:#F7E3DF; --good:#3D7A3A;
   --font-display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,ui-serif,serif;
   --font-body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
@@ -9,14 +9,14 @@
 @media (prefers-color-scheme: dark) {
   :root { --ground:#16120E; --surface:#1F1913; --ink:#F1E7D8; --muted:#A99A86;
     --hairline:#33281E; --accent:#E0964A; --accent-soft:#2C2117; --field:#241D16;
-    --danger:#E8705A; --danger-soft:#341C17; }
+    --danger:#E8705A; --danger-soft:#341C17; --good:#7DBA6E; }
 }
 :root[data-theme="light"] { --ground:#FBF8F2; --surface:#FFFFFF; --ink:#2A2018; --muted:#7C7063;
   --hairline:#E8DFCF; --accent:#AE6A2E; --accent-soft:#F3E4D2; --field:#FFFDF9;
-  --danger:#A8321F; --danger-soft:#F7E3DF; }
+  --danger:#A8321F; --danger-soft:#F7E3DF; --good:#3D7A3A; }
 :root[data-theme="dark"] { --ground:#16120E; --surface:#1F1913; --ink:#F1E7D8; --muted:#A99A86;
   --hairline:#33281E; --accent:#E0964A; --accent-soft:#2C2117; --field:#241D16;
-  --danger:#E8705A; --danger-soft:#341C17; }
+  --danger:#E8705A; --danger-soft:#341C17; --good:#7DBA6E; }
 
 * { box-sizing:border-box; }
 body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--font-body);
@@ -146,7 +146,7 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--acc
 .g2 { grid-template-columns:repeat(2,1fr); }
 .g3 { grid-template-columns:repeat(3,1fr); }
 .field { display:flex; flex-direction:column; gap:5px; min-width:0; }
-.field > label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em;
+.field > label, .field-head > label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em;
   color:var(--muted); }
 .field input, .field select, .field textarea { width:100%; }
 .field .hint { font-size:12px; color:var(--muted); }
@@ -223,17 +223,16 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stats.chem .k, table.water-sources th { text-transform:none; letter-spacing:0.04em; }
 table.water-adds { margin-bottom:12px; }
 .water-editor [hidden] { display:none !important; }
-.water-line { display:flex; gap:12px; align-items:flex-end; margin:12px 0; }
-.water-line .field { flex:1; min-width:0; }
-.water-line > .btn { margin-bottom:4px; }
-table.water-salts { width:auto; margin:4px 0 8px; }
-table.water-salts td { padding-top:4px; padding-bottom:4px; }
-table.water-salts td:first-child { padding-right:16px; }
-table.water-salts input { width:90px; }
-table.water-salts td.unit { color:var(--muted); padding:0 10px 0 6px; }
-.water-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 14px; }
+.field-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.field-remove { border:0; background:none; padding:0 2px; font-size:16px; line-height:1; color:var(--muted); cursor:pointer; }
+.field-remove:hover { color:var(--danger); }
+.water-panel .grid { margin:12px 0; }
+.water-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 16px; }
 .water-actions .more-stages > div { left:0; right:auto; }
-.use-lactic { margin:10px 0 4px; }
+.stat.good .v { color:var(--good); }
+.stat.bad .v { color:var(--danger); }
+.tile-action { margin-top:6px; padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
+.tile-action:hover { text-decoration:underline; }
 table.water-plan { margin-top:14px; }
 table.water-plan .num { white-space:nowrap; }
 table.water-plan th:first-child { white-space:normal; }

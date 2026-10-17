@@ -12,7 +12,7 @@
   }
 
   function show(editor, field) {
-    var row = editor.querySelector('tr[data-add="' + field + '"]');
+    var row = editor.querySelector('[data-add="' + field + '"]');
     row.hidden = false;
     editor.querySelectorAll('[data-adds="' + field + '"]').forEach(function (b) { b.hidden = true; });
     var menu = editor.querySelector('details[open]');
@@ -26,8 +26,7 @@
     editor.querySelector('.water-add').hidden = true;
     panel.hidden = false;
     enable(panel, true);
-    var mix = panel.querySelector('.water-mix');
-    if (mix && mix.hidden) enable(mix, false);
+    panel.querySelectorAll('.water-mix[hidden]').forEach(function (mix) { enable(mix, false); });
     changed(editor);
   };
 
@@ -44,18 +43,14 @@
 
   window.waterMix = function (button) {
     var editor = editorOf(button);
-    var mix = editor.querySelector('.water-mix');
-    mix.hidden = false;
-    enable(mix, true);
+    editor.querySelectorAll('.water-mix').forEach(function (mix) { mix.hidden = false; enable(mix, true); });
     button.hidden = true;
     changed(editor);
   };
 
   window.waterUnmix = function (button) {
     var editor = editorOf(button);
-    var mix = editor.querySelector('.water-mix');
-    mix.hidden = true;
-    enable(mix, false);
+    editor.querySelectorAll('.water-mix').forEach(function (mix) { mix.hidden = true; enable(mix, false); });
     editor.querySelector('[data-mix]').hidden = false;
     changed(editor);
   };
@@ -67,7 +62,7 @@
 
   window.waterDrop = function (button) {
     var editor = editorOf(button);
-    var row = button.closest('tr');
+    var row = button.closest('[data-add]');
     row.querySelector('input').value = '';
     row.hidden = true;
     editor.querySelectorAll('[data-adds="' + row.dataset.add + '"]').forEach(function (b) { b.hidden = false; });

@@ -4,6 +4,8 @@ import kotlinx.html.*
 import kotlinx.html.stream.createHTML
 import uk.beertool.batch.Batch
 import uk.beertool.brewing.Salt
+import uk.beertool.recipe.MAX_MASH_PH
+import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
@@ -49,63 +51,43 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
         div("water-add") {
             hidden = open
             if (names.isEmpty()) btnLink("/settings", "Add water sources in Settings", Icon.PLUS)
-            else button(type = ButtonType.button, classes = "btn small") {
-                onClick = "waterOpen(this)"
-                span("ico") { unsafe { +Icon.PLUS.markup() } }
-                span { +"Add water" }
-            }
+            else addButton("Add water", "waterOpen(this)")
         }
         if (names.isEmpty()) return@div
         div("water-panel") {
             hidden = !open
-            div("water-line") {
-                field("Water") { waterSelect("water.source", names, water?.source ?: names.first(), disabled = !open) }
-                rowRemoveButton("waterClose(this)", "Remove water")
-            }
-            if (names.size > 1) {
-                div("water-line water-mix") {
-                    hidden = !mixing
-                    field("Mixed with") {
+            fieldGrid(columns = 3) {
+                removableField("Water", "waterClose(this)", "Remove water") {
+                    waterSelect("water.source", names, water?.source ?: names.first(), disabled = !open)
+                }
+                if (names.size > 1) {
+                    removableField("Mixed with", "waterUnmix(this)", "Stop mixing", classes = "water-mix", hidden = !mixing) {
                         waterSelect("water.blendSource", names, water?.blendSource ?: names[1], disabled = !mixing)
                     }
-                    field("Share (%)") {
+                    div("field water-mix") {
+                        hidden = !mixing
+                        label { +"Share (%)" }
                         numberInput(name = "water.blendPercent") {
                             value = fmt(water?.blendPercent?.takeIf { mixing } ?: DEFAULT_BLEND_PERCENT, 0)
                             numAttrs("5", max = "100"); disabled = !mixing
                         }
                     }
-                    rowRemoveButton("waterUnmix(this)", "Stop mixing")
                 }
             }
-            table("water-salts") {
-                tbody {
-                    ADDITIONS.forEach { a ->
-                        val amount = water?.let(a.of)?.takeIf { it > 0.0 }
-                        tr {
-                            attributes["data-add"] = a.field
-                            hidden = amount == null
-                            td { +a.label }
-                            td("num") {
-                                numberInput(name = "water.${a.field}") {
-                                    value = amount?.toString() ?: ""; numAttrs("0.1"); disabled = !open
-                                }
-                            }
-                            td("unit") { +a.unit }
-                            td("right") { rowRemoveButton("waterDrop(this)", "Remove ${a.label.lowercase()}") }
+            fieldGrid(columns = 3) {
+                ADDITIONS.forEach { a ->
+                    val amount = water?.let(a.of)?.takeIf { it > 0.0 }
+                    removableField("${a.label} (${a.unit})", "waterDrop(this)", "Remove ${a.label.lowercase()}", hidden = amount == null, dataAdd = a.field) {
+                        numberInput(name = "water.${a.field}") {
+                            value = amount?.toString() ?: ""; numAttrs("0.1"); disabled = !open
                         }
                     }
                 }
             }
             div("water-actions") {
-                if (names.size > 1) button(type = ButtonType.button, classes = "btn small") {
-                    hidden = mixing
-                    attributes["data-mix"] = ""
-                    onClick = "waterMix(this)"
-                    span("ico") { unsafe { +Icon.PLUS.markup() } }
-                    span { +"Mix" }
-                }
+                if (names.size > 1) addButton("Mix", "waterMix(this)") { hidden = mixing; attributes["data-mix"] = "" }
                 details(classes = "more-stages") {
-                    summary(classes = "btn small") { +"Add salt" }
+                    summary(classes = "btn small") { span("ico") { unsafe { +Icon.PLUS.markup() } }; span { +"Salt" } }
                     div {
                         ADDITIONS.filterNot { it.mashOnly }.forEach { a ->
                             button(type = ButtonType.button, classes = "btn small") {
@@ -118,17 +100,48 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                     }
                 }
                 ADDITIONS.filter { it.mashOnly }.forEach { a ->
-                    button(type = ButtonType.button, classes = "btn small") {
+                    addButton(a.label, "waterAdd('${a.field}')") {
                         attributes["data-adds"] = a.field
                         hidden = water?.let(a.of)?.let { it > 0.0 } == true
-                        onClick = "waterAdd('${a.field}')"
-                        span("ico") { unsafe { +Icon.PLUS.markup() } }
-                        span { +a.label }
                     }
                 }
                 submitLabel?.let { submitInput(classes = "btn primary small") { value = it } }
             }
         }
+    }
+}
+
+private fun FlowContent.addButton(label: String, onClick: String, attrs: BUTTON.() -> Unit = {}) {
+    button(type = ButtonType.button, classes = "btn small") {
+        this.onClick = onClick
+        attrs()
+        span("ico") { unsafe { +Icon.PLUS.markup() } }
+        span { +label }
+    }
+}
+
+private fun FlowContent.removableField(
+    label: String,
+    onRemove: String,
+    removeLabel: String,
+    classes: String? = null,
+    hidden: Boolean = false,
+    dataAdd: String? = null,
+    block: DIV.() -> Unit,
+) {
+    div(listOfNotNull("field", classes).joinToString(" ")) {
+        this.hidden = hidden
+        dataAdd?.let { attributes["data-add"] = it }
+        div("field-head") {
+            label { +label }
+            button(type = ButtonType.button, classes = "field-remove") {
+                onClick = onRemove
+                title = removeLabel
+                attributes["aria-label"] = removeLabel
+                +"×"
+            }
+        }
+        block()
     }
 }
 
@@ -152,15 +165,19 @@ internal fun FlowContent.waterResult(report: WaterReport?, canApply: Boolean = f
 }
 
 private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
+    val inRange = report.mashPh?.let { it in MIN_MASH_PH..MAX_MASH_PH }
+    val lactic = report.lacticForTargetMl
     div("stats trio chem") {
         statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label)
-        statTile("Mash pH", fmt(report.mashPh, 2), null, accent = true)
-        statTile("Lactic for $TARGET_MASH_PH", fmt(report.lacticForTargetMl, 1), "ml")
-    }
-    val lactic = report.lacticForTargetMl?.takeIf { canApply && it >= 0.1 } ?: return
-    button(type = ButtonType.button, classes = "btn small use-lactic") {
-        onClick = "waterUseLactic('${fmt(lactic, 1)}')"
-        +"Use ${fmt(lactic, 1)} ml lactic acid"
+        statTile("Mash pH", fmt(report.mashPh, 2), "$MIN_MASH_PH-$MAX_MASH_PH", tone = if (inRange == false) "bad" else if (inRange == true) "good" else null)
+        statTile("Lactic for $TARGET_MASH_PH", fmt(lactic, 1), "ml") {
+            if (canApply && lactic != null && lactic >= 0.1) {
+                button(type = ButtonType.button, classes = "tile-action") {
+                    onClick = "waterUseLactic('${fmt(lactic, 1)}')"
+                    +"Use this"
+                }
+            }
+        }
     }
 }
 

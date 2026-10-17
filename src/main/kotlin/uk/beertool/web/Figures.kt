@@ -201,14 +201,17 @@ internal fun DIV.statTile(
     accent: Boolean = false,
     last: Boolean = false,
     valueId: String? = null,
+    tone: String? = null,
+    action: (DIV.() -> Unit)? = null,
 ) {
-    val classes = buildString { append("stat"); if (accent) append(" accent"); if (last) append(" last") }
+    val classes = listOfNotNull("stat", "accent".takeIf { accent }, "last".takeIf { last }, tone).joinToString(" ")
     div(classes) {
         div("k") { +label }
         div("v") {
             if (valueId != null) span { id = valueId; +value } else +value
             unit?.let { span("u") { +" $it" } }
         }
+        action?.invoke(this)
     }
 }
 
