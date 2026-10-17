@@ -76,7 +76,8 @@ class SettingsTelegramTest {
         val page = client.get("/settings/connections").bodyAsText()
         client.post("/settings/telegram/unlink")
 
-        page shouldContain "Connected to @beertool_test_bot"
+        page shouldContain "@beertool_test_bot"
+        page shouldContain "/settings/telegram/unlink"
         TelegramLinkRepository.findByUser(user.id).shouldBeNull()
     }
 

@@ -11,6 +11,7 @@ import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
+import uk.beertool.mcp.ApiToken
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
 import uk.beertool.mcp.Mcp
@@ -22,6 +23,7 @@ import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 @Serializable
@@ -238,9 +240,28 @@ private fun FlowContent.telegramSection(user: User) {
     if (TelegramLinkRepository.findByUser(user.id) == null) {
         actionBar { btnPost("/settings/telegram", "Connect Telegram", Icon.PLUS) }
     } else {
-        p("muted") { +"Connected to @${Telegram.botUsername}." }
-        actionBar { btnPost("/settings/telegram/unlink", "Disconnect", Icon.TRASH, style = ButtonStyle.DANGER) }
+        ul("conn-list") {
+            connRow("@${Telegram.botUsername}", "connected") {
+                deleteButton("/settings/telegram/unlink", "Disconnect Telegram? You can connect again any time.")
+            }
+        }
     }
+}
+
+private fun UL.connRow(name: String, meta: String, action: DIV.() -> Unit) {
+    li {
+        div("what") {
+            div { +name }
+            div("meta") { +meta }
+        }
+        div { action() }
+    }
+}
+
+private fun usage(created: Instant, lastUsed: Instant?): String {
+    val today = LocalDate.now()
+    fun day(at: Instant) = at.atZone(ZoneId.systemDefault()).toLocalDate().let { if (it == today) "today" else shortDate(it, today) }
+    return "connected ${day(created)} · " + (lastUsed?.let { "last used ${day(it)}" } ?: "not used yet")
 }
 
 private fun ApplicationCall.mcpEndpoint(): String? {
@@ -252,71 +273,57 @@ private fun ApplicationCall.mcpEndpoint(): String? {
     return base + MCP_PATH
 }
 
-private fun localDate(at: Instant) = fmt(at.atZone(ZoneId.systemDefault()).toLocalDate())
-
 private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
     sectionHead("AI assistant")
-    p("muted") { +"MCP endpoint "; code { +endpoint } }
-    if (Mcp.oauthEnabled) connectedApps(user, endpoint)
-    accessTokens(user, endpoint, newToken)
+    div("stack") {
+        field("Server URL") { code("token") { +endpoint } }
+        if (Mcp.oauthEnabled) connectedApps(user, endpoint)
+    }
+    val tokens = ApiTokenRepository.listByUser(user.id)
+    if (Mcp.tokensEnabled || tokens.isNotEmpty()) accessTokens(tokens, endpoint, newToken)
 }
 
 private fun FlowContent.connectedApps(user: User, endpoint: String) {
-    p {
-        +"Add the endpoint as a custom connector in Claude or ChatGPT, or in Claude Code run "
-        code { +"claude mcp add --transport http beertool $endpoint" }
-        +". You approve the connection here."
-    }
-    val apps = OAuthStore.listGrants(user.id)
-    if (apps.isEmpty()) return
-    table {
-        thead { tr { th { +"Connected app" }; th { +"Connected" }; th { +"Last used" }; th {} } }
-        tbody {
+    field("Claude or ChatGPT") { p { +"Add the server URL as a custom connector, then approve the connection here." } }
+    field("Claude Code") { code("token") { +"claude mcp add --transport http beertool $endpoint" } }
+    field("Connected apps") {
+        val apps = OAuthStore.listGrants(user.id)
+        if (apps.isEmpty()) p("muted") { +"No apps connected yet." }
+        else ul("conn-list") {
             apps.forEach { g ->
-                tr {
-                    td { +g.clientName }
-                    td { +localDate(g.createdAt) }
-                    td { +(g.lastUsedAt?.let(::localDate) ?: "never") }
-                    td("right") { deleteButton("/settings/apps/${g.id}/revoke", "Disconnect ${g.clientName}? It will need your approval to connect again.") }
+                connRow(g.clientName, usage(g.createdAt, g.lastUsedAt)) {
+                    deleteButton("/settings/apps/${g.id}/revoke", "Disconnect ${g.clientName}? It will need your approval to connect again.")
                 }
             }
         }
     }
 }
 
-private fun FlowContent.accessTokens(user: User, endpoint: String, newToken: NewToken?) {
+// Tokens left over from before they were switched off would work again if switched back on, so they stay revocable.
+private fun FlowContent.accessTokens(tokens: List<ApiToken>, endpoint: String, newToken: NewToken?) {
+    sectionHead("Personal tokens")
+    if (!Mcp.tokensEnabled) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
     newToken?.let {
         div("token-box") {
             p { strong { +"Copy the token for “${it.name}” now." }; +" It won't be shown again." }
             code("token") { +it.token }
-            p("muted") { +"To connect Claude Code:" }
+            p("muted") { +"To connect Claude Code with it:" }
             code("token") { +"claude mcp add --transport http beertool $endpoint --header \"Authorization: Bearer ${it.token}\"" }
         }
     }
-    val tokens = ApiTokenRepository.listByUser(user.id)
-    // Tokens left over from before they were switched off would work again if switched back on, so they stay revocable.
-    if (!Mcp.tokensEnabled && tokens.isNotEmpty()) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
     if (tokens.isNotEmpty()) {
-        table {
-            thead { tr { th { +"Token" }; th { +"Created" }; th { +"Last used" }; th {} } }
-            tbody {
-                tokens.forEach { t ->
-                    tr {
-                        td { +t.name }
-                        td { +localDate(t.createdAt) }
-                        td { +(t.lastUsedAt?.let(::localDate) ?: "never") }
-                        td("right") { deleteButton("/settings/tokens/${t.id}/revoke", "Revoke “${t.name}”? Anything using it will lose access.") }
-                    }
+        ul("conn-list") {
+            tokens.forEach { t ->
+                connRow(t.name, usage(t.createdAt, t.lastUsedAt)) {
+                    deleteButton("/settings/tokens/${t.id}/revoke", "Revoke “${t.name}”? Anything using it will lose access.")
                 }
             }
         }
     }
     if (!Mcp.tokensEnabled) return
-    form(action = "/settings/tokens", method = FormMethod.post) {
-        fieldGrid(columns = 2) {
-            field("New token name") { textInput(name = "name") { placeholder = "e.g. Claude Code on my laptop" } }
-        }
-        actionBar { submitInput(classes = "btn") { value = "Create token" } }
+    form(action = "/settings/tokens", method = FormMethod.post, classes = "inline-form") {
+        field("New token name") { textInput(name = "name") { placeholder = "e.g. Claude Code on my laptop" } }
+        submitInput(classes = "btn") { value = "Create token" }
     }
 }
 

@@ -11,12 +11,19 @@ import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.user.BrewerPreferences
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 internal const val MISSING = "—"
 
 internal fun fmt(v: Double?, decimals: Int) = v?.let { "%.${decimals}f".format(it) } ?: MISSING
 
 internal fun fmt(d: LocalDate?) = d?.toString() ?: MISSING
+
+private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
+private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+
+fun shortDate(date: LocalDate, today: LocalDate): String = date.format(if (date.year == today.year) DAY_MONTH else DAY_MONTH_YEAR)
 
 internal fun prettify(name: String) = name.lowercase().replace('_', ' ').replaceFirstChar { it.titlecase() }
 

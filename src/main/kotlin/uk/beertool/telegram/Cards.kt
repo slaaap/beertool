@@ -18,10 +18,9 @@ import uk.beertool.recipe.mashWater
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.web.fmt
 import uk.beertool.web.prettify
+import uk.beertool.web.shortDate
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 // Telegram rejects messages longer than 4096 characters.
 private const val MAX_MESSAGE = 4000
@@ -93,15 +92,9 @@ fun recipeCard(recipe: Recipe, stats: RecipeStats, publicUrl: String? = null): S
 
 private fun mashLines(recipe: Recipe) = recipe.mashSteps.mapIndexed { i, step -> "${i + 1}. ${formatAmount(step.tempC)} °C · ${step.timeMin} min" }
 
-private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
-private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
 private const val MAX_NOTES = 1500
 
-fun friendlyDate(date: LocalDate?, today: LocalDate): String = when {
-    date == null -> "no date"
-    date.year == today.year -> date.format(DAY_MONTH)
-    else -> date.format(DAY_MONTH_YEAR)
-}
+fun friendlyDate(date: LocalDate?, today: LocalDate): String = date?.let { shortDate(it, today) } ?: "no date"
 
 // Cuts on a whole character, so an emoji's surrogate pair is never split into an invalid half.
 fun String.shortened(max: Int): String {

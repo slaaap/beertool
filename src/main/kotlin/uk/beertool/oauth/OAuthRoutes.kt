@@ -149,7 +149,7 @@ private sealed interface Authorization {
 // Until the client and its redirect URI are verified, errors stay on beertool's page so they can't bounce users elsewhere.
 private suspend fun checkAuthorization(params: Parameters, config: OAuthConfig, clients: ClientRegistry): Authorization {
     val client = params["client_id"]?.let { clients.find(it) }
-        ?: return Authorization.Problem("This app isn't recognised, so beertool can't connect it. Only trusted apps such as Claude can connect.")
+        ?: return Authorization.Problem("This app isn't recognised, so beertool can't connect it. Only trusted apps such as Claude and ChatGPT can connect.")
     val redirectUri = params["redirect_uri"]?.takeIf { client.allowsRedirect(it) }
         ?: return Authorization.Problem("${client.name} asked to send you somewhere it hasn't registered, so the request was stopped.")
     val state = params["state"]
