@@ -56,7 +56,7 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
         if (names.isEmpty()) return@div
         div("water-panel") {
             hidden = !open
-            fieldGrid(columns = 3) {
+            div("grid g3 water-row" + if (mixing) "" else " solo") {
                 removableField("Water", "waterClose(this)", "Remove water") {
                     waterSelect("water.source", names, water?.source ?: names.first(), disabled = !open)
                 }
@@ -72,6 +72,7 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                             numAttrs("5", max = "100"); disabled = !mixing
                         }
                     }
+                    addButton("Mix", "waterMix(this)") { hidden = mixing; attributes["data-mix"] = "" }
                 }
             }
             fieldGrid(columns = 3) {
@@ -85,7 +86,6 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                 }
             }
             div("water-actions") {
-                if (names.size > 1) addButton("Mix", "waterMix(this)") { hidden = mixing; attributes["data-mix"] = "" }
                 details(classes = "more-stages") {
                     summary(classes = "btn small") { span("ico") { unsafe { +Icon.PLUS.markup() } }; span { +"Salt" } }
                     div {

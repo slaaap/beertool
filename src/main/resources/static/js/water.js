@@ -44,6 +44,7 @@
   window.waterMix = function (button) {
     var editor = editorOf(button);
     editor.querySelectorAll('.water-mix').forEach(function (mix) { mix.hidden = false; enable(mix, true); });
+    editor.querySelector('.water-row').classList.remove('solo');
     button.hidden = true;
     changed(editor);
   };
@@ -51,6 +52,7 @@
   window.waterUnmix = function (button) {
     var editor = editorOf(button);
     editor.querySelectorAll('.water-mix').forEach(function (mix) { mix.hidden = true; enable(mix, false); });
+    editor.querySelector('.water-row').classList.add('solo');
     editor.querySelector('[data-mix]').hidden = false;
     changed(editor);
   };

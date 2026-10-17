@@ -227,6 +227,8 @@ table.water-adds { margin-bottom:12px; }
 .field-remove { border:0; background:none; padding:0 2px; font-size:16px; line-height:1; color:var(--muted); cursor:pointer; }
 .field-remove:hover { color:var(--danger); }
 .water-panel .grid { margin:12px 0; }
+.water-row.solo { grid-template-columns:1fr auto; }
+.water-row > .btn { align-self:end; height:42px; }
 .water-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 16px; }
 .water-actions .more-stages > div { left:0; right:auto; }
 .stat.good .v { color:var(--good); }
@@ -277,6 +279,7 @@ li { margin:3px 0; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
   .brew-water .g3 { grid-template-columns:repeat(2,1fr); }
+  .water-row.solo, .brew-water .water-row.solo { grid-template-columns:1fr auto; }
   table.water-plan th.num { white-space:nowrap; }
 
   th.num { white-space:normal; }
