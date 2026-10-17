@@ -222,6 +222,18 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stats + .stats { margin-top:12px; }
 .stats.chem .k, table.water-sources th { text-transform:none; letter-spacing:0.04em; }
 table.water-adds { margin-bottom:12px; }
+.water-editor [hidden] { display:none !important; }
+.water-line { display:flex; gap:12px; align-items:flex-end; margin:12px 0; }
+.water-line .field { flex:1; min-width:0; }
+.water-line > .btn { margin-bottom:4px; }
+table.water-salts { width:auto; margin:4px 0 8px; }
+table.water-salts td { padding-top:4px; padding-bottom:4px; }
+table.water-salts td:first-child { padding-right:16px; }
+table.water-salts input { width:90px; }
+table.water-salts td.unit { color:var(--muted); padding:0 10px 0 6px; }
+.water-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 14px; }
+.water-actions .more-stages > div { left:0; right:auto; }
+.use-lactic { margin:10px 0 4px; }
 table.water-plan { margin-top:14px; }
 table.water-plan .num { white-space:nowrap; }
 table.water-plan th:first-child { white-space:normal; }

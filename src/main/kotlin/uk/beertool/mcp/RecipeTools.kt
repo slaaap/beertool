@@ -190,9 +190,12 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
     private fun validateWater(water: JsonObject?) {
         if (water == null) return
         val known = prefs.waterSources.map { it.name }
+        if (water.string("source").isNullOrBlank()) {
+            throw ToolError(if (known.isEmpty()) "water needs a source, but the brewer has no saved water sources; leave water out" else "water.source is required; known sources: ${known.joinToString()}")
+        }
         val unknown = listOf("source", "blendSource").mapNotNull { key -> water.string(key)?.takeIf { it.isNotBlank() && it !in known }?.let { key to it } }
         if (unknown.isEmpty()) return
-        val choices = if (known.isEmpty()) "the brewer has no saved water sources, so omit it for distilled water" else "known sources: ${known.joinToString()}"
+        val choices = if (known.isEmpty()) "the brewer has no saved water sources" else "known sources: ${known.joinToString()}"
         throw ToolError(unknown.joinToString("\n") { (key, name) -> "water.$key \"$name\" is not a saved water source; $choices" })
     }
 

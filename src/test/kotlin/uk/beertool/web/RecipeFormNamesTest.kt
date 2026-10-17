@@ -10,9 +10,12 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.serializer
 import org.junit.jupiter.api.Test
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.estimatedStats
+import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
+import uk.beertool.user.WaterSource
 import java.time.Instant
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -60,7 +63,8 @@ class RecipeFormNamesTest {
     }
 
     private fun renderedFormNames(): List<String> {
-        val user = User(id = 1, email = "b@t.uk", displayName = "Brewer", createdAt = Instant.EPOCH)
+        val waters = listOf(WaterSource("Tap", WaterProfile(calcium = 99.0)), WaterSource("Bottled", WaterProfile(calcium = 11.0)))
+        val user = User(id = 1, email = "b@t.uk", displayName = "Brewer", createdAt = Instant.EPOCH, preferences = BrewerPreferences(waterSources = waters))
         val html = createHTMLDocument()
             .html { recipeFormPage(user, null, NewRecipe(name = "").estimatedStats()) }
             .serialize()

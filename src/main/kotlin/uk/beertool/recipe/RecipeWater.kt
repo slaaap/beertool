@@ -14,10 +14,9 @@ const val TARGET_MASH_PH = 5.4
 const val MIN_MASH_PH = 5.2
 const val MAX_MASH_PH = 5.6
 
-// A null source means distilled or RO water.
 @Serializable
 data class RecipeWater(
-    val source: String? = null,
+    val source: String,
     val blendSource: String? = null,
     val blendPercent: Double = 0.0,
     val gypsumG: Double = 0.0,
@@ -36,10 +35,8 @@ data class RecipeWater(
             SaltAddition(Salt.BAKING_SODA, bakingSodaG),
         ).filter { it.grams > 0.0 }
 
-    val blends get() = blendPercent > 0.0
+    val blends get() = blendSource != null && blendPercent > 0.0
 }
-
-const val DISTILLED_WATER = "Distilled / RO"
 
 // What a brew was made with: the sources are copied so later edits in Settings leave the brew log alone.
 @Serializable
@@ -54,9 +51,8 @@ fun BrewerPreferences.snapshot(water: RecipeWater) =
 fun BrewerPreferences.defaultRecipeWater() = waterSources.firstOrNull()?.let { RecipeWater(source = it.name) }
 
 fun RecipeWater.describe(): String {
-    val base = source ?: DISTILLED_WATER
-    if (!blends) return base
-    return "$base ${fmtPercent(100.0 - blendPercent)}% + ${blendSource ?: DISTILLED_WATER} ${fmtPercent(blendPercent)}%"
+    if (!blends) return source
+    return "$source ${fmtPercent(100.0 - blendPercent)}% + $blendSource ${fmtPercent(blendPercent)}%"
 }
 
 private fun fmtPercent(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
@@ -84,7 +80,7 @@ data class WaterReport(
 
     val warnings: List<String>
         get() = buildList {
-            missingSources.forEach { add("\"$it\" is no longer in your water sources, so it counts as distilled water.") }
+            missingSources.forEach { add("\"$it\" is no longer in your water sources, so its minerals are left out.") }
             if (profile.calcium < 50.0) add("Calcium is under 50 mg/L, which can slow the yeast and leave the beer hazy.")
             if (profile.magnesium > 30.0) add("Magnesium above 30 mg/L can taste sour and bitter.")
             if (profile.sodium > 150.0) add("Sodium above 150 mg/L can taste salty.")
@@ -113,13 +109,12 @@ private fun waterReport(
     prefs: BrewerPreferences,
 ): WaterReport {
     val missing = mutableListOf<String>()
-    fun profileOf(name: String?): WaterProfile {
-        if (name == null) return WaterProfile.DISTILLED
-        return sources.find { it.name == name }?.profile ?: WaterProfile.DISTILLED.also { missing += name }
-    }
+    fun profileOf(name: String): WaterProfile =
+        sources.find { it.name == name }?.profile ?: WaterProfile.DISTILLED.also { missing += name }
 
     val base = profileOf(water.source)
-    val mixed = if (water.blends) WaterChemistry.blend(base, profileOf(water.blendSource), water.blendPercent / 100.0) else base
+    val mixed = water.blendSource?.takeIf { water.blends }
+        ?.let { WaterChemistry.blend(base, profileOf(it), water.blendPercent / 100.0) } ?: base
 
     val grainKg = fermentables.filter { it.type.isMashed }.sumOf { it.amountKg }
     val preBoil = preBoilVolumeL ?: postBoilVolumeL

@@ -113,6 +113,7 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
         prototypeRow(EXTRAS) { extraRow(0, null) }
 
         js("recipe-form.js")
+        js("water.js")
         script(type = "application/json") { id = "bjcp-map"; unsafe { +BeerStyles.nameToUrlJson } }
         js("style-link.js")
     }

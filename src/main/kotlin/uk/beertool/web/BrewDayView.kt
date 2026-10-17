@@ -113,6 +113,7 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
         }
 
         js("brew-day.js")
+        js("water.js")
         js("ui.js")
     }
 }

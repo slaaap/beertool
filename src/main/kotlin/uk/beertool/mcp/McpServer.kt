@@ -91,7 +91,7 @@ private val INSTRUCTIONS = """
     beertool holds this brewer's beer recipes and brew log, and does the brewing maths.
     - Call get_brewer_profile before drafting, so volumes, efficiency and the default mash fit their kit.
     - Never compute OG, FG, ABV, IBU, colour, water minerals or mash pH yourself: call estimate_recipe, which uses the same formulas as the app.
-    - Water: pick sources by name from the profile's waterSources (omit source for distilled/RO), add salts in grams and lactic acid in ml, and aim for the mash pH range estimate_recipe reports.
+    - Water: pick sources by name from the profile's waterSources, add salts in grams and lactic acid in ml, and aim for the mash pH range estimate_recipe reports.
     - Iterate with estimate_recipe; only call create_recipe or update_recipe once the brewer has agreed to save.
     - update_recipe replaces the whole recipe: start from get_recipe and send back every ingredient you want to keep.
     - Units: kg for fermentables, g for hops, litres, °C, minutes. Efficiency and attenuation are percentages.

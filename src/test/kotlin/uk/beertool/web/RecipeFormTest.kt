@@ -231,17 +231,17 @@ class RecipeFormTest {
     }
 
     @Test
-    fun `should leave a recipe without water when it names none and treats none`() {
-        val form = form("water.source" to "", "water.blendSource" to "Ashbeck", "water.gypsumG" to "")
+    fun `should leave a recipe without water when the water section was never opened`() {
+        val form = form("name" to "Pale")
 
         form.toNewRecipe().water shouldBe null
     }
 
     @Test
-    fun `should keep distilled water when it is treated`() {
-        val form = form("water.source" to "", "water.lacticMl" to "2")
+    fun `should ignore a share of a second water that was never picked`() {
+        val form = form("water.source" to "London tap", "water.blendPercent" to "50")
 
-        form.toNewRecipe().water shouldBe RecipeWater(lacticMl = 2.0)
+        form.toNewRecipe().water shouldBe RecipeWater(source = "London tap")
     }
 
     @OptIn(ExperimentalSerializationApi::class)

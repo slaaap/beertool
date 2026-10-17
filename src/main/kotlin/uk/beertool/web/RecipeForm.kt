@@ -50,10 +50,12 @@ data class WaterForm(
 )
 
 fun WaterForm.toRecipeWater(): RecipeWater? {
-    val percent = (blendPercent ?: 0.0).coerceIn(0.0, 100.0)
-    val water = RecipeWater(
-        source = source.trim().ifBlank { null },
-        blendSource = blendSource.trim().ifBlank { null }?.takeIf { percent > 0.0 },
+    val name = source.trim().ifBlank { return null }
+    val partner = blendSource.trim().ifBlank { null }
+    val percent = if (partner == null) 0.0 else (blendPercent ?: 0.0).coerceIn(0.0, 100.0)
+    return RecipeWater(
+        source = name,
+        blendSource = partner?.takeIf { percent > 0.0 },
         blendPercent = percent,
         gypsumG = gypsumG.amount(),
         calciumChlorideG = calciumChlorideG.amount(),
@@ -62,7 +64,6 @@ fun WaterForm.toRecipeWater(): RecipeWater? {
         bakingSodaG = bakingSodaG.amount(),
         lacticMl = lacticMl.amount(),
     )
-    return water.takeUnless { it == RecipeWater() }
 }
 
 private fun Double?.amount() = (this ?: 0.0).coerceAtLeast(0.0)

@@ -35,12 +35,12 @@ class RecipeWaterTest {
 
     @Test
     fun `should dose salts across both strike and sparge water`() {
-        val report = pale(RecipeWater(source = null, gypsumG = 3.2)).waterReport(prefs)!!
+        val report = pale(RecipeWater(source = "Ashbeck", gypsumG = 3.2)).waterReport(prefs)!!
 
         report.strikeL shouldBe (15.0 plusOrMinus 0.001)
         report.spargeL shouldBe (17.0 plusOrMinus 0.001)
         report.totalL shouldBe (32.0 plusOrMinus 0.001)
-        report.profile.calcium shouldBe (3.2 * 232.8 / 32.0 plusOrMinus 0.1)
+        report.profile.calcium shouldBe (11.0 + 3.2 * 232.8 / 32.0 plusOrMinus 0.1)
     }
 
     @Test
@@ -52,18 +52,18 @@ class RecipeWaterTest {
     }
 
     @Test
-    fun `should mix with distilled water when the second water is left blank`() {
+    fun `should not mix when no second water is named`() {
         val report = pale(RecipeWater(source = "London tap", blendPercent = 25.0)).waterReport(prefs)!!
 
-        report.profile.bicarbonate shouldBe (187.5 plusOrMinus 0.001)
+        report.profile.bicarbonate shouldBe 250.0
     }
 
     @Test
-    fun `should treat a water that was deleted from settings as distilled and say so`() {
+    fun `should leave out the minerals of a water that was deleted from settings and say so`() {
         val report = pale(RecipeWater(source = "Old well")).waterReport(prefs)!!
 
         report.profile shouldBe WaterProfile.DISTILLED
-        report.warnings shouldContain "\"Old well\" is no longer in your water sources, so it counts as distilled water."
+        report.warnings shouldContain "\"Old well\" is no longer in your water sources, so its minerals are left out."
     }
 
     @Test
@@ -109,7 +109,7 @@ class RecipeWaterTest {
 
     @Test
     fun `should list only the salts actually used`() {
-        val water = RecipeWater(gypsumG = 2.0, epsomG = 0.0, bakingSodaG = 1.0)
+        val water = RecipeWater(source = "London tap", gypsumG = 2.0, epsomG = 0.0, bakingSodaG = 1.0)
 
         water.salts.map { it.salt.name } shouldContainExactly listOf("GYPSUM", "BAKING_SODA")
     }

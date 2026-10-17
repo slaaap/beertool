@@ -185,15 +185,25 @@ class RecipeToolsTest {
 
     @Test
     fun `should round-trip a recipe's water through get and update`() {
-        val user = newUser()
+        val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(WaterSource("Tap", WaterProfile(calcium = 99.0)))))!!
         val tools = RecipeTools(user, null)
-        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"blendPercent\": 0, \"gypsumG\": 2.5, \"lacticMl\": 3}, \"yeasts\"")
+        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"source\": \"Tap\", \"gypsumG\": 2.5, \"lacticMl\": 3}, \"yeasts\"")
         val no = tools.createRecipe(args("recipe" to draft)).jsonObject["no"]!!.jsonPrimitive.int
         val fetched = tools.getRecipe(args("no" to "$no")).withoutNulls().jsonObject
 
         tools.updateRecipe(buildJsonObject { put("no", no); put("recipe", fetched["recipe"]!!) })
 
-        RecipeRepository.findByNo(no, user.id)!!.water shouldBe RecipeWater(gypsumG = 2.5, lacticMl = 3.0)
+        RecipeRepository.findByNo(no, user.id)!!.water shouldBe RecipeWater(source = "Tap", gypsumG = 2.5, lacticMl = 3.0)
+    }
+
+    @Test
+    fun `should ask for a source when a draft's water names none`() {
+        val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(WaterSource("Tap", WaterProfile(calcium = 99.0)))))!!
+        val draft = """{"name": "X", "water": {"lacticMl": 3}}"""
+
+        val error = shouldThrow<ToolError> { RecipeTools(user, null).estimateRecipe(args("recipe" to draft)) }
+
+        error.message shouldContain "water.source is required; known sources: Tap"
     }
 
     private fun RecipeTools.draftFor(json: String) = draftArg(args("recipe" to json))

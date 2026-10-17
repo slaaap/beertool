@@ -87,9 +87,9 @@ private val EXTRA = objectOf(
 
 private val WATER = objectOf(
     mapOf(
-        "source" to string("Name of one of the brewer's waterSources. Omit for distilled or RO water"),
-        "blendSource" to string("A second water to mix in, by name. Omit for distilled or RO water"),
-        "blendPercent" to number("Share of the mix that is blendSource, %. 0 or omitted means no mix"),
+        "source" to string("Name of one of the brewer's waterSources"),
+        "blendSource" to string("A second of the brewer's waterSources to mix in. Omit for no mix"),
+        "blendPercent" to number("Share of the mix that is blendSource, %"),
         "gypsumG" to number("Gypsum (calcium sulphate), grams for all the brewing water"),
         "calciumChlorideG" to number("Calcium chloride flakes (dihydrate), grams for all the brewing water"),
         "epsomG" to number("Epsom salt (magnesium sulphate), grams for all the brewing water"),
@@ -97,8 +97,8 @@ private val WATER = objectOf(
         "bakingSodaG" to number("Baking soda (sodium bicarbonate), grams for all the brewing water"),
         "lacticMl" to number("Lactic acid 80%, ml, added to the mash"),
     ),
-    emptyList(),
-    "Brewing water and its treatment. Salts are dosed across strike and sparge water in proportion.",
+    listOf("source"),
+    "Brewing water and its treatment; omit for a recipe without water chemistry. Salts are dosed across strike and sparge water in proportion.",
 )
 
 private val RECIPE = objectOf(
