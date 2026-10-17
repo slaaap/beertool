@@ -77,11 +77,6 @@ internal fun FlowContent.waterResult(report: WaterReport?) {
         WATER_IONS.forEach { ion -> statTile(ion.label, fmt(ion.of(report.profile), 0), "mg/L") }
     }
     mashPhTiles(report)
-    p("muted water-note") {
-        +"Salts dose ${fmt(report.totalL, 1)} L of water"
-        if (report.strikeL != null && report.spargeL != null) +": ${fmt(report.strikeL, 1)} L strike + ${fmt(report.spargeL, 1)} L sparge"
-        +". Lactic acid goes in the mash."
-    }
     report.warnings.forEach { div("alert") { +it } }
 }
 
@@ -96,13 +91,11 @@ private fun FlowContent.mashPhTiles(report: WaterReport) {
 internal fun FlowContent.waterSummary(water: RecipeWater?, report: WaterReport?) {
     if (water == null) return
     sectionHead("Water")
-    p { +water.describe() }
-    val used = ADDITIONS.filter { it.of(water) > 0.0 }
-    if (used.isNotEmpty()) scrollTable("bill fit") {
-        thead { tr { head("Addition", SLOT_NAME); numHead("Amount", slot = SLOT_AMOUNT); head("Unit", SLOT_WHAT) } }
+    scrollTable("bill fit water-adds") {
         tbody {
-            used.forEach { a ->
-                tr { td { +a.label }; numCell(a.of(water), decimals = 1); td { +a.unit } }
+            tr { td { +"Water" }; td { colSpan = "2"; +water.describe() } }
+            ADDITIONS.filter { it.of(water) > 0.0 }.forEach { a ->
+                tr { td { +a.label }; td("num") { +"${fmt(a.of(water), 1)} ${a.unit}" }; emptyCell() }
             }
         }
     }
@@ -113,10 +106,9 @@ internal fun FlowContent.brewDayWater(recipe: Recipe, batch: Batch, prefs: Brewe
     val snapshot = batch.water
     val water = snapshot?.water ?: RecipeWater()
     val report = snapshot?.let { recipe.waterReport(it, prefs) }
+    if (batch.waterLocked && report == null) return
     sectionHead("Water")
-    if (batch.waterLocked) {
-        p { +(snapshot?.water?.describe() ?: DISTILLED_WATER) }
-    } else {
+    if (!batch.waterLocked) {
         form(action = "/recipes/${recipe.no}/batches/${batch.no}/water", method = FormMethod.post, classes = "brew-water") {
             id = "water"
             waterInputs(water, prefs.waterSources.map { it.name })
@@ -133,11 +125,10 @@ private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
     val strike = report.strikeL ?: return
     val sparge = report.spargeL ?: return
     val used = ADDITIONS.filter { it.of(water) > 0.0 }
-    if (used.isEmpty()) return
     table("mash-plan water-plan") {
         thead {
             tr {
-                th { +"Water treatment" }
+                th { +water.describe() }
                 th(classes = "num") { +"Strike ${fmt(strike, 1)} L" }
                 th(classes = "num") { +"Sparge ${fmt(sparge, 1)} L" }
             }

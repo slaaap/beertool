@@ -221,8 +221,10 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stats.six { grid-template-columns:repeat(6,1fr); }
 .stats + .stats { margin-top:12px; }
 .stats.chem .k, table.water-sources th { text-transform:none; letter-spacing:0.04em; }
-.water-note { margin:10px 0 14px; font-size:13px; }
+table.water-adds { margin-bottom:12px; }
 table.water-plan { margin-top:14px; }
+table.water-plan .num { white-space:nowrap; }
+table.water-plan th:first-child { white-space:normal; }
 .mash-water .grid { margin-top:12px; }
 
 ul { padding-left:20px; }
@@ -264,6 +266,7 @@ li { margin:3px 0; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
   .brew-water .g3 { grid-template-columns:repeat(2,1fr); }
+  table.water-plan th.num { white-space:nowrap; }
 
   th.num { white-space:normal; }
 }
