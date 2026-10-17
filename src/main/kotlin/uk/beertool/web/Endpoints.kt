@@ -17,6 +17,9 @@ class Logout
 @Resource("/settings")
 class Settings(val saved: Boolean = false)
 
+@Resource("/settings/connections")
+class SettingsConnections
+
 @Resource("/settings/tokens")
 class SettingsTokens
 

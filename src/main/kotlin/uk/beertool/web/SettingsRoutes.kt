@@ -52,7 +52,14 @@ fun SettingsForm.toPreferences(current: BrewerPreferences) = current.copy(
 fun Route.settingsRoutes() {
     get<Settings> { res ->
         withUser(write = true) { call, user ->
-            call.respondHtml { settingsPage(user, saved = res.saved, mcpEndpoint = call.mcpEndpoint()) }
+            call.respondHtml { settingsPage(user, saved = res.saved) }
+        }
+    }
+
+    get<SettingsConnections> {
+        withUser(write = true) { call, user ->
+            if (!hasConnections()) return@withUser call.respondRedirect("/settings")
+            call.respondHtml { connectionsPage(user, call.mcpEndpoint()) }
         }
     }
 
@@ -66,24 +73,24 @@ fun Route.settingsRoutes() {
 
     post<SettingsTokens> {
         withUser(write = true) { call, user ->
-            if (!Mcp.enabled) return@withUser call.respondRedirect("/settings")
+            if (!Mcp.enabled) return@withUser call.respondRedirect(CONNECTIONS)
             val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
             val token = ApiTokenRepository.create(user.id, name)
-            call.respondHtml { settingsPage(user, saved = false, mcpEndpoint = call.mcpEndpoint(), newToken = NewToken(name, token)) }
+            call.respondHtml { connectionsPage(user, call.mcpEndpoint(), NewToken(name, token)) }
         }
     }
 
     post<SettingsTokenRevoke> { res ->
         withUser(write = true) { call, user ->
             ApiTokenRepository.revoke(res.id, user.id)
-            call.respondRedirect("/settings")
+            call.respondRedirect(CONNECTIONS)
         }
     }
 
     post<SettingsTelegram> {
         withUser(write = true) { call, user ->
             val bot = Telegram.botUsername
-            if (bot == null) call.respondRedirect("/settings")
+            if (bot == null) call.respondRedirect(CONNECTIONS)
             else call.respondRedirect("https://t.me/$bot?start=${TelegramLinkRepository.issueToken(user.id)}")
         }
     }
@@ -91,7 +98,7 @@ fun Route.settingsRoutes() {
     post<SettingsTelegramUnlink> {
         withUser(write = true) { call, user ->
             TelegramLinkRepository.unlinkUser(user.id)
-            call.respondRedirect("/settings")
+            call.respondRedirect(CONNECTIONS)
         }
     }
 }
@@ -101,10 +108,32 @@ data class NewToken(val name: String, val token: String)
 @Serializable
 data class TokenForm(val name: String = "")
 
-fun HTML.settingsPage(user: User, saved: Boolean, mcpEndpoint: String? = null, newToken: NewToken? = null) {
+private const val CONNECTIONS = "/settings/connections"
+
+private fun hasConnections() = Telegram.enabled || Mcp.enabled
+
+private fun FlowContent.settingsHead(current: String) {
+    h1 { +"Settings" }
+    if (!hasConnections()) return
+    nav("subnav") {
+        listOf("/settings" to "Brewing", CONNECTIONS to "Connections").forEach { (href, label) ->
+            a(href = href, classes = if (href == current) "current" else null) { +label }
+        }
+    }
+}
+
+fun HTML.connectionsPage(user: User, mcpEndpoint: String?, newToken: NewToken? = null) {
+    page("Connections", user) {
+        settingsHead(CONNECTIONS)
+        if (Telegram.enabled) telegramSection(user)
+        mcpEndpoint?.let { assistantSection(user, it, newToken) }
+    }
+}
+
+fun HTML.settingsPage(user: User, saved: Boolean) {
     val prefs = user.preferences
     page("Settings", user) {
-        h1 { +"Brewing preferences" }
+        settingsHead("/settings")
 
         form(action = "/settings", method = FormMethod.post) {
             id = "settings-form"
@@ -184,9 +213,6 @@ fun HTML.settingsPage(user: User, saved: Boolean, mcpEndpoint: String? = null, n
                 if (saved) span("saved-note") { id = "saved-note"; +"Saved ✓" }
             }
         }
-
-        if (Telegram.enabled) telegramSection(user)
-        mcpEndpoint?.let { assistantSection(user, it, newToken) }
 
         table { style = "display:none"; tbody { id = "sm-proto"; mashPrefRow(0, null) } }
 

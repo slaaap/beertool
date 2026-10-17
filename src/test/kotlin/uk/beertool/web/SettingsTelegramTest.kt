@@ -68,7 +68,7 @@ class SettingsTelegramTest {
         Telegram.botUsername = "beertool_test_bot"
         TelegramLinkRepository.redeem(TelegramLinkRepository.issueToken(user.id), telegramUserId = 8, chatId = 8)
 
-        val page = client.get("/settings").bodyAsText()
+        val page = client.get("/settings/connections").bodyAsText()
         client.post("/settings/telegram/unlink")
 
         page shouldContain "Connected to @beertool_test_bot"

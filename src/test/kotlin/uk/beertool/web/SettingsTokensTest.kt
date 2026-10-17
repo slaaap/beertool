@@ -12,6 +12,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.server.application.install
 import io.ktor.server.resources.Resources
@@ -25,6 +26,7 @@ import uk.beertool.auth.configureSecurity
 import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.Mcp
+import uk.beertool.telegram.Telegram
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import java.util.UUID
@@ -37,6 +39,7 @@ class SettingsTokensTest {
         SingleUser.email = null
         Mcp.enabled = true
         Mcp.publicUrl = "https://beer.example"
+        Telegram.botUsername = null
     }
 
     @AfterEach
@@ -60,7 +63,7 @@ class SettingsTokensTest {
             contentType(ContentType.Application.FormUrlEncoded)
             setBody("name=Laptop")
         }.bodyAsText()
-        val later = client.get("/settings").bodyAsText()
+        val later = client.get("/settings/connections").bodyAsText()
 
         val token = Regex("bt_[A-Za-z0-9_-]+").find(created).shouldNotBeNull().value
         ApiTokenRepository.userFor(token)!!.id shouldBe user.id
@@ -77,6 +80,39 @@ class SettingsTokensTest {
         client.post("/settings/tokens/$id/revoke")
 
         ApiTokenRepository.listByUser(user.id).shouldBeEmpty()
+    }
+
+    @Test
+    fun `should keep brewing preferences and connections on separate tabs`() = settingsApp { client, _ ->
+        val brewing = client.get("/settings").bodyAsText()
+        val connections = client.get("/settings/connections").bodyAsText()
+
+        brewing shouldContain "Your kit"
+        brewing shouldContain "href=\"/settings/connections\""
+        brewing shouldNotContain "AI assistant"
+        connections shouldContain "AI assistant"
+        connections shouldNotContain "Your kit"
+    }
+
+    @Test
+    fun `should send connections back to brewing settings when there is nothing to connect`() = settingsApp { client, _ ->
+        Mcp.enabled = false
+
+        val response = client.get("/settings/connections")
+        val brewing = client.get("/settings").bodyAsText()
+
+        response.headers[HttpHeaders.Location] shouldBe "/settings"
+        brewing shouldNotContain "Connections"
+    }
+
+    @Test
+    fun `should never list another brewer's tokens`() = settingsApp { client, _ ->
+        val other = UserRepository.create("other-${UUID.randomUUID()}@beertool.test", "hash", "Other")
+        ApiTokenRepository.create(other.id, "Other brewer's laptop")
+
+        val page = client.get("/settings/connections").bodyAsText()
+
+        page shouldNotContain "Other brewer"
     }
 
     private fun settingsApp(block: suspend ApplicationTestBuilder.(HttpClient, User) -> Unit) = testApplication {
