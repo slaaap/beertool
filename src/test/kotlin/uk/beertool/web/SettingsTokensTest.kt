@@ -26,6 +26,11 @@ import uk.beertool.auth.configureSecurity
 import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.Mcp
+import uk.beertool.oauth.AuthorizationRequest
+import uk.beertool.oauth.OAuthClient
+import uk.beertool.oauth.OAuthStore
+import uk.beertool.oauth.SCOPE
+import uk.beertool.oauth.pkceChallenge
 import uk.beertool.telegram.Telegram
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
@@ -113,6 +118,20 @@ class SettingsTokensTest {
         val page = client.get("/settings/connections").bodyAsText()
 
         page shouldNotContain "Other brewer"
+    }
+
+    @Test
+    fun `should list a connected app and let the brewer disconnect it`() = settingsApp { client, user ->
+        val claude = OAuthClient("https://claude.ai/oauth/test-client", "Claude", listOf("https://claude.ai/api/mcp/auth_callback"))
+        val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        val request = AuthorizationRequest(claude, claude.redirectUris.single(), pkceChallenge(verifier), SCOPE, "https://beer.example/mcp")
+        OAuthStore.redeemCode(OAuthStore.issueCode(user.id, request), claude.clientId, claude.redirectUris.single(), verifier, null)
+
+        val page = client.get("/settings/connections").bodyAsText()
+        client.post("/settings/apps/${OAuthStore.listGrants(user.id).single().id}/revoke")
+
+        page shouldContain "Claude"
+        OAuthStore.listGrants(user.id).shouldBeEmpty()
     }
 
     private fun settingsApp(block: suspend ApplicationTestBuilder.(HttpClient, User) -> Unit) = testApplication {

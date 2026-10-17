@@ -19,7 +19,11 @@ import uk.beertool.user.UserRepository
 data class RegisterForm(val email: String = "", val displayName: String = "", val password: String = "")
 
 @Serializable
-data class LoginForm(val email: String = "", val password: String = "")
+data class LoginForm(val email: String = "", val password: String = "", val next: String = "")
+
+// Only same-site paths, so a crafted link can't bounce a fresh login to another site.
+internal fun safeNext(next: String?): String? =
+    next?.takeIf { it.startsWith("/") && !it.startsWith("//") && '\\' !in it }
 
 fun Route.authRoutes() {
     get<Register> {
@@ -48,7 +52,7 @@ fun Route.authRoutes() {
         call.respondRedirect("/recipes")
     }
 
-    get<Login> { call.respondLoginForm() }
+    get<Login> { res -> call.respondLoginForm(next = safeNext(res.next)) }
 
     post<Login> {
         val form = call.receiveForm<LoginForm>()
@@ -56,12 +60,12 @@ fun Route.authRoutes() {
 
         val found = UserRepository.findByEmail(email)
         if (found == null || !PasswordHasher.verify(form.password, found.passwordHash)) {
-            call.respondLoginForm(email, "Invalid email or password.")
+            call.respondLoginForm(email, "Invalid email or password.", safeNext(form.next))
             return@post
         }
 
         call.sessions.set(UserSession(found.user.id))
-        call.respondRedirect("/recipes")
+        call.respondRedirect(safeNext(form.next) ?: "/recipes")
     }
 
     post<Logout> {
@@ -99,12 +103,14 @@ private suspend fun ApplicationCall.respondRegisterForm(
 private suspend fun ApplicationCall.respondLoginForm(
     email: String = "",
     error: String? = null,
+    next: String? = null,
 ) = respondHtml {
     page("Log in") {
         div("auth-card") {
             h1 { +"Log in" }
             error?.let { p("alert") { +it } }
             form(action = "/login", method = FormMethod.post) {
+                next?.let { hiddenInput(name = "next") { value = it } }
                 fieldGrid(columns = 1) {
                     field("Email") { emailInput(name = "email") { value = email; required = true } }
                     field("Password") { passwordInput(name = "password") { required = true } }

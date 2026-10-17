@@ -54,6 +54,7 @@ All configuration is via environment variables:
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
 | `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
 | `MCP_ENABLED`       | *(unset → off)*                                   | `true` turns on the MCP endpoint at `/mcp` (see below)        |
+| `MCP_OAUTH_CLIENT_HOSTS` | `claude.ai`                                  | Comma-separated hosts whose apps may connect through OAuth (see below) |
 | `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site, and the MCP endpoint accepts requests for this host |
 
 Example, pointing at a real database:
@@ -149,7 +150,20 @@ high?"*. The tools it gets:
 | `create_recipe`      | Save a new recipe                                                            |
 | `update_recipe`      | Replace an existing recipe                                                   |
 
-Revoke a token in Settings and anything using it loses access at once. Set `PUBLIC_URL` in production:
+### Connecting from claude.ai (web, desktop, mobile)
+
+With `PUBLIC_URL` set to the app's HTTPS address, beertool is also an OAuth authorization server, so you can
+add it in claude.ai as a custom connector with no token at all: **Settings → Connectors → Add custom
+connector**, URL `https://beer.example.com/mcp`. Claude sends you to beertool to log in and approve, and the
+connection then works in claude.ai on any device, including a phone's browser. Claude Code can connect the
+same way, without a token: `claude mcp add --transport http beertool https://beer.example.com/mcp`.
+
+Apps identify themselves with an OAuth Client ID Metadata Document, which beertool fetches to check the app's
+name and where it may send you back. Only apps on the hosts in `MCP_OAUTH_CLIENT_HOSTS` are accepted, so the
+server never fetches addresses a stranger supplies. Connected apps are listed under **Settings → Connections**,
+where you can disconnect them.
+
+Revoke a token or disconnect an app in Settings and it loses access at once. Set `PUBLIC_URL` in production:
 requests addressed to any other host are refused, which protects the endpoint against DNS rebinding.
 
 ## Build a standalone jar

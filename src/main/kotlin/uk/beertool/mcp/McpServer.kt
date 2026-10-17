@@ -3,12 +3,14 @@ package uk.beertool.mcp
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
 import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.routing
 import io.ktor.util.AttributeKey
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
@@ -24,16 +26,32 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
+import uk.beertool.oauth.ClientRegistry
+import uk.beertool.oauth.MetadataDocumentClients
+import uk.beertool.oauth.OAuthConfig
+import uk.beertool.oauth.OAuthStore
+import uk.beertool.oauth.oauthRoutes
 import uk.beertool.user.User
 import java.net.URI
 
 const val MCP_PATH = "/mcp"
 
-data class McpConfig(val publicUrl: String?) {
+data class McpConfig(val publicUrl: String?, val trustedClientHosts: Set<String> = DEFAULT_CLIENT_HOSTS) {
+    // OAuth needs an issuer address clients can reach, and the spec wants it on HTTPS outside a developer's machine.
+    val oauth: OAuthConfig?
+        get() = publicUrl?.takeIf { it.startsWith("https://") || URI(it).host in setOf("localhost", "127.0.0.1") }
+            ?.let { OAuthConfig(it, MCP_PATH) }
+
     companion object {
+        val DEFAULT_CLIENT_HOSTS = setOf("claude.ai")
+
         fun fromEnv(env: (String) -> String? = System::getenv): McpConfig? {
             if (env("MCP_ENABLED")?.trim()?.equals("true", ignoreCase = true) != true) return null
-            return McpConfig(env("PUBLIC_URL")?.trim()?.trimEnd('/')?.ifBlank { null })
+            return McpConfig(
+                publicUrl = env("PUBLIC_URL")?.trim()?.trimEnd('/')?.ifBlank { null },
+                trustedClientHosts = env("MCP_OAUTH_CLIENT_HOSTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
+                    ?: DEFAULT_CLIENT_HOSTS,
+            )
         }
     }
 }
@@ -61,12 +79,22 @@ private val INSTRUCTIONS = """
     - Use BJCP 2021 style names from find_styles, so the recipe links to its style guideline.
 """.trimIndent()
 
-fun Application.configureMcp(config: McpConfig? = McpConfig.fromEnv()) {
+fun Application.configureMcp(
+    config: McpConfig? = McpConfig.fromEnv(),
+    clientRegistry: (McpConfig) -> ClientRegistry = { MetadataDocumentClients(it.trustedClientHosts) },
+) {
     if (config == null) {
         log.info("MCP_ENABLED not set - MCP endpoint disabled")
         return
     }
-    install(McpAuth)
+    val oauth = config.oauth
+    install(McpAuth) { this.oauth = oauth }
+    if (oauth != null) {
+        val clients = clientRegistry(config)
+        routing { oauthRoutes(oauth, clients) }
+        monitor.subscribe(ApplicationStopped) { (clients as? AutoCloseable)?.close() }
+        log.info("MCP OAuth enabled for clients from {}", config.trustedClientHosts)
+    }
     val hosts = listOfNotNull(config.publicUrl?.let { URI(it).host }) + listOf("localhost", "127.0.0.1", "[::1]")
     mcpStatelessStreamableHttp(path = MCP_PATH, allowedHosts = hosts) {
         beertoolMcpServer(call.attributes[McpUser], config.publicUrl)
@@ -76,16 +104,24 @@ fun Application.configureMcp(config: McpConfig? = McpConfig.fromEnv()) {
     log.info("MCP endpoint enabled at {}", MCP_PATH)
 }
 
+class McpAuthConfig {
+    var oauth: OAuthConfig? = null
+}
+
 // Every MCP request carries a bearer token; each one gets a server bound to that token's user, so data never crosses users.
-private val McpAuth = createApplicationPlugin("McpAuth") {
+private val McpAuth = createApplicationPlugin("McpAuth", ::McpAuthConfig) {
+    val oauth = pluginConfig.oauth
+    val challenge = "Bearer realm=\"beertool\"" + (oauth?.let { ", resource_metadata=\"${it.resourceMetadataUrl}\"" } ?: "")
     onCall { call ->
         if (call.request.path() != MCP_PATH) return@onCall
         val token = call.request.header(HttpHeaders.Authorization)
             ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
             ?.substring("Bearer ".length)?.trim()
-        val user = token?.let { withContext(Dispatchers.IO) { ApiTokenRepository.userFor(it) } }
+        val user = token?.let {
+            withContext(Dispatchers.IO) { ApiTokenRepository.userFor(it) ?: oauth?.let { o -> OAuthStore.userForAccessToken(it, o.resource) } }
+        }
         if (user == null) {
-            call.response.header(HttpHeaders.WWWAuthenticate, "Bearer realm=\"beertool\"")
+            call.response.header(HttpHeaders.WWWAuthenticate, challenge)
             call.respondText("A valid beertool access token is required.", status = HttpStatusCode.Unauthorized)
         } else {
             call.attributes.put(McpUser, user)

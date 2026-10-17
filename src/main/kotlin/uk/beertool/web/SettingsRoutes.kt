@@ -14,6 +14,8 @@ import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
 import uk.beertool.mcp.Mcp
 import uk.beertool.telegram.Telegram
+import uk.beertool.oauth.OAuthStore
+import java.time.Instant
 import java.time.ZoneId
 import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.BrewerPreferences
@@ -83,6 +85,13 @@ fun Route.settingsRoutes() {
     post<SettingsTokenRevoke> { res ->
         withUser(write = true) { call, user ->
             ApiTokenRepository.revoke(res.id, user.id)
+            call.respondRedirect(CONNECTIONS)
+        }
+    }
+
+    post<SettingsAppRevoke> { res ->
+        withUser(write = true) { call, user ->
+            OAuthStore.revokeGrant(res.id, user.id)
             call.respondRedirect(CONNECTIONS)
         }
     }
@@ -240,6 +249,8 @@ private fun ApplicationCall.mcpEndpoint(): String? {
     return base + MCP_PATH
 }
 
+private fun localDate(at: Instant) = fmt(at.atZone(ZoneId.systemDefault()).toLocalDate())
+
 private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
     sectionHead("AI assistant")
     p("muted") { +"MCP endpoint "; code { +endpoint } }
@@ -251,6 +262,22 @@ private fun FlowContent.assistantSection(user: User, endpoint: String, newToken:
             code("token") { +"claude mcp add --transport http beertool $endpoint --header \"Authorization: Bearer ${it.token}\"" }
         }
     }
+    val apps = OAuthStore.listGrants(user.id)
+    if (apps.isNotEmpty()) {
+        table {
+            thead { tr { th { +"Connected app" }; th { +"Connected" }; th { +"Last used" }; th {} } }
+            tbody {
+                apps.forEach { g ->
+                    tr {
+                        td { +g.clientName }
+                        td { +localDate(g.createdAt) }
+                        td { +(g.lastUsedAt?.let(::localDate) ?: "never") }
+                        td("right") { deleteButton("/settings/apps/${g.id}/revoke", "Disconnect ${g.clientName}? It will need your approval to connect again.") }
+                    }
+                }
+            }
+        }
+    }
     val tokens = ApiTokenRepository.listByUser(user.id)
     if (tokens.isNotEmpty()) {
         table {
@@ -259,8 +286,8 @@ private fun FlowContent.assistantSection(user: User, endpoint: String, newToken:
                 tokens.forEach { t ->
                     tr {
                         td { +t.name }
-                        td { +fmt(t.createdAt.atZone(ZoneId.systemDefault()).toLocalDate()) }
-                        td { +(t.lastUsedAt?.atZone(ZoneId.systemDefault())?.toLocalDate()?.toString() ?: "never") }
+                        td { +localDate(t.createdAt) }
+                        td { +(t.lastUsedAt?.let(::localDate) ?: "never") }
                         td("right") { deleteButton("/settings/tokens/${t.id}/revoke", "Revoke “${t.name}”? Anything using it will lose access.") }
                     }
                 }

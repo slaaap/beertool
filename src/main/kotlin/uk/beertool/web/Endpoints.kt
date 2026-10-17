@@ -9,7 +9,7 @@ class Home
 class Register
 
 @Resource("/login")
-class Login
+class Login(val next: String? = null)
 
 @Resource("/logout")
 class Logout
@@ -25,6 +25,9 @@ class SettingsTokens
 
 @Resource("/settings/tokens/{id}/revoke")
 class SettingsTokenRevoke(val id: Long)
+
+@Resource("/settings/apps/{id}/revoke")
+class SettingsAppRevoke(val id: Long)
 
 @Resource("/settings/telegram")
 class SettingsTelegram
