@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -38,10 +39,11 @@ class McpEndpointTest {
         TestDatabase.ensureReady()
     }
 
-    private fun mcpApp(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
-        application { configureMcp(McpConfig(publicUrl = "https://beer.example")) }
-        block()
-    }
+    private fun mcpApp(config: McpConfig = McpConfig(publicUrl = "https://beer.example"), block: suspend ApplicationTestBuilder.() -> Unit) =
+        testApplication {
+            application { configureMcp(config) }
+            block()
+        }
 
     private suspend fun HttpClient.rpc(body: String, token: String?): HttpResponse = post(MCP_PATH) {
         header(HttpHeaders.Host, "beer.example")
@@ -74,6 +76,32 @@ class McpEndpointTest {
 
         response.status shouldBe HttpStatusCode.Unauthorized
     }
+
+    @Test
+    fun `should refuse a personal token once tokens are switched off`() = mcpApp(McpConfig("https://beer.example", tokensEnabled = false)) {
+        val (_, token) = newToken()
+
+        val response = client.rpc("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""", token)
+
+        response.status shouldBe HttpStatusCode.Unauthorized
+    }
+
+    @Test
+    fun `should offer no sign-in metadata once OAuth is switched off`() = mcpApp(McpConfig("https://beer.example", oauthEnabled = false)) {
+        val challenge = client.rpc("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""", token = null)
+        val metadata = client.get("/.well-known/oauth-authorization-server")
+
+        challenge.headers[HttpHeaders.WWWAuthenticate]!! shouldNotContain "resource_metadata"
+        metadata.status shouldBe HttpStatusCode.NotFound
+    }
+
+    @Test
+    fun `should leave the endpoint off when nobody could sign in`() =
+        mcpApp(McpConfig("https://beer.example", tokensEnabled = false, oauthEnabled = false)) {
+            val response = client.rpc("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""", token = null)
+
+            response.status shouldBe HttpStatusCode.NotFound
+        }
 
     @Test
     fun `should refuse a request addressed to a host it does not serve`() = mcpApp {

@@ -54,6 +54,8 @@ All configuration is via environment variables:
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
 | `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
 | `MCP_ENABLED`       | *(unset → off)*                                   | `true` turns on the MCP endpoint at `/mcp` (see below)        |
+| `MCP_OAUTH_ENABLED` | `true`                                            | `false` turns off connecting by OAuth (Claude, ChatGPT)       |
+| `MCP_TOKENS_ENABLED`| `true`                                            | `false` turns off personal access tokens                      |
 | `MCP_OAUTH_CLIENT_HOSTS` | `claude.ai,chatgpt.com`                      | Comma-separated hosts whose apps may connect through OAuth (see below) |
 | `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site, and the MCP endpoint accepts requests for this host |
 
@@ -169,6 +171,11 @@ claude mcp add --transport http beertool https://beer.example.com/mcp --header "
 | `estimate_recipe`    | OG, FG, ABV, IBU and colour for a draft, without saving it                   |
 | `create_recipe`      | Save a new recipe                                                            |
 | `update_recipe`      | Replace an existing recipe                                                   |
+
+Both ways of connecting are on by default. On a public server where everyone uses Claude or ChatGPT, consider
+`MCP_TOKENS_ENABLED=false`: OAuth access expires within the hour and renews itself, while a personal token
+works until it is revoked. Tokens created earlier then stop working but stay listed in Settings, so they can
+still be revoked.
 
 Disconnect an app or revoke a token in Settings and it loses access at once. Set `PUBLIC_URL` in production:
 requests addressed to any other host are refused, which protects the endpoint against DNS rebinding.

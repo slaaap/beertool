@@ -44,6 +44,8 @@ class SettingsTokensTest {
         SingleUser.email = null
         Mcp.enabled = true
         Mcp.publicUrl = "https://beer.example"
+        Mcp.tokensEnabled = true
+        Mcp.oauthEnabled = true
         Telegram.botUsername = null
     }
 
@@ -51,6 +53,8 @@ class SettingsTokensTest {
     fun tearDown() {
         Mcp.enabled = false
         Mcp.publicUrl = null
+        Mcp.tokensEnabled = false
+        Mcp.oauthEnabled = false
     }
 
     @Test
@@ -132,6 +136,30 @@ class SettingsTokensTest {
 
         page shouldContain "Claude"
         OAuthStore.listGrants(user.id).shouldBeEmpty()
+    }
+
+    @Test
+    fun `should only offer connecting by URL when tokens are switched off`() = settingsApp { client, user ->
+        Mcp.tokensEnabled = false
+
+        val page = client.get("/settings/connections").bodyAsText()
+        client.post("/settings/tokens") { contentType(ContentType.Application.FormUrlEncoded); setBody("name=Sneaky") }
+
+        page shouldContain "claude mcp add --transport http beertool https://beer.example/mcp"
+        page shouldNotContain "Create token"
+        ApiTokenRepository.listByUser(user.id).shouldBeEmpty()
+    }
+
+    @Test
+    fun `should keep old tokens revocable after tokens are switched off`() = settingsApp { client, user ->
+        ApiTokenRepository.create(user.id, "Old laptop")
+        Mcp.tokensEnabled = false
+
+        val page = client.get("/settings/connections").bodyAsText()
+
+        page shouldContain "Old laptop"
+        page shouldContain "switched off on this server"
+        page shouldNotContain "Create token"
     }
 
     private fun settingsApp(block: suspend ApplicationTestBuilder.(HttpClient, User) -> Unit) = testApplication {

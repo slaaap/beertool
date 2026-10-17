@@ -39,10 +39,15 @@ import java.net.URI
 
 const val MCP_PATH = "/mcp"
 
-data class McpConfig(val publicUrl: String?, val trustedClientHosts: Set<String> = DEFAULT_CLIENT_HOSTS) {
+data class McpConfig(
+    val publicUrl: String?,
+    val trustedClientHosts: Set<String> = DEFAULT_CLIENT_HOSTS,
+    val tokensEnabled: Boolean = true,
+    val oauthEnabled: Boolean = true,
+) {
     // OAuth needs an issuer address clients can reach, and the spec wants it on HTTPS outside a developer's machine.
     val oauth: OAuthConfig?
-        get() = publicUrl?.takeIf { it.startsWith("https://") || URI(it).host in LOOPBACK_HOSTS }
+        get() = publicUrl?.takeIf { oauthEnabled && (it.startsWith("https://") || URI(it).host in LOOPBACK_HOSTS) }
             ?.let { OAuthConfig(it, MCP_PATH) }
 
     companion object {
@@ -54,18 +59,28 @@ data class McpConfig(val publicUrl: String?, val trustedClientHosts: Set<String>
                 publicUrl = env("PUBLIC_URL")?.trim()?.trimEnd('/')?.ifBlank { null },
                 trustedClientHosts = env("MCP_OAUTH_CLIENT_HOSTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
                     ?: DEFAULT_CLIENT_HOSTS,
+                tokensEnabled = env("MCP_TOKENS_ENABLED").isOn(),
+                oauthEnabled = env("MCP_OAUTH_ENABLED").isOn(),
             )
         }
+
+        private fun String?.isOn() = this?.trim()?.equals("false", ignoreCase = true) != true
     }
 }
 
-// Whether the endpoint is on, so Settings only offers access tokens when they can be used.
+// What the endpoint accepts, so Settings only offers the ways of connecting that work.
 object Mcp {
     @Volatile
     var enabled = false
 
     @Volatile
     var publicUrl: String? = null
+
+    @Volatile
+    var tokensEnabled = false
+
+    @Volatile
+    var oauthEnabled = false
 }
 
 private val log = LoggerFactory.getLogger("uk.beertool.mcp.McpServer")
@@ -91,7 +106,11 @@ fun Application.configureMcp(
         return
     }
     val oauth = config.oauth
-    routing { route(MCP_PATH) { install(McpAuth) { this.oauth = oauth } } }
+    if (!config.tokensEnabled && oauth == null) {
+        log.warn("MCP endpoint disabled: personal tokens are off, and OAuth is off or lacks an HTTPS PUBLIC_URL, so nobody could connect")
+        return
+    }
+    routing { route(MCP_PATH) { install(McpAuth) { this.oauth = oauth; tokensEnabled = config.tokensEnabled } } }
     if (oauth != null) {
         val clients = clientRegistry(config)
         routing { oauthRoutes(oauth, clients) }
@@ -104,23 +123,29 @@ fun Application.configureMcp(
     }
     Mcp.enabled = true
     Mcp.publicUrl = config.publicUrl
+    Mcp.tokensEnabled = config.tokensEnabled
+    Mcp.oauthEnabled = oauth != null
     log.info("MCP endpoint enabled at {}", MCP_PATH)
 }
 
 class McpAuthConfig {
     var oauth: OAuthConfig? = null
+    var tokensEnabled = true
 }
 
 // Scoped to the routed /mcp node, so no spelling of the URL (such as /%6Dcp) reaches the tools without a token.
 private val McpAuth = createRouteScopedPlugin("McpAuth", ::McpAuthConfig) {
     val oauth = pluginConfig.oauth
+    val tokensEnabled = pluginConfig.tokensEnabled
     val challenge = "Bearer realm=\"beertool\"" + (oauth?.let { ", resource_metadata=\"${it.resourceMetadataUrl}\"" } ?: "")
     onCall { call ->
         val token = call.request.header(HttpHeaders.Authorization)
             ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
             ?.substring("Bearer ".length)?.trim()
         val user = token?.let {
-            withContext(Dispatchers.IO) { ApiTokenRepository.userFor(it) ?: oauth?.let { o -> OAuthStore.userForAccessToken(it, o.resource) } }
+            withContext(Dispatchers.IO) {
+                (if (tokensEnabled) ApiTokenRepository.userFor(it) else null) ?: oauth?.let { o -> OAuthStore.userForAccessToken(it, o.resource) }
+            }
         }
         if (user == null) {
             call.response.header(HttpHeaders.WWWAuthenticate, challenge)

@@ -77,7 +77,7 @@ fun Route.settingsRoutes() {
 
     post<SettingsTokens> {
         withUser(write = true) { call, user ->
-            if (!Mcp.enabled) return@withUser call.respondRedirect(CONNECTIONS)
+            if (!Mcp.tokensEnabled) return@withUser call.respondRedirect(CONNECTIONS)
             val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
             val token = ApiTokenRepository.create(user.id, name)
             call.response.header(HttpHeaders.CacheControl, "no-store")
@@ -257,6 +257,34 @@ private fun localDate(at: Instant) = fmt(at.atZone(ZoneId.systemDefault()).toLoc
 private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
     sectionHead("AI assistant")
     p("muted") { +"MCP endpoint "; code { +endpoint } }
+    if (Mcp.oauthEnabled) connectedApps(user, endpoint)
+    accessTokens(user, endpoint, newToken)
+}
+
+private fun FlowContent.connectedApps(user: User, endpoint: String) {
+    p {
+        +"Add the endpoint as a custom connector in Claude or ChatGPT, or in Claude Code run "
+        code { +"claude mcp add --transport http beertool $endpoint" }
+        +". You approve the connection here."
+    }
+    val apps = OAuthStore.listGrants(user.id)
+    if (apps.isEmpty()) return
+    table {
+        thead { tr { th { +"Connected app" }; th { +"Connected" }; th { +"Last used" }; th {} } }
+        tbody {
+            apps.forEach { g ->
+                tr {
+                    td { +g.clientName }
+                    td { +localDate(g.createdAt) }
+                    td { +(g.lastUsedAt?.let(::localDate) ?: "never") }
+                    td("right") { deleteButton("/settings/apps/${g.id}/revoke", "Disconnect ${g.clientName}? It will need your approval to connect again.") }
+                }
+            }
+        }
+    }
+}
+
+private fun FlowContent.accessTokens(user: User, endpoint: String, newToken: NewToken?) {
     newToken?.let {
         div("token-box") {
             p { strong { +"Copy the token for “${it.name}” now." }; +" It won't be shown again." }
@@ -265,23 +293,9 @@ private fun FlowContent.assistantSection(user: User, endpoint: String, newToken:
             code("token") { +"claude mcp add --transport http beertool $endpoint --header \"Authorization: Bearer ${it.token}\"" }
         }
     }
-    val apps = OAuthStore.listGrants(user.id)
-    if (apps.isNotEmpty()) {
-        table {
-            thead { tr { th { +"Connected app" }; th { +"Connected" }; th { +"Last used" }; th {} } }
-            tbody {
-                apps.forEach { g ->
-                    tr {
-                        td { +g.clientName }
-                        td { +localDate(g.createdAt) }
-                        td { +(g.lastUsedAt?.let(::localDate) ?: "never") }
-                        td("right") { deleteButton("/settings/apps/${g.id}/revoke", "Disconnect ${g.clientName}? It will need your approval to connect again.") }
-                    }
-                }
-            }
-        }
-    }
     val tokens = ApiTokenRepository.listByUser(user.id)
+    // Tokens left over from before they were switched off would work again if switched back on, so they stay revocable.
+    if (!Mcp.tokensEnabled && tokens.isNotEmpty()) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
     if (tokens.isNotEmpty()) {
         table {
             thead { tr { th { +"Token" }; th { +"Created" }; th { +"Last used" }; th {} } }
@@ -297,6 +311,7 @@ private fun FlowContent.assistantSection(user: User, endpoint: String, newToken:
             }
         }
     }
+    if (!Mcp.tokensEnabled) return
     form(action = "/settings/tokens", method = FormMethod.post) {
         fieldGrid(columns = 2) {
             field("New token name") { textInput(name = "name") { placeholder = "e.g. Claude Code on my laptop" } }

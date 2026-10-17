@@ -31,6 +31,17 @@ class McpConfigTest {
     }
 
     @Test
+    fun `should accept both ways of connecting unless one is switched off`() {
+        val defaults = McpConfig.fromEnv(env("MCP_ENABLED" to "true", "PUBLIC_URL" to "https://beer.example"))!!
+        val oauthOnly = McpConfig.fromEnv(env("MCP_ENABLED" to "true", "PUBLIC_URL" to "https://beer.example", "MCP_TOKENS_ENABLED" to "false"))!!
+        val tokensOnly = McpConfig.fromEnv(env("MCP_ENABLED" to "true", "PUBLIC_URL" to "https://beer.example", "MCP_OAUTH_ENABLED" to "FALSE"))!!
+
+        val methods = listOf(defaults, oauthOnly, tokensOnly).map { it.tokensEnabled to (it.oauth != null) }
+
+        methods shouldBe listOf(true to true, false to true, true to false)
+    }
+
+    @Test
     fun `should offer OAuth only on HTTPS or a developer's own machine`() {
         val configs = listOf("https://beer.example", "http://localhost:8080", "http://beer.example")
             .map { McpConfig(publicUrl = it) }
