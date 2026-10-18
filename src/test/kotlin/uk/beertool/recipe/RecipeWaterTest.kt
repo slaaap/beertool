@@ -3,6 +3,7 @@ package uk.beertool.recipe
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.doubles.plusOrMinus
+import io.kotest.matchers.doubles.shouldBeGreaterThan
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -203,6 +204,18 @@ class RecipeWaterTest {
         val treated = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
 
         treated.profile.chlorideToSulphate!! shouldBe (2.0 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should suggest soft water up to hazy IPA levels of calcium and chloride`() {
+        val water = RecipeWater(source = "Ashbeck")
+
+        val salts = pale(water).waterReport(prefs)!!.saltsFor.getValue(FlavourBalance.HAZY)
+        val treated = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
+
+        treated.profile.calcium shouldBe (150.0 plusOrMinus 0.01)
+        treated.profile.chlorideToSulphate!! shouldBe (2.0 plusOrMinus 0.001)
+        treated.profile.chloride shouldBeGreaterThan 150.0
     }
 
     @Test

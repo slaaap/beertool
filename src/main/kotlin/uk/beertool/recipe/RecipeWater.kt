@@ -97,6 +97,9 @@ enum class FlavourBalance(val code: String, val label: String, val calcium: Doub
     BITTER("bitter", "Bitter", 100.0, 0.5),
     BALANCED("balanced", "Balanced", 75.0, 1.0),
     MALTY("malty", "Malty", 75.0, 2.0),
+
+    // Hazy IPAs want chloride-forward water at higher levels overall, for a soft, full mouthfeel.
+    HAZY("hazy", "Hazy", 150.0, 2.0),
 }
 
 data class WaterReport(
