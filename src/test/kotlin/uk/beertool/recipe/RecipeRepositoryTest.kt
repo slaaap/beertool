@@ -35,7 +35,7 @@ class RecipeRepositoryTest {
     @Test
     fun `should keep a recipe's water through a save and an update`() {
         val userId = newUser()
-        val water = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0, gypsumG = 3.0, lacticMl = 4.5)
+        val water = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0, gypsumG = 3.0, acidMl = 4.5)
 
         val created = RecipeRepository.create(userId, sampleDraft().copy(water = water))
         RecipeRepository.update(created.id, userId, sampleDraft().copy(water = null))

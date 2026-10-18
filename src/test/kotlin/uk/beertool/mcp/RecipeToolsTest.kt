@@ -163,13 +163,13 @@ class RecipeToolsTest {
     fun `should estimate the water and mash pH of a draft using the brewer's saved sources`() {
         val tap = WaterSource("London tap", WaterProfile(calcium = 99.0, magnesium = 4.5, sodium = 30.0, chloride = 45.0, sulphate = 47.0, bicarbonate = 250.0))
         val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(tap)))!!
-        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"source\": \"London tap\", \"gypsumG\": 4, \"lacticMl\": 6}, \"yeasts\"")
+        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"source\": \"London tap\", \"gypsumG\": 4, \"acidMl\": 6}, \"yeasts\"")
 
         val water = RecipeTools(user, null).estimateRecipe(args("recipe" to draft)).jsonObject["water"]!!.jsonObject
 
         water["mgPerL"]!!.jsonObject["calcium"]!!.jsonPrimitive.double shouldBeGreaterThan 99.0
         water["mashPh"]!!.jsonPrimitive.double shouldBeLessThan 5.9
-        water["lacticMlForTarget"]!!.jsonPrimitive.double shouldBeGreaterThan 0.0
+        water["acidMlForTarget"]!!.jsonPrimitive.double shouldBeGreaterThan 0.0
     }
 
     @Test
@@ -187,19 +187,29 @@ class RecipeToolsTest {
     fun `should round-trip a recipe's water through get and update`() {
         val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(WaterSource("Tap", WaterProfile(calcium = 99.0)))))!!
         val tools = RecipeTools(user, null)
-        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"source\": \"Tap\", \"gypsumG\": 2.5, \"lacticMl\": 3}, \"yeasts\"")
+        val draft = paleAle.replace("\"yeasts\"", "\"water\": {\"source\": \"Tap\", \"gypsumG\": 2.5, \"acidMl\": 3}, \"yeasts\"")
         val no = tools.createRecipe(args("recipe" to draft)).jsonObject["no"]!!.jsonPrimitive.int
         val fetched = tools.getRecipe(args("no" to "$no")).withoutNulls().jsonObject
 
         tools.updateRecipe(buildJsonObject { put("no", no); put("recipe", fetched["recipe"]!!) })
 
-        RecipeRepository.findByNo(no, user.id)!!.water shouldBe RecipeWater(source = "Tap", gypsumG = 2.5, lacticMl = 3.0)
+        RecipeRepository.findByNo(no, user.id)!!.water shouldBe RecipeWater(source = "Tap", gypsumG = 2.5, acidMl = 3.0)
+    }
+
+    @Test
+    fun `should name the acids it knows when a draft asks for another`() {
+        val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(WaterSource("Tap", WaterProfile(calcium = 99.0)))))!!
+        val draft = """{"name": "X", "water": {"source": "Tap", "acid": "citric", "acidMl": 3}}"""
+
+        val error = shouldThrow<ToolError> { RecipeTools(user, null).estimateRecipe(args("recipe" to draft)) }
+
+        error.message shouldContain "water.acid \"citric\" must be one of lactic80, phosphoric75, phosphoric10"
     }
 
     @Test
     fun `should ask for a source when a draft's water names none`() {
         val user = UserRepository.updatePreferences(newUser().id, BrewerPreferences(waterSources = listOf(WaterSource("Tap", WaterProfile(calcium = 99.0)))))!!
-        val draft = """{"name": "X", "water": {"lacticMl": 3}}"""
+        val draft = """{"name": "X", "water": {"acidMl": 3}}"""
 
         val error = shouldThrow<ToolError> { RecipeTools(user, null).estimateRecipe(args("recipe" to draft)) }
 

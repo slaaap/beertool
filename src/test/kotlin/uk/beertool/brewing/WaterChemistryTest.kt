@@ -62,7 +62,7 @@ class WaterChemistryTest {
 
     @Test
     fun `should land a pale grist near its distilled water pH in distilled water`() {
-        val ph = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, strikeL = 15.0, lacticMl = 0.0)!!
+        val ph = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, strikeL = 15.0, acidMeq = 0.0)!!
 
         ph shouldBe (5.70 plusOrMinus 0.05)
     }
@@ -81,35 +81,45 @@ class WaterChemistryTest {
     fun `should raise mash pH by about Kolbach's 0_3 for 10 degrees German of residual alkalinity`() {
         val alkaline = WaterProfile(bicarbonate = 10 * 17.8 * 1.22)
 
-        val distilled = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, strikeL = 15.0, lacticMl = 0.0)!!
-        val hard = WaterChemistry.mashPh(paleGrist, alkaline, strikeL = 15.0, lacticMl = 0.0)!!
+        val distilled = WaterChemistry.mashPh(paleGrist, WaterProfile.DISTILLED, strikeL = 15.0, acidMeq = 0.0)!!
+        val hard = WaterChemistry.mashPh(paleGrist, alkaline, strikeL = 15.0, acidMeq = 0.0)!!
 
         hard - distilled shouldBe (0.3 plusOrMinus 0.05)
     }
 
     @Test
     fun `should bring the mash pH down as lactic acid goes in`() {
-        val without = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, lacticMl = 0.0)!!
-        val with = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, lacticMl = 5.0)!!
+        val without = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, acidMeq = 0.0)!!
+        val with = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, acidMeq = 5.0 * Acid.LACTIC_80.meqPerMl)!!
 
         without shouldBeGreaterThan 5.8
         with shouldBeLessThan without - 0.2
     }
 
     @Test
-    fun `should suggest the lactic acid that hits the target pH exactly`() {
-        val ml = WaterChemistry.lacticForPh(5.4, paleGrist, londonTap, strikeL = 15.0)!!
+    fun `should suggest the acid that hits the target pH exactly, whichever acid it is`() {
+        val ph = Acid.entries.map { acid ->
+            val ml = WaterChemistry.acidForPh(5.4, acid, paleGrist, londonTap, strikeL = 15.0)!!
 
-        val ph = WaterChemistry.mashPh(paleGrist, londonTap, 15.0, ml)!!
+            WaterChemistry.mashPh(paleGrist, londonTap, 15.0, ml * acid.meqPerMl)!!
+        }
 
-        ph shouldBe (5.4 plusOrMinus 0.001)
+        ph.forEach { it shouldBe (5.4 plusOrMinus 0.001) }
+    }
+
+    @Test
+    fun `should need a little less strong phosphoric than lactic, and far more of the dilute one`() {
+        val ml = Acid.entries.associateWith { WaterChemistry.acidForPh(5.4, it, paleGrist, londonTap, strikeL = 15.0)!! }
+
+        ml.getValue(Acid.PHOSPHORIC_75) shouldBeLessThan ml.getValue(Acid.LACTIC_80)
+        ml.getValue(Acid.PHOSPHORIC_10) shouldBeGreaterThan ml.getValue(Acid.LACTIC_80) * 9
     }
 
     @Test
     fun `should suggest no acid for a mash already below the target`() {
         val roast = listOf(FermentableAddition(extractPercent = 70.0, colourEbc = 1000.0, massKg = 5.0))
 
-        val ml = WaterChemistry.lacticForPh(5.4, roast, WaterProfile.DISTILLED, strikeL = 15.0)
+        val ml = WaterChemistry.acidForPh(5.4, Acid.LACTIC_80, roast, WaterProfile.DISTILLED, strikeL = 15.0)
 
         ml shouldBe 0.0
     }
@@ -118,7 +128,7 @@ class WaterChemistryTest {
     fun `should not guess a mash pH when nothing is mashed`() {
         val extract = listOf(FermentableAddition(extractPercent = 95.0, colourEbc = 15.0, massKg = 3.0, mashed = false))
 
-        WaterChemistry.mashPh(extract, londonTap, strikeL = 15.0, lacticMl = 0.0).shouldBeNull()
-        WaterChemistry.lacticForPh(5.4, extract, londonTap, strikeL = 15.0).shouldBeNull()
+        WaterChemistry.mashPh(extract, londonTap, strikeL = 15.0, acidMeq = 0.0).shouldBeNull()
+        WaterChemistry.acidForPh(5.4, Acid.LACTIC_80, extract, londonTap, strikeL = 15.0).shouldBeNull()
     }
 }

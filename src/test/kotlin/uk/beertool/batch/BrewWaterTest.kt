@@ -27,7 +27,7 @@ class BrewWaterTest {
 
     private val tap = WaterSource("London tap", WaterProfile(calcium = 99.0, bicarbonate = 250.0))
     private val ashbeck = WaterSource("Ashbeck", WaterProfile(calcium = 11.0, bicarbonate = 25.0))
-    private val planned = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 50.0, lacticMl = 3.0)
+    private val planned = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 50.0, acidMl = 3.0)
 
     @Test
     fun `should copy the recipe's water and its sources' numbers onto a new brew`() {
@@ -62,11 +62,11 @@ class BrewWaterTest {
     fun `should let the brewer switch water on brew day while there is no OG`() {
         val userId = brewer(tap, ashbeck)
         val brew = BatchRepository.startBrewDay(recipe(userId, planned), userId, LocalDate.of(2026, 10, 18))!!
-        val tapOnly = BrewerPreferences(waterSources = listOf(tap, ashbeck)).snapshot(RecipeWater(source = "London tap", lacticMl = 9.0))
+        val tapOnly = BrewerPreferences(waterSources = listOf(tap, ashbeck)).snapshot(RecipeWater(source = "London tap", acidMl = 9.0))
 
         val updated = BatchRepository.updateWater(brew.id, userId, tapOnly)
 
-        updated!!.water shouldBe WaterSnapshot(RecipeWater(source = "London tap", lacticMl = 9.0), listOf(tap))
+        updated!!.water shouldBe WaterSnapshot(RecipeWater(source = "London tap", acidMl = 9.0), listOf(tap))
     }
 
     @Test

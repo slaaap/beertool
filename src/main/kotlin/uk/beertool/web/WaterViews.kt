@@ -2,6 +2,7 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
+import uk.beertool.brewing.Acid
 import uk.beertool.batch.Batch
 import uk.beertool.common.MISSING
 import uk.beertool.common.fmt
@@ -64,9 +65,14 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
             fieldGrid(columns = 3) {
                 WaterAddition.entries.forEach { a ->
                     val amount = water?.let(a.amountIn)?.takeIf { it > 0.0 }
-                    removableField("${a.label} (${a.unit})", "waterDrop(this)", "Remove ${a.label.lowercase()}", hidden = amount == null, dataAdd = a.field) {
-                        numberInput(name = "water.${a.field}") {
-                            value = amount?.toString() ?: ""; numAttrs("0.1"); disabled = !open
+                    val label = a.labelIn(null)
+                    val classes = if (a == WaterAddition.ACID) "acid" else null
+                    removableField("$label (${a.unit})", "waterDrop(this)", "Remove ${label.lowercase()}", classes, hidden = amount == null, dataAdd = a.field) {
+                        if (a == WaterAddition.ACID) div("acid-input") {
+                            acidSelect(water?.acid ?: Acid.LACTIC_80, disabled = !open)
+                            amountInput(a, amount, disabled = !open)
+                        } else {
+                            amountInput(a, amount, disabled = !open)
                         }
                     }
                 }
@@ -75,18 +81,18 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                 details(classes = "more-stages") {
                     summary(classes = "btn small") { iconSvg(Icon.PLUS); span { +"Salt" } }
                     div {
-                        WaterAddition.entries.filterNot { it.mashOnly }.forEach { a ->
+                        WaterAddition.entries.filter { it.salt != null }.forEach { a ->
                             button(type = ButtonType.button, classes = "btn small") {
                                 attributes["data-adds"] = a.field
                                 hidden = water?.let(a.amountIn)?.let { it > 0.0 } == true
                                 onClick = "waterAdd('${a.field}')"
-                                +a.label
+                                +a.labelIn(null)
                             }
                         }
                     }
                 }
-                WaterAddition.entries.filter { it.mashOnly }.forEach { a ->
-                    addButton(a.label, "waterAdd('${a.field}')") {
+                WaterAddition.entries.filter { it.salt == null }.forEach { a ->
+                    addButton(a.labelIn(null), "waterAdd('${a.field}')") {
                         attributes["data-adds"] = a.field
                         hidden = water?.let(a.amountIn)?.let { it > 0.0 } == true
                     }
@@ -124,6 +130,19 @@ private fun FlowContent.removableField(
 
 private const val DEFAULT_BLEND_PERCENT = 50.0
 
+private fun FlowContent.amountInput(addition: WaterAddition, amount: Double?, disabled: Boolean) =
+    numberInput(name = "water.${addition.field}") {
+        value = amount?.toString() ?: ""; numAttrs("0.1"); this.disabled = disabled
+    }
+
+private fun FlowContent.acidSelect(chosen: Acid, disabled: Boolean) {
+    select {
+        name = "water.acid"
+        this.disabled = disabled
+        Acid.entries.forEach { acid -> option { value = acid.code; if (acid == chosen) selected = true; +acid.shortLabel } }
+    }
+}
+
 private fun FlowContent.waterSelect(name: String, names: List<String>, chosen: String, disabled: Boolean) {
     select {
         this.name = name
@@ -143,14 +162,14 @@ internal fun FlowContent.waterResult(report: WaterReport?, canApply: Boolean = f
 
 private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
     val inRange = report.mashPh?.let { it in MIN_MASH_PH..MAX_MASH_PH }
-    val lactic = report.lacticForTargetMl
+    val acidMl = report.acidForTargetMl
     div("stats trio chem") {
         statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label)
         statTile("Mash pH", fmt(report.mashPh, 2), "$MIN_MASH_PH-$MAX_MASH_PH", tone = if (inRange == false) "bad" else if (inRange == true) "good" else null)
-        statTile("Lactic for $TARGET_MASH_PH", fmt(lactic, 1), "ml") {
-            if (canApply && lactic != null && lactic >= 0.1) {
+        statTile("${report.acid.shortLabel} for $TARGET_MASH_PH", fmt(acidMl, 1), "ml") {
+            if (canApply && acidMl != null && acidMl >= 0.1) {
                 button(type = ButtonType.button, classes = "tile-action") {
-                    onClick = "waterUseLactic('${fmt(lactic, 1)}')"
+                    onClick = "waterUseAcid('${fmt(acidMl, 1)}')"
                     +"Use this"
                 }
             }
@@ -163,7 +182,7 @@ internal fun FlowContent.waterSummary(water: RecipeWater?, report: WaterReport?)
     sectionHead("Water")
     div("stats auto") {
         statTile("Water", water.describe(), null, tone = "text")
-        water.additions.forEach { a -> statTile(a.label, fmt(a.amountIn(water), 1), a.unit) }
+        water.additions.forEach { a -> statTile(a.labelIn(water), fmt(a.amountIn(water), 1), a.unit) }
     }
     waterResult(report)
 }
@@ -200,7 +219,7 @@ private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
             report.doses(water).forEach { dose ->
                 val unit = dose.addition.unit
                 tr {
-                    td { +dose.addition.label }
+                    td { +dose.addition.labelIn(water) }
                     td("num") { +"${fmt(dose.strike, 1)} $unit" }
                     td("num") { +(if (dose.addition.mashOnly || sparge <= 0.0) MISSING else "${fmt(dose.sparge, 1)} $unit") }
                 }

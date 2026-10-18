@@ -1,5 +1,6 @@
 package uk.beertool.brewing
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.math.exp
 
@@ -56,10 +57,25 @@ enum class Salt(private val molarMass: Double, private val ions: WaterProfile) {
 
 data class SaltAddition(val salt: Salt, val grams: Double)
 
-object WaterChemistry {
-    // Lactic acid 80% w/w at 1.18 g/ml is 10.5 mmol/ml, about 97% dissociated at mash pH.
-    const val LACTIC_MEQ_PER_ML = 10.2
+@Serializable
+enum class Acid(val code: String, val label: String, val shortLabel: String, val meqPerMl: Double) {
+    // 80% w/w at 1.18 g/ml is 10.5 mmol/ml, about 97% dissociated at mash pH.
+    @SerialName("lactic80")
+    LACTIC_80("lactic80", "Lactic acid 80%", "Lactic 80%", 10.2),
 
+    // 75% w/w at 1.58 g/ml is 12.1 mmol/ml; at mash pH the first proton is given up and barely any of the second.
+    @SerialName("phosphoric75")
+    PHOSPHORIC_75("phosphoric75", "Phosphoric acid 75%", "Phosphoric 75%", 12.3),
+
+    @SerialName("phosphoric10")
+    PHOSPHORIC_10("phosphoric10", "Phosphoric acid 10%", "Phosphoric 10%", 1.09);
+
+    companion object {
+        fun fromCodeOrNull(code: String?) = entries.find { it.code == code }
+    }
+}
+
+object WaterChemistry {
     // Troester measured 31-47 mEq/(kg·pH) for malts; one middle value stands in for the whole grist.
     private const val GRIST_BUFFER_MEQ_PER_KG_PH = 38.0
 
@@ -76,19 +92,19 @@ object WaterChemistry {
     // Fitted to Troester's distilled-water mash pH: about 5.75 for pale malt down to 4.7 for roasted.
     fun distilledWaterPh(colourEbc: Double) = 4.65 + 1.15 * exp(-colourEbc / 60.0)
 
-    fun mashPh(grist: List<FermentableAddition>, water: WaterProfile, strikeL: Double, lacticMl: Double): Double? {
+    fun mashPh(grist: List<FermentableAddition>, water: WaterProfile, strikeL: Double, acidMeq: Double): Double? {
         val mashed = grist.filter { it.mashed && it.massKg > 0.0 }
         val kg = mashed.sumOf { it.massKg }
         if (kg <= 0.0 || strikeL <= 0.0) return null
         val distilledPh = mashed.sumOf { distilledWaterPh(it.colourEbc) * it.massKg } / kg
-        val alkalinityMeq = water.residualAlkalinityMeqPerL * strikeL - lacticMl * LACTIC_MEQ_PER_ML
+        val alkalinityMeq = water.residualAlkalinityMeqPerL * strikeL - acidMeq
         return distilledPh + alkalinityMeq / (GRIST_BUFFER_MEQ_PER_KG_PH * kg)
     }
 
-    fun lacticForPh(targetPh: Double, grist: List<FermentableAddition>, water: WaterProfile, strikeL: Double): Double? {
+    fun acidForPh(targetPh: Double, acid: Acid, grist: List<FermentableAddition>, water: WaterProfile, strikeL: Double): Double? {
         val kg = grist.filter { it.mashed }.sumOf { it.massKg }
-        val withoutAcid = mashPh(grist, water, strikeL, lacticMl = 0.0) ?: return null
+        val withoutAcid = mashPh(grist, water, strikeL, acidMeq = 0.0) ?: return null
         val meq = (withoutAcid - targetPh) * GRIST_BUFFER_MEQ_PER_KG_PH * kg
-        return (meq / LACTIC_MEQ_PER_ML).coerceAtLeast(0.0)
+        return (meq / acid.meqPerMl).coerceAtLeast(0.0)
     }
 }

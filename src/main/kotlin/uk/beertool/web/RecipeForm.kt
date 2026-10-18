@@ -1,6 +1,7 @@
 package uk.beertool.web
 
 import kotlinx.serialization.Serializable
+import uk.beertool.brewing.Acid
 import uk.beertool.recipe.AmountUnit
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.DEFAULT_ATTENUATION
@@ -46,7 +47,9 @@ data class WaterForm(
     @Serializable(with = BlankAsNullDouble::class) val epsomG: Double? = null,
     @Serializable(with = BlankAsNullDouble::class) val tableSaltG: Double? = null,
     @Serializable(with = BlankAsNullDouble::class) val bakingSodaG: Double? = null,
-    @Serializable(with = BlankAsNullDouble::class) val lacticMl: Double? = null,
+    val acid: String = "",
+    @Serializable(with = BlankAsNullDouble::class) val acidMl: Double? = null,
+    @Serializable(with = BlankAsNullDouble::class) val campdenTablets: Double? = null,
 )
 
 fun WaterForm.toRecipeWater(): RecipeWater? {
@@ -62,7 +65,9 @@ fun WaterForm.toRecipeWater(): RecipeWater? {
         epsomG = epsomG.amount(),
         tableSaltG = tableSaltG.amount(),
         bakingSodaG = bakingSodaG.amount(),
-        lacticMl = lacticMl.amount(),
+        acid = Acid.fromCodeOrNull(acid) ?: Acid.LACTIC_80,
+        acidMl = acidMl.amount(),
+        campdenTablets = campdenTablets.amount(),
     )
 }
 

@@ -233,7 +233,7 @@ private fun waterTreatment(water: RecipeWater, report: WaterReport): List<String
         val unit = dose.addition.unit
         val where = if (dose.addition.mashOnly || dose.sparge <= 0.0) "${fmt(dose.strike, 1)} $unit in the mash"
         else "${fmt(dose.strike, 1)} $unit strike + ${fmt(dose.sparge, 1)} $unit sparge"
-        lines += "• ${dose.addition.label}: $where"
+        lines += "• ${dose.addition.labelIn(water)}: $where"
     }
     report.mashPh?.let { ph ->
         val inRange = ph in MIN_MASH_PH..MAX_MASH_PH

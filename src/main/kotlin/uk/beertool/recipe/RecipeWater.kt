@@ -1,6 +1,9 @@
 package uk.beertool.recipe
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
+import uk.beertool.brewing.Acid
 import uk.beertool.brewing.Calculators
 import uk.beertool.brewing.FermentableAddition
 import uk.beertool.brewing.Salt
@@ -15,6 +18,7 @@ const val TARGET_MASH_PH = 5.4
 const val MIN_MASH_PH = 5.2
 const val MAX_MASH_PH = 5.6
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class RecipeWater(
     val source: String,
@@ -25,7 +29,10 @@ data class RecipeWater(
     val epsomG: Double = 0.0,
     val tableSaltG: Double = 0.0,
     val bakingSodaG: Double = 0.0,
-    val lacticMl: Double = 0.0,
+    val acid: Acid = Acid.LACTIC_80,
+    // Recipes saved before phosphoric acid was offered stored their lactic acid under this name.
+    @JsonNames("lacticMl") val acidMl: Double = 0.0,
+    val campdenTablets: Double = 0.0,
 ) {
     val salts: List<SaltAddition>
         get() = WaterAddition.entries.mapNotNull { a -> a.salt?.let { SaltAddition(it, a.amountIn(this)) } }.filter { it.grams > 0.0 }
@@ -37,20 +44,25 @@ data class RecipeWater(
 
 enum class WaterAddition(
     val field: String,
-    val label: String,
+    private val label: String,
     val unit: String,
     val salt: Salt?,
+    val mashOnly: Boolean,
     val amountIn: (RecipeWater) -> Double,
 ) {
-    GYPSUM("gypsumG", "Gypsum", "g", Salt.GYPSUM, RecipeWater::gypsumG),
-    CALCIUM_CHLORIDE("calciumChlorideG", "Calcium chloride", "g", Salt.CALCIUM_CHLORIDE, RecipeWater::calciumChlorideG),
-    EPSOM("epsomG", "Epsom salt", "g", Salt.EPSOM, RecipeWater::epsomG),
-    TABLE_SALT("tableSaltG", "Table salt", "g", Salt.TABLE_SALT, RecipeWater::tableSaltG),
-    BAKING_SODA("bakingSodaG", "Baking soda", "g", Salt.BAKING_SODA, RecipeWater::bakingSodaG),
-    LACTIC("lacticMl", "Lactic acid 80%", "ml", null, RecipeWater::lacticMl);
+    GYPSUM("gypsumG", "Gypsum", "g", Salt.GYPSUM, false, RecipeWater::gypsumG),
+    CALCIUM_CHLORIDE("calciumChlorideG", "Calcium chloride", "g", Salt.CALCIUM_CHLORIDE, false, RecipeWater::calciumChlorideG),
+    EPSOM("epsomG", "Epsom salt", "g", Salt.EPSOM, false, RecipeWater::epsomG),
+    TABLE_SALT("tableSaltG", "Table salt", "g", Salt.TABLE_SALT, false, RecipeWater::tableSaltG),
+    BAKING_SODA("bakingSodaG", "Baking soda", "g", Salt.BAKING_SODA, false, RecipeWater::bakingSodaG),
 
     // Acid is there to bring the mash pH down, so all of it goes in the mash.
-    val mashOnly get() = salt == null
+    ACID("acidMl", "Acid", "ml", null, true, RecipeWater::acidMl),
+
+    // Campden tablets clear chlorine and chloramine from all the water before it is heated; the minerals barely move.
+    CAMPDEN("campdenTablets", "Campden", "tablets", null, false, RecipeWater::campdenTablets);
+
+    fun labelIn(water: RecipeWater?) = if (this == ACID && water != null) water.acid.label else label
 }
 
 data class WaterDose(val addition: WaterAddition, val strike: Double, val sparge: Double)
@@ -90,7 +102,8 @@ data class WaterReport(
     val spargeL: Double?,
     val profile: WaterProfile,
     val mashPh: Double?,
-    val lacticForTargetMl: Double?,
+    val acid: Acid,
+    val acidForTargetMl: Double?,
     val missingSources: List<String>,
 ) {
     val balance: FlavourBalance?
@@ -154,8 +167,9 @@ private fun waterReport(
         strikeL = mash?.strikeL,
         spargeL = mash?.spargeL,
         profile = profile,
-        mashPh = WaterChemistry.mashPh(grist, profile, strikeL, water.lacticMl),
-        lacticForTargetMl = WaterChemistry.lacticForPh(TARGET_MASH_PH, grist, profile, strikeL),
+        mashPh = WaterChemistry.mashPh(grist, profile, strikeL, water.acidMl * water.acid.meqPerMl),
+        acid = water.acid,
+        acidForTargetMl = WaterChemistry.acidForPh(TARGET_MASH_PH, water.acid, grist, profile, strikeL),
         missingSources = missing.distinct(),
     )
 }

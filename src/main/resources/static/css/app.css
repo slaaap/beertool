@@ -222,6 +222,8 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .water-row > .btn { align-self:end; height:42px; }
 .water-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 16px; }
 .water-actions .more-stages > div { left:0; right:auto; }
+.acid-input { display:grid; grid-template-columns:1fr 6.5em; gap:8px; }
+.water-panel .field.acid { grid-column:span 2; }
 .stat.good .v { color:var(--good); }
 .stat.bad .v { color:var(--danger); }
 .tile-action { margin-top:6px; padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
@@ -281,7 +283,9 @@ li { margin:3px 0; }
   table.hops .c-amount, table.hops .c-time, table.hops .c-last { width:19%; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
+  .water-panel .field.acid { grid-column:auto; }
   .brew-water .g3 { grid-template-columns:repeat(2,1fr); }
+  .brew-water .water-panel .field.acid { grid-column:span 2; }
   .water-row.solo, .brew-water .water-row.solo { grid-template-columns:1fr auto; }
   table.water-plan th.num { white-space:nowrap; }
 

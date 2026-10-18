@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import uk.beertool.brewing.Acid
 import uk.beertool.recipe.AmountUnit
 import uk.beertool.recipe.Coded
 import uk.beertool.recipe.ExtraUsage
@@ -25,9 +26,11 @@ private fun string(description: String) = prop("string", description)
 private fun number(description: String) = prop("number", description)
 private fun integer(description: String) = prop("integer", description)
 
-private fun codes(description: String, values: Collection<Coded>) = prop("string", description) {
-    putJsonArray("enum") { values.forEach { add(JsonPrimitive(it.code)) } }
+private fun choices(description: String, values: Collection<String>) = prop("string", description) {
+    putJsonArray("enum") { values.forEach { add(JsonPrimitive(it)) } }
 }
+
+private fun codes(description: String, values: Collection<Coded>) = choices(description, values.map { it.code })
 
 private fun objectOf(properties: Map<String, JsonObject>, required: List<String>, description: String? = null) = buildJsonObject {
     put("type", "object")
@@ -95,7 +98,9 @@ private val WATER = objectOf(
         "epsomG" to number("Epsom salt (magnesium sulphate), grams for all the brewing water"),
         "tableSaltG" to number("Table salt (sodium chloride), grams for all the brewing water"),
         "bakingSodaG" to number("Baking soda (sodium bicarbonate), grams for all the brewing water"),
-        "lacticMl" to number("Lactic acid 80%, ml, added to the mash"),
+        "acid" to choices("Which acid acidMl measures; default lactic80", Acid.entries.map { it.code }),
+        "acidMl" to number("Acid, ml, added to the mash"),
+        "campdenTablets" to number("Campden tablets, to clear chlorine and chloramine from tap water"),
     ),
     listOf("source"),
     "Brewing water and its treatment; omit for a recipe without water chemistry. Salts are dosed across strike and sparge water in proportion.",

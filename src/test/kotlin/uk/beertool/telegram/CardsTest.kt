@@ -79,7 +79,7 @@ class CardsTest {
     @Test
     fun `should give the brew's water treatment split between strike and sparge`() {
         val tap = WaterSource("London tap", WaterProfile(calcium = 99.0, bicarbonate = 250.0))
-        val water = WaterSnapshot(RecipeWater(source = "London tap", gypsumG = 3.5, lacticMl = 4.0), listOf(tap))
+        val water = WaterSnapshot(RecipeWater(source = "London tap", gypsumG = 3.5, acidMl = 4.0), listOf(tap))
 
         val card = brewDayCard(recipe(), sampleBatch(water = water), BrewerPreferences(), today)
 

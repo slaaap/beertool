@@ -14,6 +14,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
+import uk.beertool.brewing.Acid
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.common.asPercent
 import uk.beertool.common.fmt
@@ -299,7 +300,8 @@ private fun ions(p: WaterProfile) = buildJsonObject {
 private fun waterInputJson(w: RecipeWater) = buildJsonObject {
     put("source", w.source); put("blendSource", w.blendSource); put("blendPercent", w.blendPercent)
     put("gypsumG", w.gypsumG); put("calciumChlorideG", w.calciumChlorideG); put("epsomG", w.epsomG)
-    put("tableSaltG", w.tableSaltG); put("bakingSodaG", w.bakingSodaG); put("lacticMl", w.lacticMl)
+    put("tableSaltG", w.tableSaltG); put("bakingSodaG", w.bakingSodaG)
+    put("acid", w.acid.code); put("acidMl", w.acidMl); put("campdenTablets", w.campdenTablets)
 }
 
 private fun waterJson(r: WaterReport) = buildJsonObject {
@@ -309,7 +311,8 @@ private fun waterJson(r: WaterReport) = buildJsonObject {
     put("mashPh", r.mashPh?.roundTo(2))
     put("mashPhRange", "$MIN_MASH_PH-$MAX_MASH_PH")
     put("targetMashPh", TARGET_MASH_PH)
-    put("lacticMlForTarget", r.lacticForTargetMl?.roundTo(1))
+    put("acid", r.acid.code)
+    put("acidMlForTarget", r.acidForTargetMl?.roundTo(1))
     put("waterL", r.totalL.roundTo(1))
     put("strikeL", r.strikeL?.roundTo(1))
     put("spargeL", r.spargeL?.roundTo(1))
@@ -346,8 +349,11 @@ private fun validate(recipe: JsonObject) {
     }
 
     (recipe["water"] as? JsonObject)?.let { water ->
-        val fields = listOf("blendPercent", "gypsumG", "calciumChlorideG", "epsomG", "tableSaltG", "bakingSodaG", "lacticMl")
+        val fields = listOf("blendPercent", "gypsumG", "calciumChlorideG", "epsomG", "tableSaltG", "bakingSodaG", "acidMl", "campdenTablets")
         numbers("water.", water, *fields.toTypedArray())
+        water.string("acid")?.let { code ->
+            if (Acid.fromCodeOrNull(code) == null) problems += "water.acid \"$code\" must be one of ${Acid.entries.joinToString { it.code }}"
+        }
         fields.forEach { field -> (water[field] as? JsonPrimitive)?.doubleOrNull?.let { if (it < 0.0) problems += "water.$field must not be negative" } }
     }
     numbers("", recipe, "preBoilVolumeL", "postBoilVolumeL", "fermenterVolumeL", "efficiency", "boilTimeMin")

@@ -71,9 +71,9 @@
     changed(editor);
   };
 
-  window.waterUseLactic = function (ml) {
+  window.waterUseAcid = function (ml) {
     var editor = document.querySelector('[data-water-editor]');
-    show(editor, 'lacticMl').value = ml;
+    show(editor, 'acidMl').value = ml;
     changed(editor);
   };
 })();

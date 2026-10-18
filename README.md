@@ -10,8 +10,9 @@ including a phone-first **Brew Day** mode for using it at the kettle.
 - **Recipes** - fermentables, hops, yeasts, extras and a step mash, with live estimates as you type:
   OG, FG, ABV, IBU (Tinseth), colour (Morey, in EBC), and a mash-temperature-driven attenuation shift.
 - **Water chemistry** (optional per recipe) - pick one of your saved waters or mix two, add brewing salts
-  and lactic acid, and see the resulting minerals, the chloride-to-sulphate balance and an estimated mash
-  pH, with a one-tap lactic acid amount to reach pH 5.4.
+  and an acid (lactic or phosphoric), and see the resulting minerals, the chloride-to-sulphate balance and
+  an estimated mash pH, with a one-tap acid amount to reach pH 5.4. Campden tablets for chlorinated tap
+  water are part of the plan too.
 - **Full-text search** across recipe and ingredient names ("citra" finds the beer it's dry-hopped with).
 - **Brew Day mode** (phone-first) - a mash-water guide (strike volume + temperature, sparge volume), the
   salts and acid split between strike and sparge water, a wall-clock boil timer that survives the phone

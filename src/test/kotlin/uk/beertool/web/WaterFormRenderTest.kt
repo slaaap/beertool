@@ -26,12 +26,12 @@ class WaterFormRenderTest {
 
     @Test
     fun `should render a recipe's water with its mix and only the additions it uses`() {
-        val water = RecipeWater(source = "London tap", blendSource = "Tesco", blendPercent = 40.0, gypsumG = 4.0, lacticMl = 3.0)
+        val water = RecipeWater(source = "London tap", blendSource = "Tesco", blendPercent = 40.0, gypsumG = 4.0, acidMl = 3.0)
 
         val html = render(recipe(water))
 
         html.fieldIsHidden("gypsumG") shouldBe false
-        html.fieldIsHidden("lacticMl") shouldBe false
+        html.fieldIsHidden("acidMl") shouldBe false
         html.fieldIsHidden("epsomG") shouldBe true
         html.tag("input", "water.blendPercent") shouldContain """value="40""""
         html.tag("input", "water.blendPercent") shouldNotContain "disabled"
@@ -58,11 +58,11 @@ class WaterFormRenderTest {
     fun `should offer to fill in the lactic acid the mash needs`() {
         val html = render(recipe(RecipeWater(source = "London tap")))
 
-        html shouldContain Regex("""onclick="waterUseLactic\('\d+\.\d'\)"""")
+        html shouldContain Regex("""onclick="waterUseAcid\('\d+\.\d'\)"""")
     }
 
     private fun String.fieldIsHidden(field: String) =
-        Regex("""<div class="field"[^>]*data-add="$field"[^>]*>""").find(this)!!.value.contains("hidden")
+        Regex("""<div class="field[^"]*"[^>]*data-add="$field"[^>]*>""").find(this)!!.value.contains("hidden")
 
     private fun String.tag(element: String, name: String) =
         Regex("""<$element[^>]*name="${Regex.escape(name)}"[^>]*>""").find(this)!!.value

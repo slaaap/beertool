@@ -7,6 +7,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 import org.junit.jupiter.api.Test
+import uk.beertool.brewing.Acid
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
@@ -213,12 +214,21 @@ class RecipeFormTest {
     fun `should read the water, its mix and its additions`() {
         val form = form(
             "water.source" to "London tap", "water.blendSource" to "Ashbeck", "water.blendPercent" to "40",
-            "water.gypsumG" to "3.5", "water.calciumChlorideG" to "", "water.lacticMl" to "4",
+            "water.gypsumG" to "3.5", "water.calciumChlorideG" to "", "water.acidMl" to "4",
         )
 
         val water = form.toNewRecipe().water
 
-        water shouldBe RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0, gypsumG = 3.5, lacticMl = 4.0)
+        water shouldBe RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0, gypsumG = 3.5, acidMl = 4.0)
+    }
+
+    @Test
+    fun `should read the chosen acid and fall back to lactic for an unknown one`() {
+        val phosphoric = form("water.source" to "Tap", "water.acid" to "phosphoric75", "water.acidMl" to "3")
+        val unknown = form("water.source" to "Tap", "water.acid" to "vinegar", "water.acidMl" to "3")
+
+        phosphoric.toNewRecipe().water!!.acid shouldBe Acid.PHOSPHORIC_75
+        unknown.toNewRecipe().water!!.acid shouldBe Acid.LACTIC_80
     }
 
     @Test

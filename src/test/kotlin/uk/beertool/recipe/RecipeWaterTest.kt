@@ -6,8 +6,10 @@ import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import uk.beertool.brewing.Acid
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.user.BrewerPreferences
+import uk.beertool.user.PrefsJson
 import uk.beertool.user.WaterSource
 
 class RecipeWaterTest {
@@ -71,7 +73,7 @@ class RecipeWaterTest {
         val report = pale(RecipeWater(source = "London tap")).waterReport(prefs)!!
 
         report.mashPh!! shouldBe (5.91 plusOrMinus 0.03)
-        report.lacticForTargetMl!! shouldBe (9.5 plusOrMinus 0.3)
+        report.acidForTargetMl!! shouldBe (9.5 plusOrMinus 0.3)
         report.warnings shouldContain "Mash pH is above 5.6: expect a harsher, duller beer. Add acid."
     }
 
@@ -102,15 +104,45 @@ class RecipeWaterTest {
 
     @Test
     fun `should split salts by volume between strike and sparge and put all the acid in the mash`() {
-        val water = RecipeWater(source = "London tap", gypsumG = 3.2, lacticMl = 5.0)
+        val water = RecipeWater(source = "London tap", gypsumG = 3.2, acidMl = 5.0)
 
         val doses = pale(water).waterReport(prefs)!!.doses(water)
 
-        doses.map { it.addition } shouldContainExactly listOf(WaterAddition.GYPSUM, WaterAddition.LACTIC)
+        doses.map { it.addition } shouldContainExactly listOf(WaterAddition.GYPSUM, WaterAddition.ACID)
         doses[0].strike shouldBe (1.5 plusOrMinus 0.001)
         doses[0].sparge shouldBe (1.7 plusOrMinus 0.001)
         doses[1].strike shouldBe 5.0
         doses[1].sparge shouldBe 0.0
+    }
+
+    @Test
+    fun `should give each Campden tablet share its volume and leave the minerals and pH alone`() {
+        val plain = RecipeWater(source = "London tap")
+        val treated = plain.copy(campdenTablets = 1.0)
+
+        val report = pale(treated).waterReport(prefs)!!
+
+        report.doses(treated).single().strike shouldBe (15.0 / 32.0 plusOrMinus 0.001)
+        report.profile shouldBe pale(plain).waterReport(prefs)!!.profile
+        report.mashPh shouldBe pale(plain).waterReport(prefs)!!.mashPh
+    }
+
+    @Test
+    fun `should read a recipe saved before the acid could be chosen as lactic acid`() {
+        val saved = """{"source": "London tap", "lacticMl": 4.5}"""
+
+        val water = PrefsJson.decodeFromString(RecipeWater.serializer(), saved)
+
+        water shouldBe RecipeWater(source = "London tap", acid = Acid.LACTIC_80, acidMl = 4.5)
+    }
+
+    @Test
+    fun `should suggest the acid amount in the acid the recipe uses`() {
+        val lactic = pale(RecipeWater(source = "London tap")).waterReport(prefs)!!
+        val phosphoric = pale(RecipeWater(source = "London tap", acid = Acid.PHOSPHORIC_10)).waterReport(prefs)!!
+
+        phosphoric.acid shouldBe Acid.PHOSPHORIC_10
+        phosphoric.acidForTargetMl!! shouldBe (lactic.acidForTargetMl!! * Acid.LACTIC_80.meqPerMl / Acid.PHOSPHORIC_10.meqPerMl plusOrMinus 0.01)
     }
 
     @Test
