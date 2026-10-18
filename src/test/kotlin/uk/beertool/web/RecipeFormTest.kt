@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test
 import uk.beertool.brewing.Acid
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
-import uk.beertool.recipe.FlavourBalance
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.RecipeWater
 
@@ -230,15 +229,6 @@ class RecipeFormTest {
 
         phosphoric.toNewRecipe().water!!.acid shouldBe Acid.PHOSPHORIC_75
         unknown.toNewRecipe().water!!.acid shouldBe Acid.LACTIC_80
-    }
-
-    @Test
-    fun `should read the balance to aim for, and none when left blank`() {
-        val bitter = form("water.source" to "Tap", "water.target" to "bitter")
-        val none = form("water.source" to "Tap", "water.target" to "")
-
-        bitter.toNewRecipe().water!!.target shouldBe FlavourBalance.BITTER
-        none.toNewRecipe().water!!.target shouldBe null
     }
 
     @Test

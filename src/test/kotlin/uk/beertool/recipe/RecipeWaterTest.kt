@@ -185,10 +185,10 @@ class RecipeWaterTest {
     }
 
     @Test
-    fun `should suggest salts that bring the treated water to the chosen balance`() {
-        val water = RecipeWater(source = "Ashbeck", target = FlavourBalance.BITTER)
+    fun `should suggest salts that bring the treated water to a bitter balance`() {
+        val water = RecipeWater(source = "Ashbeck")
 
-        val salts = pale(water).waterReport(prefs)!!.saltsForTarget!!
+        val salts = pale(water).waterReport(prefs)!!.saltsFor.getValue(FlavourBalance.BITTER)
         val treated = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
 
         treated.profile.calcium shouldBe (100.0 plusOrMinus 0.01)
@@ -197,17 +197,19 @@ class RecipeWaterTest {
 
     @Test
     fun `should count AMS's chloride and sulphate when suggesting salts`() {
-        val water = RecipeWater(source = "London tap", acid = Acid.AMS, acidMl = 30.0, target = FlavourBalance.MALTY)
+        val water = RecipeWater(source = "London tap", acid = Acid.AMS, acidMl = 30.0)
 
-        val salts = pale(water).waterReport(prefs)!!.saltsForTarget!!
+        val salts = pale(water).waterReport(prefs)!!.saltsFor.getValue(FlavourBalance.MALTY)
         val treated = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
 
         treated.profile.chlorideToSulphate!! shouldBe (2.0 plusOrMinus 0.001)
     }
 
     @Test
-    fun `should suggest nothing until a balance is chosen`() {
-        pale(RecipeWater(source = "London tap")).waterReport(prefs)!!.saltsForTarget.shouldBeNull()
+    fun `should suggest salts for every balance at once`() {
+        val report = pale(RecipeWater(source = "London tap")).waterReport(prefs)!!
+
+        report.saltsFor.keys shouldBe FlavourBalance.entries.toSet()
     }
 
     @Test

@@ -135,7 +135,7 @@ input:focus, select:focus, textarea:focus { outline:none; border-color:var(--acc
 .g2 { grid-template-columns:repeat(2,1fr); }
 .g3 { grid-template-columns:repeat(3,1fr); }
 .field { display:flex; flex-direction:column; gap:5px; min-width:0; }
-.field > label, .field-head > label, .water-aim > label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em;
+.field > label, .field-head > label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em;
   color:var(--muted); }
 .field input, .field select, .field textarea { width:100%; }
 .field .hint { font-size:12px; color:var(--muted); }
@@ -229,13 +229,15 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .water-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 16px; }
 .water-actions .more-stages > div { left:0; right:auto; }
 .acid-input { display:grid; grid-template-columns:1fr 6.5em; gap:8px; }
-.water-aim { display:flex; align-items:center; gap:8px; margin-left:auto; }
-.water-aim select { width:auto; }
 .water-panel .field.acid { grid-column:span 2; }
 .stat.good .v { color:var(--good); }
 .stat.bad .v { color:var(--danger); }
 .tile-action { display:block; text-align:left; margin-top:6px; padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
 .tile-action:hover { text-decoration:underline; }
+.balance-links { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
+.balance-links button { padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
+.balance-links button:hover { text-decoration:underline; }
+.balance-links button.active { color:var(--ink); text-decoration:underline; text-underline-offset:3px; cursor:default; }
 table.water-plan { margin-top:14px; }
 table.water-plan .num { white-space:nowrap; }
 table.water-plan th:first-child { white-space:normal; }

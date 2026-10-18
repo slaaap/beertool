@@ -76,7 +76,10 @@
     changed(editor);
   };
 
-  window.waterUseSalts = function (gypsum, chloride) {
+  window.waterUseSalts = function (link, gypsum, chloride) {
+    link.parentNode.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); b.disabled = false; });
+    link.classList.add('active');
+    link.disabled = true;
     var editor = document.querySelector('[data-water-editor]');
     [['gypsumG', gypsum], ['calciumChlorideG', chloride]].forEach(function (pair) {
       if (parseFloat(pair[1]) > 0) show(editor, pair[0]).value = pair[1];
@@ -85,7 +88,8 @@
     changed(editor);
   };
 
-  window.waterUseAcid = function (ml) {
+  window.waterUseAcid = function (link, ml) {
+    link.remove();
     var editor = document.querySelector('[data-water-editor]');
     show(editor, 'acidMl').value = ml;
     changed(editor);

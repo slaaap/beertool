@@ -61,28 +61,44 @@ class WaterFormRenderTest {
     fun `should offer to fill in the lactic acid the mash needs`() {
         val html = render(recipe(RecipeWater(source = "London tap")))
 
-        html shouldContain Regex("""onclick="waterUseAcid\('\d+\.\d'\)"""")
+        html shouldContain Regex("""onclick="waterUseAcid\(this, '\d+\.\d'\)"""")
     }
 
     @Test
-    fun `should offer the salts that reach the chosen balance`() {
-        val html = render(recipe(RecipeWater(source = "London tap", target = FlavourBalance.BITTER)))
+    fun `should offer a link for each balance that fills in its salts`() {
+        val html = render(recipe(RecipeWater(source = "London tap")))
 
-        html shouldContain Regex("""onclick="waterUseSalts\('\d+\.\d','0\.0'\)">Use \d+\.\d g gypsum<""")
+        FlavourBalance.entries.forEach { balance ->
+            html shouldContain Regex("""onclick="waterUseSalts\(this, '\d+\.\d', '\d+\.\d'\)">${balance.label}<""")
+        }
     }
 
     @Test
-    fun `should not offer salts the recipe already uses`() {
-        val water = RecipeWater(source = "London tap", target = FlavourBalance.BITTER)
-        val treated = water.copy(gypsumG = suggestedGypsum(water))
+    fun `should mark the balance the recipe's salts already match`() {
+        val water = RecipeWater(source = "London tap")
+        val bitter = water.copy(gypsumG = suggestedGypsum(water))
+
+        val html = render(recipe(bitter))
+
+        html shouldContain Regex("""<button[^>]*class="active"[^>]*disabled[^>]*>Bitter<""")
+        html shouldNotContain Regex("""class="active"[^>]*>Balanced<""")
+    }
+
+    @Test
+    fun `should not offer acid the recipe already uses`() {
+        val water = RecipeWater(source = "London tap")
+        val treated = water.copy(acidMl = suggestedAcid(water))
 
         val html = render(recipe(treated))
 
-        html shouldNotContain "waterUseSalts"
+        html shouldNotContain "waterUseAcid"
     }
 
+    private fun suggestedAcid(water: RecipeWater) =
+        recipe(water).waterReport(BrewerPreferences(waterSources = waters))!!.acidForTargetMl!!.roundTo(1)
+
     private fun suggestedGypsum(water: RecipeWater) =
-        recipe(water).waterReport(BrewerPreferences(waterSources = waters))!!.saltsForTarget!!.gypsumG.roundTo(1)
+        recipe(water).waterReport(BrewerPreferences(waterSources = waters))!!.saltsFor.getValue(FlavourBalance.BITTER).gypsumG.roundTo(1)
 
     private fun String.fieldIsHidden(field: String) =
         Regex("""<div class="field[^"]*"[^>]*data-add="$field"[^>]*>""").find(this)!!.value.contains("hidden")

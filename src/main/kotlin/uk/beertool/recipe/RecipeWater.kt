@@ -1,6 +1,5 @@
 package uk.beertool.recipe
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import uk.beertool.brewing.Acid
 import uk.beertool.brewing.Calculators
@@ -31,7 +30,6 @@ data class RecipeWater(
     val acid: Acid = Acid.LACTIC_80,
     val acidMl: Double = 0.0,
     val campdenTablets: Double = 0.0,
-    val target: FlavourBalance? = null,
 ) {
     val salts: List<SaltAddition>
         get() = WaterAddition.entries.mapNotNull { a -> a.salt?.let { SaltAddition(it, a.amountIn(this)) } }.filter { it.grams > 0.0 }
@@ -95,20 +93,10 @@ fun RecipeWater.describe(): String {
 }
 
 // Each balance doubles as a target for suggested salts: common guidance for calcium and the chloride-to-sulphate ratio.
-@Serializable
 enum class FlavourBalance(val code: String, val label: String, val calcium: Double, val chlorideToSulphate: Double) {
-    @SerialName("bitter")
     BITTER("bitter", "Bitter", 100.0, 0.5),
-
-    @SerialName("balanced")
     BALANCED("balanced", "Balanced", 75.0, 1.0),
-
-    @SerialName("malty")
-    MALTY("malty", "Malty", 75.0, 2.0);
-
-    companion object {
-        fun fromCodeOrNull(code: String?) = entries.find { it.code == code }
-    }
+    MALTY("malty", "Malty", 75.0, 2.0),
 }
 
 data class WaterReport(
@@ -121,7 +109,7 @@ data class WaterReport(
     val acid: Acid,
     val acidForTargetMl: Double?,
     val missingSources: List<String>,
-    val saltsForTarget: SaltSuggestion? = null,
+    val saltsFor: Map<FlavourBalance, SaltSuggestion> = emptyMap(),
 ) {
     val balance: FlavourBalance?
         get() {
@@ -181,10 +169,10 @@ private fun waterReport(
     val acid = water.acid
     fun withWholeWaterAcid(p: WaterProfile) = if (acid.treatsAllWater) WaterChemistry.withAcid(p, acid, water.acidMl, totalL) else p
     val profile = withWholeWaterAcid(salted)
-    val saltsForTarget = water.target?.let { target ->
-        val others = water.salts.filterNot { it.salt == Salt.GYPSUM || it.salt == Salt.CALCIUM_CHLORIDE }
-        val base = withWholeWaterAcid(WaterChemistry.withSalts(mixed, others, totalL))
-        WaterChemistry.saltsFor(base, target.calcium, target.chlorideToSulphate, totalL)
+    val others = water.salts.filterNot { it.salt == Salt.GYPSUM || it.salt == Salt.CALCIUM_CHLORIDE }
+    val beforeGypsumAndChloride = withWholeWaterAcid(WaterChemistry.withSalts(mixed, others, totalL))
+    val saltsFor = FlavourBalance.entries.associateWith {
+        WaterChemistry.saltsFor(beforeGypsumAndChloride, it.calcium, it.chlorideToSulphate, totalL)
     }
 
     val grist = fermentables.map { it.toCalcInput() }
@@ -201,6 +189,6 @@ private fun waterReport(
         acid = acid,
         acidForTargetMl = WaterChemistry.acidForPh(TARGET_MASH_PH, acid, grist, salted, strikeL)?.takeIf { mashShare > 0.0 }?.let { it / mashShare },
         missingSources = missing.distinct(),
-        saltsForTarget = saltsForTarget,
+        saltsFor = saltsFor,
     )
 }
