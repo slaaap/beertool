@@ -117,7 +117,7 @@
   var oTemp = document.getElementById('strike-temp');
   var oSparge = document.getElementById('sparge-water');
 
-  function show(el, v) { el.textContent = isFinite(v) ? v.toFixed(1) : '—'; }
+  function show(el, v) { el.textContent = isFinite(v) ? v.toFixed(1) : '-'; }
   function update() {
     var r = parseFloat(ratio.value), a = parseFloat(ret.value), g = parseFloat(gt.value);
     var strike = grain * r;

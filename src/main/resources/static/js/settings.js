@@ -2,7 +2,7 @@
   var f = document.getElementById('settings-form');
   if (!f) return;
   function num(name) { var el = f.elements[name]; return el ? parseFloat(el.value) : NaN; }
-  function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = isFinite(v) ? v.toFixed(1) : '—'; }
+  function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = isFinite(v) ? v.toFixed(1) : '-'; }
   function update() {
     var post = num('preBoilVolumeL') - num('boilOffL');
     set('d-post', post);

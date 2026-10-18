@@ -8,7 +8,7 @@ import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.roundToLong
 
-const val MISSING = "—"
+const val MISSING = "-"
 
 fun fmt(v: Double?, decimals: Int) = v?.let { "%.${decimals}f".format(it) } ?: MISSING
 
