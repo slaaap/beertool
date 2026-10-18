@@ -207,6 +207,7 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stat.accent .v { color:var(--accent); }
 .stats.derived { grid-template-columns:repeat(2,1fr); margin-top:12px; }
 .stats.trio { grid-template-columns:repeat(3,1fr); }
+.stats.duo { grid-template-columns:repeat(2,1fr); }
 .stats.six { grid-template-columns:repeat(6,1fr); }
 .stats + .stats { margin-top:12px; }
 .stats.chem .k, table.water-sources th { text-transform:none; letter-spacing:0.04em; }

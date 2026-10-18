@@ -11,6 +11,7 @@ import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.RecipeFermentable
 import uk.beertool.recipe.RecipeHop
+import uk.beertool.recipe.RecipeWater
 import uk.beertool.recipe.RecipeYeast
 import uk.beertool.recipe.stats
 import uk.beertool.user.User
@@ -26,6 +27,16 @@ class RecipeViewRenderTest {
         html shouldContain "Estimates"
         html shouldContain """<table class="bill mash">"""
         html shouldContain "Rest"
+    }
+
+    @Test
+    fun `should show the mash pH on the recipe page without an acid amount to apply`() {
+        val water = RecipeWater(source = "London tap", acidMl = 3.0)
+
+        val html = render(recipe(mashSteps = listOf(MashStep(66.0, 60)), water = water))
+
+        html shouldContain "Mash pH"
+        html shouldNotContain "for 5.4"
     }
 
     @Test
@@ -78,7 +89,7 @@ class RecipeViewRenderTest {
             .serialize()
     }
 
-    private fun recipe(mashSteps: List<MashStep>, hops: List<RecipeHop> = emptyList()) = Recipe(
+    private fun recipe(mashSteps: List<MashStep>, hops: List<RecipeHop> = emptyList(), water: RecipeWater? = null) = Recipe(
         id = 1, userId = 1, name = "Test", style = "Saison", description = null,
         preBoilVolumeL = 27.0, postBoilVolumeL = 22.0, fermenterVolumeL = 19.0,
         efficiency = 0.68, boilTimeMin = 60, mashSteps = mashSteps,
@@ -86,6 +97,7 @@ class RecipeViewRenderTest {
         hops = hops,
         yeasts = listOf(RecipeYeast(name = "US-05", attenuation = 0.80)),
         extras = emptyList(),
+        water = water,
         createdAt = Instant.EPOCH, updatedAt = Instant.EPOCH,
     )
 }

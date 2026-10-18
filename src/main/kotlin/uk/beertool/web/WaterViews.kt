@@ -163,11 +163,11 @@ internal fun FlowContent.waterResult(report: WaterReport?, canApply: Boolean = f
 private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
     val inRange = report.mashPh?.let { it in MIN_MASH_PH..MAX_MASH_PH }
     val acidMl = report.acidForTargetMl
-    div("stats trio chem") {
+    div(if (canApply) "stats trio chem" else "stats duo chem") {
         statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label)
         statTile("Mash pH", fmt(report.mashPh, 2), "$MIN_MASH_PH-$MAX_MASH_PH", tone = if (inRange == false) "bad" else if (inRange == true) "good" else null)
-        statTile("${report.acid.shortLabel} for $TARGET_MASH_PH", fmt(acidMl, 1), "ml") {
-            if (canApply && acidMl != null && acidMl >= 0.1) {
+        if (canApply) statTile("${report.acid.shortLabel} for $TARGET_MASH_PH", fmt(acidMl, 1), "ml") {
+            if (acidMl != null && acidMl >= 0.1) {
                 button(type = ButtonType.button, classes = "tile-action") {
                     onClick = "waterUseAcid('${fmt(acidMl, 1)}')"
                     +"Use this"
