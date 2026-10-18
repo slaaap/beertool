@@ -17,6 +17,8 @@ const val TARGET_MASH_PH = 5.4
 const val MIN_MASH_PH = 5.2
 const val MAX_MASH_PH = 5.6
 
+private const val HAZY_CHLORIDE = 120.0
+
 @Serializable
 data class RecipeWater(
     val source: String,
@@ -116,13 +118,16 @@ data class WaterReport(
 ) {
     val balance: FlavourBalance?
         get() {
-            val ratio = profile.chlorideToSulphate ?: return if (profile.chloride > 0.0) FlavourBalance.MALTY else null
+            val ratio = profile.chlorideToSulphate ?: return if (profile.chloride > 0.0) chlorideForward() else null
             return when {
                 ratio < 0.77 -> FlavourBalance.BITTER
-                ratio > 1.3 -> FlavourBalance.MALTY
+                ratio > 1.3 -> chlorideForward()
                 else -> FlavourBalance.BALANCED
             }
         }
+
+    // Malty and hazy waters share a ratio; hazy ones carry far more chloride.
+    private fun chlorideForward() = if (profile.chloride >= HAZY_CHLORIDE) FlavourBalance.HAZY else FlavourBalance.MALTY
 
     val warnings: List<String>
         get() = buildList {

@@ -81,10 +81,20 @@ class RecipeWaterTest {
     @Test
     fun `should call a sulphate-heavy water bitter and a chloride-heavy one malty`() {
         val bitter = pale(RecipeWater(source = "London tap", gypsumG = 6.0)).waterReport(prefs)!!
-        val malty = pale(RecipeWater(source = "London tap", calciumChlorideG = 6.0)).waterReport(prefs)!!
+        val malty = pale(RecipeWater(source = "London tap", calciumChlorideG = 3.0)).waterReport(prefs)!!
 
         bitter.balance shouldBe FlavourBalance.BITTER
         malty.balance shouldBe FlavourBalance.MALTY
+    }
+
+    @Test
+    fun `should call chloride-forward water hazy once there is plenty of chloride`() {
+        val water = RecipeWater(source = "London tap")
+        val salts = pale(water).waterReport(prefs)!!.saltsFor.getValue(FlavourBalance.HAZY)
+
+        val hazy = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
+
+        hazy.balance shouldBe FlavourBalance.HAZY
     }
 
     @Test
