@@ -178,13 +178,9 @@ private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
 internal fun FlowContent.waterSummary(water: RecipeWater?, report: WaterReport?) {
     if (water == null) return
     sectionHead("Water")
-    scrollTable("bill fit water-adds") {
-        tbody {
-            tr { td { +"Water" }; td { colSpan = "2"; +water.describe() } }
-            ADDITIONS.filter { it.of(water) > 0.0 }.forEach { a ->
-                tr { td { +a.label }; td("num") { +"${fmt(a.of(water), 1)} ${a.unit}" }; emptyCell() }
-            }
-        }
+    div("stats auto") {
+        statTile("Water", water.describe(), null, tone = "text")
+        ADDITIONS.filter { it.of(water) > 0.0 }.forEach { a -> statTile(a.label, fmt(a.of(water), 1), a.unit) }
     }
     waterResult(report)
 }

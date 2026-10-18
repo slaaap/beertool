@@ -115,7 +115,8 @@ private fun FlowContent.fermentableStages(recipe: Recipe) {
                             td { +f.name }
                             numCell(f.amountKg, decimals = 3)
                             td { +prettify(f.type.name) }
-                            if (section.usage.takesTime) numCell(f.boilTimeMin)
+                            emptyCell()
+                            if (section.usage.takesTime) numCell(f.boilTimeMin) else emptyCell()
                             numCell(f.colourEbc, decimals = 0)
                             numCell(f.extractPercent, decimals = 1)
                         }
@@ -142,7 +143,10 @@ private fun FlowContent.hopStages(recipe: Recipe, prefs: BrewerPreferences) {
                         tr {
                             td { +h.name }
                             numCell(h.amountG, decimals = 0)
-                            numCell(section.timeOf(h))
+                            emptyCell()
+                            emptyCell()
+                            if (section.timeField != null) numCell(section.timeOf(h)) else emptyCell()
+                            emptyCell()
                             numCell(h.alphaAcid, decimals = 1)
                         }
                     }
@@ -185,6 +189,7 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
             emptyCell()
             numCell(m.timeMin)
             emptyCell()
+            emptyCell()
         }
 
         fermentableStages(recipe)
@@ -192,21 +197,23 @@ fun HTML.recipeViewPage(user: User, recipe: Recipe, stats: RecipeStats, brews: L
 
         hopStages(recipe, user.preferences)
 
-        billTable("Yeasts", recipe.yeasts.inBrewOrder(), TR::yeastHead) { y ->
+        billTable("Yeasts", recipe.yeasts.inBrewOrder(), TR::yeastHead, "bill yeasts") { y ->
             td { +y.name }
             emptyCell()
             emptyCell()
             td { +prettify(y.usage.name) }
             emptyCell()
+            emptyCell()
             numCell(y.attenuation.asPercent(), decimals = 0)
         }
 
-        billTable("Extras", recipe.extras.inBrewOrder(), TR::extraHead) { e ->
+        billTable("Extras", recipe.extras.inBrewOrder(), TR::extraHead, "bill extras") { e ->
             td { +e.name }
             numCell(e.amount, decimals = 1)
             td { +e.unit.code }
             td { +prettify(e.usage.name) }
             numCell(e.boilTimeMin)
+            emptyCell()
             emptyCell()
         }
 

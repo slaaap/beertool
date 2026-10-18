@@ -96,10 +96,10 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
             }
             fermentableSections(recipe)
             hopSections(recipe, prefs, recipe?.boilTimeMin ?: prefs.boilTimeMin)
-            editableBill(YEASTS, "Yeasts", "Add yeast", TR::yeastHead) {
+            editableBill(YEASTS, "Yeasts", "Add yeast", TR::yeastHead, "bill yeasts") {
                 recipe?.yeasts.orEmpty().inBrewOrder().forEachIndexed { i, y -> yeastRow(i, y) }
             }
-            editableBill(EXTRAS, "Extras", "Add extra", TR::extraHead) {
+            editableBill(EXTRAS, "Extras", "Add extra", TR::extraHead, "bill extras") {
                 recipe?.extras.orEmpty().inBrewOrder().forEachIndexed { i, e -> extraRow(i, e) }
             }
 
@@ -158,6 +158,7 @@ private fun TBODY.mashStepRow(i: Int, m: MashStep?) {
         emptyCell()
         numInput(field("timeMin"), m?.timeMin?.toString(), "1")
         emptyCell()
+        emptyCell()
         td("right") { removeButton() }
     }
 }
@@ -208,7 +209,8 @@ private fun TBODY.fermentableRow(i: Int, f: RecipeFermentable?, section: Ferment
                 }
             }
         }
-        if (section.usage.takesTime) numInput(field("boilTimeMin"), f?.boilTimeMin?.toString(), "1")
+        emptyCell()
+        if (section.usage.takesTime) numInput(field("boilTimeMin"), f?.boilTimeMin?.toString(), "1") else emptyCell()
         numInput(field("colourEbc"), f?.colourEbc?.toString(), "1")
         numInput(field("extractPercent"), f?.extractPercent?.toString(), "0.1", placeholder = "auto")
         td("right") { removeButton() }
@@ -270,9 +272,10 @@ private fun TBODY.hopRow(i: Int, h: RecipeHop?, section: HopSection) {
             hiddenInput(name = field("usage")) { value = section.usage.code }
         }
         numInput(field("amountG"), h?.amountG?.toString(), "1")
-        td("num") {
-            section.timeField?.let { stageTimeInput(field(it), h?.let(section::timeOf)) }
-        }
+        emptyCell()
+        emptyCell()
+        section.timeField?.let { td("num") { stageTimeInput(field(it), h?.let(section::timeOf)) } } ?: emptyCell()
+        emptyCell()
         numInput(field("alphaAcid"), h?.alphaAcid?.toString(), "0.1")
         td("right") { removeButton() }
     }
@@ -292,6 +295,7 @@ private fun TBODY.yeastRow(i: Int, y: RecipeYeast?) {
         emptyCell()
         td { select { name = field("usage"); enumOptions(y?.usage, YeastUsage) } }
         emptyCell()
+        emptyCell()
         numInput(field("attenuation"), fmt((y?.attenuation ?: DEFAULT_ATTENUATION).asPercent(), 0), "1", max = "100")
         td("right") { removeButton() }
     }
@@ -305,6 +309,7 @@ private fun TBODY.extraRow(i: Int, e: RecipeExtra?) {
         td { select { name = field("unit"); enumOptions(e?.unit, AmountUnit) { it.code } } }
         td { select { name = field("usage"); enumOptions(e?.usage, ExtraUsage) { u -> usageAttrs(u) } } }
         numInput(field("boilTimeMin"), e?.boilTimeMin?.toString(), "1")
+        emptyCell()
         emptyCell()
         td("right") { removeButton() }
     }

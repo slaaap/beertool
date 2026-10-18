@@ -15,25 +15,25 @@ import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.user.BrewerPreferences
 
+// Every recipe table uses the same seven slots, so their columns line up down the page.
 internal const val SLOT_NAME = "c-name"
 internal const val SLOT_AMOUNT = "c-amount"
 internal const val SLOT_WHAT = "c-what"
 internal const val SLOT_USE = "c-use"
 internal const val SLOT_TIME = "c-time"
-internal const val SLOT_ALPHA = "c-alpha"
+internal const val SLOT_PROP = "c-prop"
+internal const val SLOT_LAST = "c-last"
 
 internal fun TR.stepNumberCell() = td(SLOT_NAME) {}
-
-internal const val SLOT_PROP_NARROW = "c-prop-narrow"
 
 internal fun TR.mashHead() {
     head("Rest", SLOT_NAME)
     numHead("Temp", "°C", SLOT_AMOUNT)
     emptySlot(SLOT_WHAT)
     emptySlot(SLOT_USE)
-
     numHead("Time", "min", SLOT_TIME)
-    propertySpacer()
+    emptySlot(SLOT_PROP)
+    emptySlot(SLOT_LAST)
 }
 
 // The stage supplies the usage, so only the types legal there are offered: no sugar in the mash.
@@ -52,9 +52,10 @@ internal fun TR.fermentableStageColumns(section: FermentableSection) {
     head("Fermentable", SLOT_NAME)
     numHead("Amount", "kg", SLOT_AMOUNT)
     head("Type", SLOT_WHAT)
-    if (section.usage.takesTime) numHead("Time", "min", SLOT_TIME)
-    numHead("EBC", slot = SLOT_PROP_NARROW)
-    numHead("Extract", "%")
+    emptySlot(SLOT_USE)
+    if (section.usage.takesTime) numHead("Time", "min", SLOT_TIME) else emptySlot(SLOT_TIME)
+    numHead("EBC", slot = SLOT_PROP)
+    numHead("Extract", "%", SLOT_LAST)
 }
 
 // Each hop stage shows only the time that means something there: minutes in the kettle or days in the fermenter.
@@ -99,8 +100,11 @@ internal fun FlowContent.stageTitle(label: String, note: String? = null) {
 internal fun TR.hopStageColumns(section: HopSection) {
     head("Hop", SLOT_NAME)
     numHead("Amount", "g", SLOT_AMOUNT)
-    section.timeLabel?.let { numHead(it, section.timeUnit, SLOT_TIME) }
-    numHead("Alpha", "%", SLOT_ALPHA)
+    emptySlot(SLOT_WHAT)
+    emptySlot(SLOT_USE)
+    section.timeLabel?.let { numHead(it, section.timeUnit, SLOT_TIME) } ?: emptySlot(SLOT_TIME)
+    emptySlot(SLOT_PROP)
+    numHead("Alpha", "%", SLOT_LAST)
 }
 
 internal fun TR.yeastHead() {
@@ -109,7 +113,8 @@ internal fun TR.yeastHead() {
     emptySlot(SLOT_WHAT)
     head("Use", SLOT_USE)
     emptySlot(SLOT_TIME)
-    numHead("Attenuation", "%")
+    emptySlot(SLOT_PROP)
+    numHead("Attenuation", "%", SLOT_LAST)
 }
 
 internal fun TR.extraHead() {
@@ -118,7 +123,8 @@ internal fun TR.extraHead() {
     head("Unit", SLOT_WHAT)
     head("Use", SLOT_USE)
     numHead("Time", "min", SLOT_TIME)
-    propertySpacer()
+    emptySlot(SLOT_PROP)
+    emptySlot(SLOT_LAST)
 }
 
 internal class Ion(val field: String, val label: String, val of: (WaterProfile) -> Double)
@@ -139,11 +145,9 @@ internal fun TR.head(label: String, slot: String) = th(classes = slot) { +label 
 internal fun TR.numHead(label: String, unit: String? = null, slot: String? = null) =
     th(classes = listOfNotNull("num", slot).joinToString(" ")) { +(if (unit == null) label else "$label ($unit)") }
 
-internal fun TR.emptySlot(slot: String) = th(classes = slot) {}
+internal fun TR.emptySlot(slot: String) = th(classes = "$slot gap") {}
 
-internal fun TR.propertySpacer() = th {}
-
-internal fun TR.emptyCell() = td {}
+internal fun TR.emptyCell() = td("gap") {}
 
 internal fun TR.numCell(v: Double?, decimals: Int) = td("num") { +fmt(v, decimals) }
 

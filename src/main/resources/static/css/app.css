@@ -86,30 +86,19 @@ td.tnum { font-family:var(--font-mono); font-variant-numeric:tabular-nums; white
 .nowrap { white-space:nowrap; }
 
 table.bill { table-layout:fixed; }
-.c-name { width:25%; }
+.c-name { width:26%; }
 .c-amount { width:12%; }
 .c-what { width:12%; }
-.c-use { width:15%; }
+.c-use { width:12%; }
 .c-time { width:11%; }
+.c-prop { width:10%; }
+.c-last { width:17%; }
 .c-act { width:32px; }
-
-.c-prop-narrow { width:8%; }
-.c-alpha { width:20%; }
 
 .stage + .stage { margin-top:18px; }
 .stage-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:14px 0 0; }
 .stage-head h3 { margin:0; font-family:var(--font-display); font-size:17px; font-weight:600; }
 .stage-note { color:var(--muted); font-size:13px; }
-
-table.hops .c-name { width:36%; }
-table.hops .c-amount { width:20%; }
-table.hops .c-time { width:20%; }
-
-table.ferm .c-name { width:26%; }
-table.ferm .c-amount { width:15%; }
-table.ferm .c-what { width:17%; }
-table.ferm .c-time { width:13%; }
-table.ferm .c-prop-narrow { width:12%; }
 
 .more-stages { position:relative; display:inline-block; }
 .more-stages > summary { list-style:none; color:var(--muted); }
@@ -221,7 +210,9 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stats.six { grid-template-columns:repeat(6,1fr); }
 .stats + .stats { margin-top:12px; }
 .stats.chem .k, table.water-sources th { text-transform:none; letter-spacing:0.04em; }
-table.water-adds { margin-bottom:12px; }
+.stats.auto { grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }
+.stat.text { grid-column:span 2; }
+.stat.text .v { font-family:var(--font-body); font-size:18px; letter-spacing:0; line-height:1.3; margin-top:9px; }
 .water-editor [hidden] { display:none !important; }
 .field-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
 .field-remove { border:0; background:none; padding:0 2px; font-size:16px; line-height:1; color:var(--muted); cursor:pointer; }
@@ -254,6 +245,7 @@ li { margin:3px 0; }
   .stats { grid-template-columns:repeat(2,1fr); }
   .stat.last { grid-column:span 2; }
   .stats.six { grid-template-columns:repeat(3,1fr); }
+  .stats.auto { grid-template-columns:repeat(2,1fr); }
   .g2, .g3 { grid-template-columns:1fr; }
   .hide-sm { display:none; }
 
@@ -266,16 +258,27 @@ li { margin:3px 0; }
   main.wrap { padding:22px 16px 56px; }
 
   .table-scroll table { min-width:520px; }
-  .table-scroll table.bill { min-width:620px; }
+  .table-scroll table.bill { min-width:0; }
   .table-scroll table.fit { min-width:0; }
-  .table-scroll table.hops { min-width:0; }
-  .table-scroll table.ferm { min-width:0; }
-  table.ferm td:not(:last-child), table.ferm th:not(:last-child) { padding-right:6px; }
-  table.ferm td.num input[type=number] { padding-left:4px; padding-right:4px; }
+  table.bill .gap { display:none; }
+  table.ferm .c-name { width:26%; }
+  table.ferm .c-amount { width:15%; }
+  table.ferm .c-what { width:17%; }
+  table.ferm .c-time { width:13%; }
+  table.ferm .c-prop { width:12%; }
+  table.mash .c-name { width:20%; }
+  table.mash .c-amount, table.mash .c-time { width:30%; }
+  table.yeasts .c-name { width:44%; }
+  table.yeasts .c-use { width:26%; }
+  table.yeasts .c-last { width:20%; }
+  table.extras .c-name { width:30%; }
+  table.extras .c-amount { width:15%; }
+  table.extras .c-what, table.extras .c-use { width:18%; }
+  table.extras .c-time { width:12%; }
+  table.bill td:not(:last-child), table.bill th:not(:last-child) { padding-right:6px; }
+  table.bill td.num input[type=number] { padding-left:4px; padding-right:4px; }
   table.hops .c-name { width:32%; }
-  table.hops .c-amount, table.hops .c-time, table.hops .c-alpha { width:19%; }
-  table.hops td:not(:last-child), table.hops th:not(:last-child) { padding-right:6px; }
-  table.hops td.num input[type=number] { padding-left:4px; padding-right:4px; }
+  table.hops .c-amount, table.hops .c-time, table.hops .c-last { width:19%; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
   .brew-water .g3 { grid-template-columns:repeat(2,1fr); }
