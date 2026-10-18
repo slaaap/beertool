@@ -28,6 +28,11 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
+import uk.beertool.common.Env
+import uk.beertool.common.flag
+import uk.beertool.common.publicUrl
+import uk.beertool.common.systemEnv
+import uk.beertool.common.text
 import uk.beertool.oauth.ClientRegistry
 import uk.beertool.oauth.LOOPBACK_HOSTS
 import uk.beertool.oauth.MetadataDocumentClients
@@ -53,18 +58,16 @@ data class McpConfig(
     companion object {
         val DEFAULT_CLIENT_HOSTS = setOf("claude.ai", "chatgpt.com")
 
-        fun fromEnv(env: (String) -> String? = System::getenv): McpConfig? {
-            if (env("MCP_ENABLED")?.trim()?.equals("true", ignoreCase = true) != true) return null
+        fun fromEnv(env: Env = systemEnv): McpConfig? {
+            if (!env.flag("MCP_ENABLED", default = false)) return null
             return McpConfig(
-                publicUrl = env("PUBLIC_URL")?.trim()?.trimEnd('/')?.ifBlank { null },
-                trustedClientHosts = env("MCP_OAUTH_CLIENT_HOSTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
+                publicUrl = env.publicUrl(),
+                trustedClientHosts = env.text("MCP_OAUTH_CLIENT_HOSTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
                     ?: DEFAULT_CLIENT_HOSTS,
-                tokensEnabled = env("MCP_TOKENS_ENABLED").isOn(),
-                oauthEnabled = env("MCP_OAUTH_ENABLED").isOn(),
+                tokensEnabled = env.flag("MCP_TOKENS_ENABLED", default = true),
+                oauthEnabled = env.flag("MCP_OAUTH_ENABLED", default = true),
             )
         }
-
-        private fun String?.isOn() = this?.trim()?.equals("false", ignoreCase = true) != true
     }
 }
 

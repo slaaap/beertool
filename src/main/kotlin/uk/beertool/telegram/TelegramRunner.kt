@@ -9,12 +9,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import uk.beertool.common.Env
+import uk.beertool.common.publicUrl
+import uk.beertool.common.systemEnv
+import uk.beertool.common.text
 
 data class TelegramConfig(val token: String, val publicUrl: String?) {
     companion object {
-        fun fromEnv(env: (String) -> String? = System::getenv): TelegramConfig? {
-            val token = env("TELEGRAM_BOT_TOKEN")?.trim()?.ifBlank { null } ?: return null
-            return TelegramConfig(token, env("PUBLIC_URL")?.trim()?.trimEnd('/')?.ifBlank { null })
+        fun fromEnv(env: Env = systemEnv): TelegramConfig? {
+            val token = env.text("TELEGRAM_BOT_TOKEN") ?: return null
+            return TelegramConfig(token, env.publicUrl())
         }
     }
 }

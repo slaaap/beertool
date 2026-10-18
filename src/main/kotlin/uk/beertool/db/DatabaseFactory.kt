@@ -5,17 +5,19 @@ import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.slf4j.LoggerFactory
+import uk.beertool.common.systemEnv
+import uk.beertool.common.text
 
 object DatabaseFactory {
     private val log = LoggerFactory.getLogger(DatabaseFactory::class.java)
 
     fun init(): HikariDataSource {
-        val url = System.getenv("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/beertool"
+        val url = systemEnv.text("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/beertool"
         log.info("Connecting to Postgres at {}", url)
         val ds = hikari(
             url = url,
-            user = System.getenv("DATABASE_USER") ?: "beertool",
-            password = System.getenv("DATABASE_PASSWORD") ?: "beertool",
+            user = systemEnv.text("DATABASE_USER") ?: "beertool",
+            password = systemEnv.text("DATABASE_PASSWORD") ?: "beertool",
         )
         Flyway.configure().dataSource(ds).load().migrate()
         Database.connect(ds)
