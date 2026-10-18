@@ -104,6 +104,29 @@ enum class FlavourBalance(val code: String, val label: String, val calcium: Doub
     HAZY("hazy", "Hazy", 150.0, 2.0),
 }
 
+private val MALTY_STYLES = listOf(
+    "stout", "porter", "brown", "bock", "dunkel", "schwarz", "scotch", "wee heavy", "quad", "dark strong",
+    "barleywine", "old ale", "dubbel", "märzen", "festbier",
+)
+
+// Late hops and little bitterness mark a hazy IPA, whatever style it was filed under.
+private fun hazyHopping(hops: List<RecipeHop>, ibu: Double): Boolean {
+    val total = hops.sumOf { it.amountG }
+    val late = hops.filter { it.usage == HopUsage.WHIRLPOOL || it.usage == HopUsage.DRY_HOP }.sumOf { it.amountG }
+    return total > 0.0 && late / total >= 0.75 && ibu < 30.0
+}
+
+fun recommendedBalance(style: String?, hops: List<RecipeHop>, ibu: Double): FlavourBalance {
+    val s = style.orEmpty().lowercase()
+    return when {
+        "hazy" in s || "double ipa" in s || "imperial ipa" in s -> FlavourBalance.HAZY
+        "ipa" in s || "india pale" in s -> if (hazyHopping(hops, ibu)) FlavourBalance.HAZY else FlavourBalance.BITTER
+        "pale ale" in s || "bitter" in s -> FlavourBalance.BITTER
+        MALTY_STYLES.any { it in s } -> FlavourBalance.MALTY
+        else -> FlavourBalance.BALANCED
+    }
+}
+
 data class WaterReport(
     val water: RecipeWater,
     val totalL: Double,
@@ -115,6 +138,7 @@ data class WaterReport(
     val acidForTargetMl: Double?,
     val missingSources: List<String>,
     val saltsFor: Map<FlavourBalance, SaltSuggestion> = emptyMap(),
+    val recommended: FlavourBalance = FlavourBalance.BALANCED,
 ) {
     val balance: FlavourBalance?
         get() {
@@ -146,12 +170,15 @@ data class WaterReport(
 
 fun Recipe.waterReport(prefs: BrewerPreferences): WaterReport? =
     water?.let { waterReport(it, prefs.waterSources, fermentables, preBoilVolumeL, postBoilVolumeL, prefs) }
+        ?.copy(recommended = recommendedBalance(style, hops, stats(prefs.whirlpool).ibu))
 
 fun NewRecipe.waterReport(prefs: BrewerPreferences): WaterReport? =
     water?.let { waterReport(it, prefs.waterSources, fermentables, preBoilVolumeL, postBoilVolumeL, prefs) }
+        ?.copy(recommended = recommendedBalance(style, hops, estimatedStats(prefs.whirlpool).ibu))
 
 fun Recipe.waterReport(snapshot: WaterSnapshot, prefs: BrewerPreferences): WaterReport =
     waterReport(snapshot.water, snapshot.sources, fermentables, preBoilVolumeL, postBoilVolumeL, prefs)
+        .copy(recommended = recommendedBalance(style, hops, stats(prefs.whirlpool).ibu))
 
 private fun waterReport(
     water: RecipeWater,

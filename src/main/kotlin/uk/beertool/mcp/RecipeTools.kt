@@ -313,6 +313,7 @@ private fun waterJson(r: WaterReport) = buildJsonObject {
     put("targetMashPh", TARGET_MASH_PH)
     put("acid", r.acid.code)
     put("acidMlForTarget", r.acidForTargetMl?.roundTo(1))
+    put("recommendedBalance", r.recommended.code)
     put("saltsFor", buildJsonObject {
         r.saltsFor.forEach { (balance, s) ->
             put(balance.code, buildJsonObject { put("gypsumG", s.gypsumG.roundTo(1)); put("calciumChlorideG", s.calciumChlorideG.roundTo(1)) })

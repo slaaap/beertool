@@ -181,7 +181,7 @@ private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
     }
 }
 
-// Tapping a balance fills in its gypsum and calcium chloride; the one the salts already match is marked.
+// Tapping a balance fills in its gypsum and calcium chloride; the one the salts match is marked, and a dot shows the one that suits the beer.
 private fun DIV.balanceLinks(report: WaterReport) {
     div("balance-links") {
         FlavourBalance.entries.forEach { balance ->
@@ -189,9 +189,11 @@ private fun DIV.balanceLinks(report: WaterReport) {
             val gypsum = salts.gypsumG.roundTo(1)
             val chloride = salts.calciumChlorideG.roundTo(1)
             val current = gypsum == report.water.gypsumG.roundTo(1) && chloride == report.water.calciumChlorideG.roundTo(1)
-            button(type = ButtonType.button, classes = if (current) "active" else null) {
+            val classes = listOfNotNull("active".takeIf { current }, "recommended".takeIf { balance == report.recommended })
+            button(type = ButtonType.button, classes = classes.joinToString(" ").ifEmpty { null }) {
                 disabled = current
-                title = "${fmt(gypsum, 1)} g gypsum + ${fmt(chloride, 1)} g calcium chloride"
+                title = "${fmt(gypsum, 1)} g gypsum + ${fmt(chloride, 1)} g calcium chloride" +
+                    if (balance == report.recommended) ", suggested for this beer" else ""
                 onClick = "waterUseSalts(this, '${fmt(gypsum, 1)}', '${fmt(chloride, 1)}')"
                 +balance.label
             }

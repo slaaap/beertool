@@ -229,6 +229,38 @@ class RecipeWaterTest {
     }
 
     @Test
+    fun `should recommend hazy water for hazy and double IPAs`() {
+        val hazy = recommendedBalance("Hazy IPA", emptyList(), ibu = 40.0)
+        val double = recommendedBalance("Double IPA", emptyList(), ibu = 45.0)
+
+        hazy shouldBe FlavourBalance.HAZY
+        double shouldBe FlavourBalance.HAZY
+    }
+
+    @Test
+    fun `should tell a hazy IPA filed under another IPA style by its late hops and low bitterness`() {
+        val late = listOf(hop(HopUsage.BOIL, 10.0), hop(HopUsage.WHIRLPOOL, 50.0), hop(HopUsage.DRY_HOP, 100.0))
+        val bittered = listOf(hop(HopUsage.BOIL, 60.0), hop(HopUsage.DRY_HOP, 60.0))
+
+        val hazy = recommendedBalance("American IPA", late, ibu = 22.0)
+        val westCoast = recommendedBalance("American IPA", bittered, ibu = 55.0)
+
+        hazy shouldBe FlavourBalance.HAZY
+        westCoast shouldBe FlavourBalance.BITTER
+    }
+
+    @Test
+    fun `should recommend malty water for dark beers and balanced for the rest`() {
+        recommendedBalance("Sweet Stout", emptyList(), ibu = 30.0) shouldBe FlavourBalance.MALTY
+        recommendedBalance("Weizenbock", emptyList(), ibu = 16.0) shouldBe FlavourBalance.MALTY
+        recommendedBalance("Witbier", emptyList(), ibu = 8.0) shouldBe FlavourBalance.BALANCED
+        recommendedBalance(null, emptyList(), ibu = 0.0) shouldBe FlavourBalance.BALANCED
+    }
+
+    private fun hop(usage: HopUsage, grams: Double) =
+        RecipeHop(name = "Citra", amountG = grams, alphaAcid = 12.0, usage = usage, boilTimeMin = if (usage == HopUsage.BOIL) 60 else null)
+
+    @Test
     fun `should suggest salts for every balance at once`() {
         val report = pale(RecipeWater(source = "London tap")).waterReport(prefs)!!
 

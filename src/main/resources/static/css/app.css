@@ -238,6 +238,7 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .balance-links button { padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
 .balance-links button:hover { text-decoration:underline; }
 .balance-links button.active { color:var(--ink); text-decoration:underline; text-underline-offset:3px; cursor:default; }
+.balance-links button.recommended::after { content:"\2022"; margin-left:3px; color:var(--accent); }
 table.water-plan { margin-top:14px; }
 table.water-plan .num { white-space:nowrap; }
 table.water-plan th:first-child { white-space:normal; }
