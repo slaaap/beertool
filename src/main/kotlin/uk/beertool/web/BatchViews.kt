@@ -2,9 +2,8 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import uk.beertool.batch.Batch
-import uk.beertool.batch.BatchStats
 import uk.beertool.batch.BatchSummary
-import uk.beertool.batch.stats
+import uk.beertool.batch.attenuation
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.waterReport
@@ -35,7 +34,7 @@ internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boole
                     td("tnum hide-sm") { +fmt(b.packagedDate) }
                     numCell(b.measuredOg, 3)
                     numCell(b.measuredFg, 3)
-                    numCell(b.stats().abv, 1)
+                    numCell(b.abv, 1)
                 }
             }
         }
@@ -56,7 +55,6 @@ fun HTML.batchLogPage(user: User, brews: Page<BatchSummary>) {
 }
 
 fun HTML.batchViewPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeStats) {
-    val measured = batch.stats()
     val base = "/recipes/${recipe.no}/batches/${batch.no}"
     page("Brew #${batch.no} of ${recipe.name}", user) {
         h1 {
@@ -70,21 +68,19 @@ fun HTML.batchViewPage(user: User, batch: Batch, recipe: Recipe, estimate: Recip
         }
         actionBar {
             if (user.canWrite) {
-                val live = batch.packagedDate == null
-                val onBrewDay = live && batch.measuredOg == null
-                if (onBrewDay) {
+                if (batch.isOnBrewDay) {
                     btnLink("$base/brew", "Brew day", Icon.BREW, style = ButtonStyle.PRIMARY)
                 } else {
                     btnLink("$base/edit", "Edit brew", Icon.EDIT, style = ButtonStyle.PRIMARY)
                 }
-                if (live && !onBrewDay) btnPost("$base/packaged", "Packaged today", Icon.PACKAGE)
+                if (batch.isFermenting) btnPost("$base/packaged", "Packaged today", Icon.PACKAGE)
             }
             btnLink("/recipes/${recipe.no}", "Recipe", Icon.BACK)
             if (user.canWrite) deleteButton("$base/delete", "Delete this brew?")
         }
 
         sectionHead("Measured")
-        div("stats") { measuredTiles(measured, batch) }
+        div("stats") { measuredTiles(batch) }
 
         sectionHead("Volumes")
         volumesTable(recipe, batch)
@@ -116,11 +112,11 @@ private fun FlowContent.volumesTable(recipe: Recipe, batch: Batch) {
     }
 }
 
-private fun DIV.measuredTiles(measured: BatchStats, batch: Batch) {
+private fun DIV.measuredTiles(batch: Batch) {
     statTile("OG", fmt(batch.measuredOg, 3), null)
     statTile("FG", fmt(batch.measuredFg, 3), null)
-    statTile("ABV", fmt(measured.abv, 1), "%", accent = true)
-    statTile("Attenuation", fmt(measured.attenuation?.asPercent(), 0), "%")
+    statTile("ABV", fmt(batch.abv, 1), "%", accent = true)
+    statTile("Attenuation", fmt(batch.attenuation?.asPercent(), 0), "%")
 
     statTile("Efficiency", fmt(batch.mashEfficiency?.asPercent(), 0), "%", last = true)
 }

@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import uk.beertool.db.forDb
 import uk.beertool.recipe.BoilAddition
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -56,7 +57,7 @@ object BoilTimerRepository {
             batchId = batchId,
             userId = userId,
             chatId = chatId,
-            endsAt = now.plus(boilMinutes.toLong(), ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MICROS),
+            endsAt = now.plus(boilMinutes.toLong(), ChronoUnit.MINUTES).forDb(),
             announcedDownTo = boilMinutes + 1,
         )
         BoilTimers.deleteWhere { BoilTimers.batchId eq batchId }

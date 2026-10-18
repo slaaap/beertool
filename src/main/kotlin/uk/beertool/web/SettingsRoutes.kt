@@ -237,11 +237,7 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
             }
 
             sectionHead("Default mash") {
-                button(type = ButtonType.button, classes = "btn small") {
-                    onClick = "rowAdd('sm')"
-                    span("ico") { unsafe { +Icon.PLUS.markup() } }
-                    span { +"Add rest" }
-                }
+                addButton("Add rest", "rowAdd('sm')")
             }
             table("mash") {
                 thead { tr { head("Rest", "c-name"); numHead("Temp", "°C"); numHead("Time", "min"); actionSlot() } }
@@ -249,11 +245,7 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
             }
 
             sectionHead("Water sources") {
-                button(type = ButtonType.button, classes = "btn small") {
-                    onClick = "rowAdd('ws')"
-                    span("ico") { unsafe { +Icon.PLUS.markup() } }
-                    span { +"Add water" }
-                }
+                addButton("Add water", "rowAdd('ws')")
             }
             scrollTable("water-sources") {
                 thead {

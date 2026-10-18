@@ -14,7 +14,7 @@ private fun loadIcon(file: String): String =
         ?.bufferedReader()?.use { it.readText().trim() }
         ?: error("Missing icon: static/icons/$file.svg")
 
-private fun FlowContent.iconSvg(icon: Icon) = span("ico") { unsafe { +icon.markup() } }
+internal fun HtmlBlockInlineTag.iconSvg(icon: Icon) = span("ico") { unsafe { +icon.markup() } }
 
 fun FlowContent.js(file: String) = script(src = "/static/js/$file") {}
 
@@ -50,6 +50,15 @@ fun FlowContent.btnPost(
 
 fun FlowContent.deleteButton(action: String, confirm: String) =
     btnPost(action, "Delete", Icon.TRASH, style = ButtonStyle.DANGER, iconOnly = true, confirm = confirm)
+
+fun FlowContent.addButton(label: String, onClick: String, attrs: BUTTON.() -> Unit = {}) {
+    button(type = ButtonType.button, classes = "btn small") {
+        this.onClick = onClick
+        attrs()
+        iconSvg(Icon.PLUS)
+        span { +label }
+    }
+}
 
 fun FlowContent.rowRemoveButton(onClick: String, label: String) {
     button(type = ButtonType.button, classes = "btn danger icon-only") {

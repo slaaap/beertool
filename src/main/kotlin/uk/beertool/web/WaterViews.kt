@@ -87,7 +87,7 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
             }
             div("water-actions") {
                 details(classes = "more-stages") {
-                    summary(classes = "btn small") { span("ico") { unsafe { +Icon.PLUS.markup() } }; span { +"Salt" } }
+                    summary(classes = "btn small") { iconSvg(Icon.PLUS); span { +"Salt" } }
                     div {
                         ADDITIONS.filterNot { it.mashOnly }.forEach { a ->
                             button(type = ButtonType.button, classes = "btn small") {
@@ -108,15 +108,6 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                 submitLabel?.let { submitInput(classes = "btn primary small") { value = it } }
             }
         }
-    }
-}
-
-private fun FlowContent.addButton(label: String, onClick: String, attrs: BUTTON.() -> Unit = {}) {
-    button(type = ButtonType.button, classes = "btn small") {
-        this.onClick = onClick
-        attrs()
-        span("ico") { unsafe { +Icon.PLUS.markup() } }
-        span { +label }
     }
 }
 

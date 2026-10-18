@@ -14,9 +14,9 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import uk.beertool.auth.Secrets
+import uk.beertool.db.forDb
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 object TelegramLinks : Table("telegram_links") {
     val telegramUserId = long("telegram_user_id")
@@ -51,7 +51,7 @@ object TelegramLinkRepository {
         TelegramLinkTokens.insert {
             it[tokenHash] = Secrets.sha256(token)
             it[TelegramLinkTokens.userId] = userId
-            it[expiresAt] = now.plus(LINK_TOKEN_TTL).truncatedTo(ChronoUnit.MICROS)
+            it[expiresAt] = now.plus(LINK_TOKEN_TTL).forDb()
         }
         token
     }
@@ -69,7 +69,7 @@ object TelegramLinkRepository {
             it[TelegramLinks.telegramUserId] = telegramUserId
             it[TelegramLinks.userId] = userId
             it[TelegramLinks.chatId] = chatId
-            it[linkedAt] = now.truncatedTo(ChronoUnit.MICROS)
+            it[linkedAt] = now.forDb()
         }
         TelegramLink(telegramUserId, userId, chatId, currentBatchId = null)
     }

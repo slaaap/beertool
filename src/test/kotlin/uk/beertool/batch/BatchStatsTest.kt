@@ -13,20 +13,9 @@ class BatchStatsTest {
     fun `should derive apparent attenuation from the measured gravities`() {
         val batch = batch(og = 1.052, fg = 1.011, abv = 5.4)
 
-        val stats = batch.stats()
+        val attenuation = batch.attenuation
 
-        stats.attenuation!! shouldBe (0.788 plusOrMinus 0.001)
-        stats.abv shouldBe 5.4
-    }
-
-    @Test
-    fun `should report the ABV that was stamped, not one recomputed from the gravities`() {
-
-        val batch = batch(og = 1.048, fg = 1.010, abv = 7.5)
-
-        batch.stats().abv shouldBe 7.5
-
-        batch.stats().attenuation!! shouldBe (0.79 plusOrMinus 0.01)
+        attenuation!! shouldBe (0.788 plusOrMinus 0.001)
     }
 
     @Test
@@ -38,8 +27,8 @@ class BatchStatsTest {
 
     @Test
     fun `should report no attenuation until both gravities are measured`() {
-        batch(og = 1.052, fg = null).stats().attenuation.shouldBeNull()
-        batch(og = null, fg = 1.011).stats().attenuation.shouldBeNull()
+        batch(og = 1.052, fg = null).attenuation.shouldBeNull()
+        batch(og = null, fg = 1.011).attenuation.shouldBeNull()
     }
 
     private fun batch(og: Double?, fg: Double?, abv: Double? = null) = Batch(

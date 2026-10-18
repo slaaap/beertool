@@ -12,6 +12,7 @@ import org.jetbrains.exposed.v1.jdbc.insertAndGetId
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import uk.beertool.db.forDb
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.Recipes
 import uk.beertool.recipe.WaterSnapshot
@@ -21,7 +22,6 @@ import uk.beertool.recipe.snapshot
 import uk.beertool.user.UserRepository
 import java.time.Instant
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 data class BatchSummary(
     val batch: Batch,
@@ -43,7 +43,7 @@ object BatchRepository {
             it.applyMeasured(userId, draft)
             it[Batches.userId] = userId
             it[no] = nextNo
-            it[createdAt] = Instant.now().truncatedTo(ChronoUnit.MICROS)
+            it[createdAt] = Instant.now().forDb()
             it[water] = plannedWater(userId, draft.recipeId)
         }.value
         findById(id, userId)

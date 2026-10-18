@@ -27,7 +27,12 @@ data class Batch(
     val createdAt: Instant,
     val water: WaterSnapshot? = null,
 ) {
-    val waterLocked get() = measuredOg != null
 
-    val isOnBrewDay get() = packagedDate == null && measuredOg == null
+    val isPackaged get() = packagedDate != null
+
+    val isOnBrewDay get() = !isPackaged && measuredOg == null
+
+    val isFermenting get() = !isPackaged && !isOnBrewDay
+
+    val waterLocked get() = !isOnBrewDay
 }

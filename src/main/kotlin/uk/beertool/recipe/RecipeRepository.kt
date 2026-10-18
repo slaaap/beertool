@@ -13,12 +13,12 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import uk.beertool.brewing.Whirlpool
+import uk.beertool.db.forDb
 import uk.beertool.db.matches
 import uk.beertool.db.recipeSearchDoc
 import uk.beertool.db.tsQuery
 import uk.beertool.db.tsRank
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 data class RecipeSummary(
     val id: Long,
@@ -34,7 +34,7 @@ private val UNSEARCHABLE = """[^\p{L}\p{N}-]""".toRegex()
 object RecipeRepository {
 
     fun create(userId: Long, draft: NewRecipe): Recipe = transaction {
-        val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        val now = Instant.now().forDb()
         val nextNo = nextRecipeNo(userId)
         val recipeId = Recipes.insertAndGetId {
             it[Recipes.userId] = userId
@@ -95,7 +95,7 @@ object RecipeRepository {
     }
 
     fun update(id: Long, userId: Long, draft: NewRecipe): Recipe? = transaction {
-        val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        val now = Instant.now().forDb()
         val rows = Recipes.update({ (Recipes.id eq id) and (Recipes.userId eq userId) }) {
             it[name] = draft.name
             it[style] = draft.style

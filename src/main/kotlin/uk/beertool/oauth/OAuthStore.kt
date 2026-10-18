@@ -15,12 +15,12 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import uk.beertool.auth.Secrets
+import uk.beertool.db.forDb
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.Base64
 
 object OAuthGrants : LongIdTable("oauth_grants") {
@@ -98,7 +98,7 @@ object OAuthStore {
             it[codeChallenge] = request.codeChallenge
             it[scope] = request.scope
             it[resource] = request.resource
-            it[expiresAt] = now.plus(CODE_TTL).truncatedTo(ChronoUnit.MICROS)
+            it[expiresAt] = now.plus(CODE_TTL).forDb()
         }
         code
     }
@@ -128,8 +128,8 @@ object OAuthStore {
                 it[scope] = row[OAuthCodes.scope]
                 it[OAuthGrants.resource] = row[OAuthCodes.resource]
                 it[refreshHash] = Secrets.sha256(refresh)
-                it[refreshExpiresAt] = now.plus(REFRESH_TTL).truncatedTo(ChronoUnit.MICROS)
-                it[createdAt] = now.truncatedTo(ChronoUnit.MICROS)
+                it[refreshExpiresAt] = now.plus(REFRESH_TTL).forDb()
+                it[createdAt] = now.forDb()
             }.value
             Tokens(issueAccess(grantId, now), refresh, ACCESS_TTL.seconds, row[OAuthCodes.scope])
         }
@@ -146,8 +146,8 @@ object OAuthStore {
         val refresh = newRefresh()
         val swapped = OAuthGrants.update({ (OAuthGrants.id eq grantId) and (OAuthGrants.refreshHash eq presented) }) {
             it[refreshHash] = Secrets.sha256(refresh)
-            it[refreshExpiresAt] = now.plus(REFRESH_TTL).truncatedTo(ChronoUnit.MICROS)
-            it[lastUsedAt] = now.truncatedTo(ChronoUnit.MICROS)
+            it[refreshExpiresAt] = now.plus(REFRESH_TTL).forDb()
+            it[lastUsedAt] = now.forDb()
         }
         if (swapped != 1) throw OAuthException("invalid_grant", "The refresh token was already used.")
         Tokens(issueAccess(grantId, now), refresh, ACCESS_TTL.seconds, row[OAuthGrants.scope])
@@ -158,7 +158,7 @@ object OAuthStore {
             ?.takeIf { it[OAuthAccessTokens.expiresAt].isAfter(now) } ?: return@transaction null
         val grant = OAuthGrants.selectAll().where { OAuthGrants.id eq access[OAuthAccessTokens.grantId] }.singleOrNull()
             ?.takeIf { it[OAuthGrants.resource] == resource } ?: return@transaction null
-        OAuthGrants.update({ OAuthGrants.id eq grant[OAuthGrants.id] }) { it[lastUsedAt] = now.truncatedTo(ChronoUnit.MICROS) }
+        OAuthGrants.update({ OAuthGrants.id eq grant[OAuthGrants.id] }) { it[lastUsedAt] = now.forDb() }
         UserRepository.findById(grant[OAuthGrants.userId])
     }
 
@@ -181,7 +181,7 @@ object OAuthStore {
         OAuthAccessTokens.insert {
             it[tokenHash] = Secrets.sha256(token)
             it[OAuthAccessTokens.grantId] = grantId
-            it[expiresAt] = now.plus(ACCESS_TTL).truncatedTo(ChronoUnit.MICROS)
+            it[expiresAt] = now.plus(ACCESS_TTL).forDb()
         }
         return token
     }

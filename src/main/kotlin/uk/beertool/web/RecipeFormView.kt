@@ -133,11 +133,7 @@ private fun FlowContent.editableBill(
     rows: TBODY.() -> Unit,
 ) {
     sectionHead(heading) {
-        button(type = ButtonType.button, classes = "btn small") {
-            onClick = "addRow('$key-body','#$key-proto tr')"
-            span("ico") { unsafe { +Icon.PLUS.markup() } }
-            span { +addLabel }
-        }
+        addButton(addLabel, "addRow('$key-body','#$key-proto tr')")
     }
     scrollTable(tableClass) {
         thead { tr { header(); actionSlot() } }
@@ -262,11 +258,7 @@ private fun FlowContent.otherStages(stages: List<Pair<String, String>>) {
 }
 
 private fun FlowContent.addStageButton(key: String, label: String) {
-    button(type = ButtonType.button, classes = "btn small") {
-        onClick = "addStageRow('$key')"
-        span("ico") { unsafe { +Icon.PLUS.markup() } }
-        span { +label }
-    }
+    addButton(label, "addStageRow('$key')")
 }
 
 private fun TBODY.hopRow(i: Int, h: RecipeHop?, section: HopSection) {

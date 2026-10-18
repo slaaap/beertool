@@ -2,7 +2,7 @@ package uk.beertool.telegram
 
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
-import uk.beertool.batch.stats
+import uk.beertool.batch.attenuation
 import uk.beertool.recipe.BoilAddition
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.FermentableUsage
@@ -108,8 +108,8 @@ internal fun String.escapeAttribute() = escapeHtml().replace("\"", "&quot;")
 private fun days(n: Long) = if (n == 1L) "1 day" else "$n days"
 
 private fun statusIcon(batch: Batch) = when {
-    batch.packagedDate != null -> "🍺"
-    batch.measuredOg == null -> "🔥"
+    batch.isPackaged -> "🍺"
+    batch.isOnBrewDay -> "🔥"
     else -> "🫧"
 }
 
@@ -118,7 +118,7 @@ private fun batchProgress(batch: Batch, today: LocalDate): String {
     val brewed = batch.brewDate
     val packaged = batch.packagedDate
     return when {
-        batch.measuredOg == null && packaged == null -> "Brew day" + (brewed?.let { " · ${day(it)}" } ?: "")
+        batch.isOnBrewDay -> "Brew day" + (brewed?.let { " · ${day(it)}" } ?: "")
         else -> listOfNotNull(
             brewed?.let { "Brewed ${day(it)}" },
             when {
@@ -162,7 +162,7 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
 
     val headline = listOfNotNull(
         batch.abv?.let { "${fmt(it, 1)}% ABV" },
-        batch.stats().attenuation?.let { "${fmt(it * 100, 0)}% attenuation" },
+        batch.attenuation?.let { "${fmt(it * 100, 0)}% attenuation" },
         batch.mashEfficiency?.let { "${fmt(it * 100, 0)}% efficiency" },
     )
     val all = readings(recipe, batch, estimate)
@@ -172,7 +172,7 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
     lines += figures
 
     val missing = all.filter { it.actual == null }
-    if (batch.packagedDate == null && missing.isNotEmpty()) {
+    if (!batch.isPackaged && missing.isNotEmpty()) {
         lines += ""
         lines += "Still to log: ${missing.joinToString(", ") { it.key }}. Send e.g. <code>${missing.first().example}</code>"
     }
@@ -253,4 +253,4 @@ fun batchLine(summary: BatchSummary, today: LocalDate) =
     "${friendlyDate(summary.batch.brewDate, today)} · ${summary.recipeName}${activeMark(summary.batch)}"
 
 // List rows read like a diary; a dot marks the brews still going among the packaged majority.
-fun activeMark(batch: Batch) = if (batch.packagedDate == null) " •" else ""
+fun activeMark(batch: Batch) = if (batch.isPackaged) "" else " •"

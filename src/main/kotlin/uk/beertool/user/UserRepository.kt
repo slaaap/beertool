@@ -6,14 +6,14 @@ import org.jetbrains.exposed.v1.jdbc.insertAndGetId
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import uk.beertool.db.forDb
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 object UserRepository {
 
     fun create(email: String, passwordHash: String, displayName: String): User = transaction {
 
-        val createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS)
+        val createdAt = Instant.now().forDb()
         val preferences = BrewerPreferences()
         val id = Users.insertAndGetId {
             it[Users.email] = email

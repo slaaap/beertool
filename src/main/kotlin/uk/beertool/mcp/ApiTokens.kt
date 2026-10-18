@@ -12,10 +12,10 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import uk.beertool.auth.Secrets
+import uk.beertool.db.forDb
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 object ApiTokens : LongIdTable("api_tokens") {
     val userId = long("user_id")
@@ -43,14 +43,14 @@ object ApiTokenRepository {
             it[ApiTokens.userId] = userId
             it[ApiTokens.name] = name
             it[tokenHash] = Secrets.sha256(token)
-            it[createdAt] = now.truncatedTo(ChronoUnit.MICROS)
+            it[createdAt] = now.forDb()
         }
         token
     }
 
     fun userFor(token: String, now: Instant = Instant.now()): User? = transaction {
         val row = ApiTokens.selectAll().where { ApiTokens.tokenHash eq Secrets.sha256(token) }.singleOrNull() ?: return@transaction null
-        ApiTokens.update({ ApiTokens.id eq row[ApiTokens.id] }) { it[lastUsedAt] = now.truncatedTo(ChronoUnit.MICROS) }
+        ApiTokens.update({ ApiTokens.id eq row[ApiTokens.id] }) { it[lastUsedAt] = now.forDb() }
         UserRepository.findById(row[ApiTokens.userId])
     }
 

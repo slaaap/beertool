@@ -180,11 +180,11 @@ class TelegramBot(
 
     private fun openBatches(user: User): List<Pair<Recipe, Batch>> =
         BatchRepository.listByUser(user.id)
-            .filter { it.batch.packagedDate == null }
+            .filterNot { it.batch.isPackaged }
             .mapNotNull { s -> RecipeRepository.findById(s.batch.recipeId, user.id)?.let { it to s.batch } }
 
     private fun currentBatch(who: Chatter, user: User): Pair<Recipe, Batch>? {
-        val chosen = who.link?.currentBatchId?.let { BatchRepository.findById(it, user.id) }?.takeIf { it.packagedDate == null }
+        val chosen = who.link?.currentBatchId?.let { BatchRepository.findById(it, user.id) }?.takeUnless { it.isPackaged }
         val batch = chosen ?: openBatches(user).singleOrNull()?.second ?: return null
         return RecipeRepository.findById(batch.recipeId, user.id)?.let { it to batch }
     }
@@ -270,7 +270,7 @@ class TelegramBot(
         val now = clock()
         for (timer in BoilTimerRepository.all()) {
             try {
-                val batch = BatchRepository.findById(timer.batchId, timer.userId)?.takeIf { it.packagedDate == null }
+                val batch = BatchRepository.findById(timer.batchId, timer.userId)?.takeUnless { it.isPackaged }
                 val recipe = batch?.let { RecipeRepository.findById(it.recipeId, timer.userId) }
                     ?: run { BoilTimerRepository.stop(timer.batchId); null }
                     ?: continue
@@ -324,9 +324,9 @@ class TelegramBot(
 
     private fun batchKeyboard(user: User, recipe: Recipe, batch: Batch) = keyboard(
         listOfNotNull(
-            button("🔥 Brew day", "cur:${recipe.no}:${batch.no}").takeIf { user.canWrite && batch.packagedDate == null },
+            button("🔥 Brew day", "cur:${recipe.no}:${batch.no}").takeIf { user.canWrite && !batch.isPackaged },
             button("🍺 Mark packaged", "pkg:${recipe.no}:${batch.no}")
-                .takeIf { user.canWrite && batch.packagedDate == null && batch.measuredFg != null },
+                .takeIf { user.canWrite && !batch.isPackaged && batch.measuredFg != null },
         ),
     )
 
