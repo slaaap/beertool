@@ -16,7 +16,8 @@ import uk.beertool.web.configureRouting
 
 fun main() {
     val port = systemEnv.text("PORT")?.toIntOrNull() ?: 8080
-    embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::module)
+    val host = systemEnv.text("HOST") ?: "127.0.0.1"
+    embeddedServer(Netty, port = port, host = host, module = Application::module)
         .start(wait = true)
 }
 

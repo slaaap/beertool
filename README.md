@@ -58,6 +58,7 @@ All configuration is via environment variables:
 | `SESSION_SECRET`    | *(random per boot)*                               | Signs the session cookie; **set a long random value in production** (otherwise sessions don't survive a restart) |
 | `SINGLE_USER_EMAIL` | *(unset → normal multi-user mode)*                | Enables single-user mode for this account (see below)         |
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
+| `HOST`              | `127.0.0.1`                                       | Address to listen on; `0.0.0.0` exposes it beyond this machine |
 | `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
 | `MCP_ENABLED`       | *(unset → off)*                                   | `true` turns on the MCP endpoint at `/mcp` (see below)        |
 | `MCP_OAUTH_ENABLED` | `true`                                            | `false` turns off connecting by OAuth (Claude, ChatGPT)       |
