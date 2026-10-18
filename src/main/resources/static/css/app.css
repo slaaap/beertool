@@ -234,11 +234,11 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stat.bad .v { color:var(--danger); }
 .tile-action { display:block; text-align:left; margin-top:6px; padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
 .tile-action:hover { text-decoration:underline; }
-.balance-links { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
-.balance-links button { padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
-.balance-links button:hover { text-decoration:underline; }
-.balance-links button.active { color:var(--ink); text-decoration:underline; text-underline-offset:3px; cursor:default; }
-.balance-links button.recommended::after { content:"\2022"; margin-left:3px; color:var(--accent); }
+.balance-links { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 0 -8px; }
+.balance-links button { padding:3px 8px; border:0; border-radius:999px; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
+.balance-links button:hover { background:var(--accent-soft); }
+.balance-links button.active { background:var(--accent-soft); cursor:default; }
+.balance-links button.recommended::after { content:"\2022"; display:inline-block; margin-left:4px; }
 table.water-plan { margin-top:14px; }
 table.water-plan .num { white-space:nowrap; }
 table.water-plan th:first-child { white-space:normal; }
