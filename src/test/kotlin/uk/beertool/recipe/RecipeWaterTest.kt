@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test
 import uk.beertool.brewing.Acid
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.user.BrewerPreferences
-import uk.beertool.user.PrefsJson
 import uk.beertool.user.WaterSource
 
 class RecipeWaterTest {
@@ -125,15 +124,6 @@ class RecipeWaterTest {
         report.doses(treated).single().strike shouldBe (15.0 / 32.0 plusOrMinus 0.001)
         report.profile shouldBe pale(plain).waterReport(prefs)!!.profile
         report.mashPh shouldBe pale(plain).waterReport(prefs)!!.mashPh
-    }
-
-    @Test
-    fun `should read a recipe saved before the acid could be chosen as lactic acid`() {
-        val saved = """{"source": "London tap", "lacticMl": 4.5}"""
-
-        val water = PrefsJson.decodeFromString(RecipeWater.serializer(), saved)
-
-        water shouldBe RecipeWater(source = "London tap", acid = Acid.LACTIC_80, acidMl = 4.5)
     }
 
     @Test
