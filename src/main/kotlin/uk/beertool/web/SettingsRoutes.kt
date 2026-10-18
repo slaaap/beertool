@@ -12,6 +12,9 @@ import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.brewing.WaterProfile
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
+import uk.beertool.common.shortDate
 import uk.beertool.mcp.ApiToken
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
@@ -22,8 +25,8 @@ import uk.beertool.telegram.Telegram
 import uk.beertool.telegram.TelegramLinkRepository
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
-import uk.beertool.user.WaterSource
 import uk.beertool.user.UserRepository
+import uk.beertool.user.WaterSource
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId

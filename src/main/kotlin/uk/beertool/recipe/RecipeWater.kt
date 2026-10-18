@@ -7,6 +7,7 @@ import uk.beertool.brewing.Salt
 import uk.beertool.brewing.SaltAddition
 import uk.beertool.brewing.WaterChemistry
 import uk.beertool.brewing.WaterProfile
+import uk.beertool.common.formatAmount
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.WaterSource
 
@@ -52,10 +53,8 @@ fun BrewerPreferences.defaultRecipeWater() = waterSources.firstOrNull()?.let { R
 
 fun RecipeWater.describe(): String {
     if (!blends) return source
-    return "$source ${fmtPercent(100.0 - blendPercent)}% + $blendSource ${fmtPercent(blendPercent)}%"
+    return "$source ${formatAmount(100.0 - blendPercent)}% + $blendSource ${formatAmount(blendPercent)}%"
 }
-
-private fun fmtPercent(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else "%.1f".format(v)
 
 enum class FlavourBalance(val label: String) { BITTER("Bitter"), BALANCED("Balanced"), MALTY("Malty") }
 

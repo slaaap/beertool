@@ -4,15 +4,15 @@ import org.slf4j.LoggerFactory
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
 import uk.beertool.batch.toDraft
+import uk.beertool.common.paginate
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.boilAdditions
 import uk.beertool.recipe.stats
+import uk.beertool.user.SingleUser
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import uk.beertool.user.readOnly
-import uk.beertool.web.SingleUser
-import uk.beertool.web.paginate
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId

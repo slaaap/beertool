@@ -15,9 +15,12 @@ import kotlinx.serialization.json.putJsonArray
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
 import uk.beertool.brewing.WaterProfile
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
+import uk.beertool.common.roundTo
 import uk.beertool.recipe.AmountUnit
-import uk.beertool.recipe.Coded
 import uk.beertool.recipe.CodeLookup
+import uk.beertool.recipe.Coded
 import uk.beertool.recipe.ExtraUsage
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
@@ -73,7 +76,7 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         put("fermenterVolumeL", prefs.fermenterVolumeL)
         put("boilOffL", prefs.boilOffL)
         put("kettleRetentionL", prefs.kettleRetentionL)
-        put("efficiencyPercent", round(prefs.efficiency * 100, 1))
+        put("efficiencyPercent", prefs.efficiency.asPercent().roundTo(1))
         put("boilTimeMin", prefs.boilTimeMin)
         put("whirlpoolTempC", prefs.whirlpoolTempC)
         put("coolingTimeMin", prefs.coolingTimeMin)
@@ -203,7 +206,7 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         if (draft.fermentables.isEmpty()) add("There are no fermentables, so the gravity estimate is meaningless.")
         if (draft.yeasts.isEmpty()) add("No yeast: the estimate assumes 75% attenuation.")
         if (draft.unmaltedFraction() > MAX_UNMALTED_FRACTION) {
-            add("Unmalted grain is ${round(draft.unmaltedFraction() * 100, 0)}% of the grist; above ${round(MAX_UNMALTED_FRACTION * 100, 0)}% the mash may lack enzymes to convert it.")
+            add("Unmalted grain is ${fmt(draft.unmaltedFraction().asPercent(), 0)}% of the grist; above ${fmt(MAX_UNMALTED_FRACTION.asPercent(), 0)}% the mash may lack enzymes to convert it.")
         }
         if (draft.style != null && BeerStyles.urlFor(draft.style) == null) add("Style \"${draft.style}\" is not a BJCP 2021 name; find_styles lists them.")
     }
@@ -217,7 +220,7 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         put("preBoilVolumeL", r.preBoilVolumeL)
         put("postBoilVolumeL", r.postBoilVolumeL)
         put("fermenterVolumeL", r.fermenterVolumeL)
-        put("efficiency", round(r.efficiency * 100, 1))
+        put("efficiency", r.efficiency.asPercent().roundTo(1))
         put("boilTimeMin", r.boilTimeMin)
         putJsonArray("mashSteps") { r.mashSteps.forEach { add(mashStep(it.tempC, it.timeMin)) } }
         putJsonArray("fermentables") {
@@ -238,7 +241,7 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         }
         putJsonArray("yeasts") {
             r.yeasts.inBrewOrder().forEach {
-                add(buildJsonObject { put("name", it.name); put("attenuation", round(it.attenuation * 100, 1)); put("usage", it.usage.code) })
+                add(buildJsonObject { put("name", it.name); put("attenuation", it.attenuation.asPercent().roundTo(1)); put("usage", it.usage.code) })
             }
         }
         putJsonArray("extras") {
@@ -261,8 +264,8 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         put("packagedDate", b.packagedDate?.toString())
         put("og", b.measuredOg)
         put("fg", b.measuredFg)
-        put("abv", b.abv?.let { round(it, 2) })
-        put("efficiencyPercent", b.mashEfficiency?.let { round(it * 100, 1) })
+        put("abv", b.abv?.roundTo(2))
+        put("efficiencyPercent", b.mashEfficiency?.asPercent()?.roundTo(1))
         put("preBoilVolumeL", b.measuredPreBoilVolumeL)
         put("postBoilVolumeL", b.measuredPostBoilVolumeL)
         put("fermenterVolumeL", b.measuredFermenterVolumeL)
@@ -277,20 +280,20 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
 private fun mashStep(tempC: Double, timeMin: Int) = buildJsonObject { put("tempC", tempC); put("timeMin", timeMin) }
 
 private fun estimate(s: RecipeStats) = buildJsonObject {
-    put("og", round(s.og, 3))
-    put("fg", round(s.fg, 3))
-    put("abv", round(s.abv, 2))
-    put("ibu", round(s.ibu, 1))
-    put("colourEbc", round(s.colourEbc, 1))
+    put("og", s.og.roundTo(3))
+    put("fg", s.fg.roundTo(3))
+    put("abv", s.abv.roundTo(2))
+    put("ibu", s.ibu.roundTo(1))
+    put("colourEbc", s.colourEbc.roundTo(1))
 }
 
 private fun ions(p: WaterProfile) = buildJsonObject {
-    put("calcium", round(p.calcium, 1))
-    put("magnesium", round(p.magnesium, 1))
-    put("sodium", round(p.sodium, 1))
-    put("chloride", round(p.chloride, 1))
-    put("sulphate", round(p.sulphate, 1))
-    put("bicarbonate", round(p.bicarbonate, 1))
+    put("calcium", p.calcium.roundTo(1))
+    put("magnesium", p.magnesium.roundTo(1))
+    put("sodium", p.sodium.roundTo(1))
+    put("chloride", p.chloride.roundTo(1))
+    put("sulphate", p.sulphate.roundTo(1))
+    put("bicarbonate", p.bicarbonate.roundTo(1))
 }
 
 private fun waterInputJson(w: RecipeWater) = buildJsonObject {
@@ -301,20 +304,15 @@ private fun waterInputJson(w: RecipeWater) = buildJsonObject {
 
 private fun waterJson(r: WaterReport) = buildJsonObject {
     put("mgPerL", ions(r.profile))
-    put("chlorideToSulphate", r.profile.chlorideToSulphate?.let { round(it, 2) })
+    put("chlorideToSulphate", r.profile.chlorideToSulphate?.roundTo(2))
     put("balance", r.balance?.label)
-    put("mashPh", r.mashPh?.let { round(it, 2) })
+    put("mashPh", r.mashPh?.roundTo(2))
     put("mashPhRange", "$MIN_MASH_PH-$MAX_MASH_PH")
     put("targetMashPh", TARGET_MASH_PH)
-    put("lacticMlForTarget", r.lacticForTargetMl?.let { round(it, 1) })
-    put("waterL", round(r.totalL, 1))
-    put("strikeL", r.strikeL?.let { round(it, 1) })
-    put("spargeL", r.spargeL?.let { round(it, 1) })
-}
-
-private fun round(v: Double, decimals: Int): Double {
-    val factor = Math.pow(10.0, decimals.toDouble())
-    return Math.round(v * factor) / factor
+    put("lacticMlForTarget", r.lacticForTargetMl?.roundTo(1))
+    put("waterL", r.totalL.roundTo(1))
+    put("strikeL", r.strikeL?.roundTo(1))
+    put("spargeL", r.spargeL?.roundTo(1))
 }
 
 private fun JsonObject.string(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull

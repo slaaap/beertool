@@ -5,12 +5,17 @@ import kotlinx.html.*
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
 import uk.beertool.batch.BrewInfo
+import uk.beertool.common.MISSING
+import uk.beertool.common.Page
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
+import uk.beertool.common.prettify
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
+import uk.beertool.recipe.inBrewOrder
 import uk.beertool.recipe.unmaltedFraction
 import uk.beertool.recipe.waterReport
-import uk.beertool.recipe.inBrewOrder
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 

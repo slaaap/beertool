@@ -4,6 +4,9 @@ import kotlinx.html.*
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
 import uk.beertool.batch.attenuation
+import uk.beertool.common.Page
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.waterReport

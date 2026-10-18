@@ -1,6 +1,5 @@
 package uk.beertool.telegram
 
-import uk.beertool.recipe.formatAmount
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -8,6 +7,7 @@ import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
+import uk.beertool.common.formatAmount
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.Recipe

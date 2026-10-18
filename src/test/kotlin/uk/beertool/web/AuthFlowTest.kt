@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.configureSecurity
 import uk.beertool.db.TestDatabase
+import uk.beertool.user.SingleUser
 import uk.beertool.user.UserRepository
 import java.util.UUID
 

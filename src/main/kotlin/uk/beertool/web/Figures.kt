@@ -2,6 +2,10 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import uk.beertool.brewing.WaterProfile
+import uk.beertool.common.MISSING
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
+import uk.beertool.common.prettify
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
@@ -10,22 +14,6 @@ import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.user.BrewerPreferences
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-internal const val MISSING = "—"
-
-internal fun fmt(v: Double?, decimals: Int) = v?.let { "%.${decimals}f".format(it) } ?: MISSING
-
-internal fun fmt(d: LocalDate?) = d?.toString() ?: MISSING
-
-private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
-private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
-
-fun shortDate(date: LocalDate, today: LocalDate): String = date.format(if (date.year == today.year) DAY_MONTH else DAY_MONTH_YEAR)
-
-internal fun prettify(name: String) = name.lowercase().replace('_', ' ').replaceFirstChar { it.titlecase() }
 
 internal const val SLOT_NAME = "c-name"
 internal const val SLOT_AMOUNT = "c-amount"

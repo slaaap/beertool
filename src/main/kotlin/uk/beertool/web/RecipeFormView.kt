@@ -1,6 +1,9 @@
 package uk.beertool.web
 
 import kotlinx.html.*
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
+import uk.beertool.common.prettify
 import uk.beertool.recipe.AmountUnit
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.CodeLookup

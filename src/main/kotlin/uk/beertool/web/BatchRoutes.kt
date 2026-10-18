@@ -7,6 +7,7 @@ import io.ktor.server.resources.post
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import uk.beertool.batch.BatchRepository
+import uk.beertool.common.paginate
 import uk.beertool.recipe.snapshot
 import uk.beertool.recipe.stats
 import java.time.LocalDate

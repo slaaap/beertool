@@ -24,9 +24,9 @@ import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeFermentable
 import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.RecipeRepository
+import uk.beertool.user.SingleUser
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
-import uk.beertool.web.SingleUser
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset

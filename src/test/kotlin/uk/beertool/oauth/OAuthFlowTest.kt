@@ -37,8 +37,8 @@ import uk.beertool.auth.configureSecurity
 import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.McpConfig
 import uk.beertool.mcp.configureMcp
+import uk.beertool.user.SingleUser
 import uk.beertool.user.UserRepository
-import uk.beertool.web.SingleUser
 import uk.beertool.web.configureRouting
 import java.util.UUID
 

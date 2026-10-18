@@ -179,5 +179,3 @@ internal fun BrewStage.kettleTime(minutes: Int?, boilTimeMin: Int): Int? = when 
 }
 
 internal fun percentToFraction(percent: Double) = if (percent <= 1.0) percent else percent / 100.0
-
-internal fun Double.asPercent() = this * 100.0

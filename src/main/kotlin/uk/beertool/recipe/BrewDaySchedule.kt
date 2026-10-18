@@ -1,7 +1,7 @@
 package uk.beertool.recipe
 
-import java.math.BigDecimal
-import java.math.RoundingMode
+import uk.beertool.common.formatAmount
+
 
 data class BoilAddition(val minutesBeforeEnd: Int, val what: String)
 
@@ -29,5 +29,3 @@ private fun hopMinutes(usage: HopUsage, boilTimeMin: Int?, boil: Int) = when (us
 
 private fun kettleMinutes(inBoil: Boolean, boilTimeMin: Int?, boil: Int) =
     if (inBoil) (boilTimeMin ?: boil).coerceAtMost(boil) else 0
-
-fun formatAmount(v: Double): String = BigDecimal.valueOf(v).setScale(3, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()

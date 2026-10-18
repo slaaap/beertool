@@ -4,6 +4,9 @@ import kotlinx.html.*
 import kotlinx.html.stream.createHTML
 import uk.beertool.batch.Batch
 import uk.beertool.brewing.Salt
+import uk.beertool.common.MISSING
+import uk.beertool.common.fmt
+import uk.beertool.common.prettify
 import uk.beertool.recipe.MAX_MASH_PH
 import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.NewRecipe

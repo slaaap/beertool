@@ -27,6 +27,7 @@ import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.Mcp
 import uk.beertool.telegram.Telegram
 import uk.beertool.telegram.TelegramLinkRepository
+import uk.beertool.user.SingleUser
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import java.util.UUID

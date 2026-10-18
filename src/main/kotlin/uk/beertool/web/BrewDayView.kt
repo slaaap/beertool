@@ -3,6 +3,7 @@ package uk.beertool.web
 import kotlinx.html.*
 import uk.beertool.batch.Batch
 import uk.beertool.brewing.Calculators
+import uk.beertool.common.fmt
 import uk.beertool.recipe.DEFAULT_GRAIN_TEMP_C
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats

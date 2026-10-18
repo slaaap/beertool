@@ -1,6 +1,7 @@
 package uk.beertool.web
 
 import kotlinx.html.*
+import uk.beertool.user.SingleUser
 import uk.beertool.user.User
 
 const val LOGO = "/static/logo.svg"

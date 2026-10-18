@@ -7,6 +7,7 @@ import io.ktor.server.resources.get
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.routing
 import kotlinx.html.*
+import uk.beertool.user.SingleUser
 
 fun Application.configureRouting() {
     routing {

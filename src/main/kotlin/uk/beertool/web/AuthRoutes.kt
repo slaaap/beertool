@@ -13,6 +13,7 @@ import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.UserSession
+import uk.beertool.user.SingleUser
 import uk.beertool.user.UserRepository
 import java.net.URI
 

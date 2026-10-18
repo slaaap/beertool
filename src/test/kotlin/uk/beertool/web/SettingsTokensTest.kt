@@ -32,6 +32,7 @@ import uk.beertool.oauth.OAuthStore
 import uk.beertool.oauth.SCOPE
 import uk.beertool.oauth.pkceChallenge
 import uk.beertool.telegram.Telegram
+import uk.beertool.user.SingleUser
 import uk.beertool.user.User
 import uk.beertool.user.UserRepository
 import java.util.UUID

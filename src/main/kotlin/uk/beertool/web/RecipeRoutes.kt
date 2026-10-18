@@ -10,6 +10,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import uk.beertool.batch.BatchRepository
 import uk.beertool.batch.BatchSummary
+import uk.beertool.common.paginate
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.recipe.estimatedStats

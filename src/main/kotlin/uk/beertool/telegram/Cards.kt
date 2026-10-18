@@ -3,22 +3,24 @@ package uk.beertool.telegram
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
 import uk.beertool.batch.attenuation
+import uk.beertool.common.asPercent
+import uk.beertool.common.fmt
+import uk.beertool.common.formatAmount
+import uk.beertool.common.prettify
+import uk.beertool.common.roundTo
+import uk.beertool.common.shortDate
 import uk.beertool.recipe.BoilAddition
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.Recipe
-import uk.beertool.recipe.YeastUsage
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
+import uk.beertool.recipe.YeastUsage
 import uk.beertool.recipe.boilAdditions
-import uk.beertool.recipe.formatAmount
 import uk.beertool.recipe.inBrewOrder
 import uk.beertool.recipe.mashWater
 import uk.beertool.user.BrewerPreferences
-import uk.beertool.web.fmt
-import uk.beertool.web.prettify
-import uk.beertool.web.shortDate
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -65,7 +67,7 @@ fun recipeCard(recipe: Recipe, stats: RecipeStats, publicUrl: String? = null): S
     lines += ""
     lines += "<b>${statsLine(stats)}</b>"
     lines += "OG ${fmt(stats.og, 3)} → FG ${fmt(stats.fg, 3)}"
-    lines += "${formatAmount(recipe.fermenterVolumeL)} L · ${recipe.boilTimeMin} min boil · ${fmt(recipe.efficiency * 100, 0)}% efficiency"
+    lines += "${formatAmount(recipe.fermenterVolumeL)} L · ${recipe.boilTimeMin} min boil · ${fmt(recipe.efficiency.asPercent(), 0)}% efficiency"
 
     fun section(heading: String, items: List<String>) {
         if (items.isEmpty()) return
@@ -134,7 +136,7 @@ private class Reading(val label: String, val key: String, val example: String, v
 
 private fun gravity(v: Double) = fmt(v, 3)
 
-private fun volume(v: Double) = formatAmount(Math.round(v * 10) / 10.0)
+private fun volume(v: Double) = formatAmount(v.roundTo(1))
 
 private fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
     Reading("OG", "og", "og 1.052", batch.measuredOg, estimate.og, "", ::gravity),
@@ -162,8 +164,8 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
 
     val headline = listOfNotNull(
         batch.abv?.let { "${fmt(it, 1)}% ABV" },
-        batch.attenuation?.let { "${fmt(it * 100, 0)}% attenuation" },
-        batch.mashEfficiency?.let { "${fmt(it * 100, 0)}% efficiency" },
+        batch.attenuation?.let { "${fmt(it.asPercent(), 0)}% attenuation" },
+        batch.mashEfficiency?.let { "${fmt(it.asPercent(), 0)}% efficiency" },
     )
     val all = readings(recipe, batch, estimate)
     val figures = listOfNotNull(readingsLine(all.take(2)), readingsLine(all.drop(2)))
