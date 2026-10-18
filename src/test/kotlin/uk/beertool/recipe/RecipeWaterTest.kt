@@ -101,6 +101,19 @@ class RecipeWaterTest {
     }
 
     @Test
+    fun `should split salts by volume between strike and sparge and put all the acid in the mash`() {
+        val water = RecipeWater(source = "London tap", gypsumG = 3.2, lacticMl = 5.0)
+
+        val doses = pale(water).waterReport(prefs)!!.doses(water)
+
+        doses.map { it.addition } shouldContainExactly listOf(WaterAddition.GYPSUM, WaterAddition.LACTIC)
+        doses[0].strike shouldBe (1.5 plusOrMinus 0.001)
+        doses[0].sparge shouldBe (1.7 plusOrMinus 0.001)
+        doses[1].strike shouldBe 5.0
+        doses[1].sparge shouldBe 0.0
+    }
+
+    @Test
     fun `should describe a mix with each water's share`() {
         val water = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0)
 

@@ -7,14 +7,18 @@ import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
+import uk.beertool.brewing.WaterProfile
 import uk.beertool.common.formatAmount
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeFermentable
 import uk.beertool.recipe.RecipeHop
+import uk.beertool.recipe.RecipeWater
+import uk.beertool.recipe.WaterSnapshot
 import uk.beertool.recipe.stats
 import uk.beertool.user.BrewerPreferences
+import uk.beertool.user.WaterSource
 import java.time.Instant
 import java.time.LocalDate
 
@@ -70,6 +74,26 @@ class CardsTest {
         val card = brewDayCard(recipe, sampleBatch(), BrewerPreferences(), today)
 
         card shouldContain "Strike 13.5 L at"
+    }
+
+    @Test
+    fun `should give the brew's water treatment split between strike and sparge`() {
+        val tap = WaterSource("London tap", WaterProfile(calcium = 99.0, bicarbonate = 250.0))
+        val water = WaterSnapshot(RecipeWater(source = "London tap", gypsumG = 3.5, lacticMl = 4.0), listOf(tap))
+
+        val card = brewDayCard(recipe(), sampleBatch(water = water), BrewerPreferences(), today)
+
+        card shouldContain "<i>London tap</i>"
+        card shouldContain "• Gypsum: 1.5 g strike + 2.0 g sparge"
+        card shouldContain "• Lactic acid 80%: 4.0 ml in the mash"
+        card shouldContain "Mash pH about"
+    }
+
+    @Test
+    fun `should leave water treatment off a brew that has none`() {
+        val card = brewDayCard(recipe(), sampleBatch(), BrewerPreferences(), today)
+
+        card shouldNotContain "Mash pH"
     }
 
     @Test
@@ -186,9 +210,10 @@ class CardsTest {
         abv: Double? = null,
         mashEfficiency: Double? = null,
         notes: String? = null,
+        water: WaterSnapshot? = null,
     ) = Batch(
         id = 1, recipeId = 1, userId = 1, no = 1, brewDate = brewDate, packagedDate = packagedDate,
         measuredOg = measuredOg, measuredFg = measuredFg, measuredPostBoilVolumeL = measuredPostBoilVolumeL,
-        notes = notes, abv = abv, mashEfficiency = mashEfficiency, createdAt = Instant.EPOCH,
+        notes = notes, abv = abv, mashEfficiency = mashEfficiency, createdAt = Instant.EPOCH, water = water,
     )
 }

@@ -28,15 +28,41 @@ data class RecipeWater(
     val lacticMl: Double = 0.0,
 ) {
     val salts: List<SaltAddition>
-        get() = listOf(
-            SaltAddition(Salt.GYPSUM, gypsumG),
-            SaltAddition(Salt.CALCIUM_CHLORIDE, calciumChlorideG),
-            SaltAddition(Salt.EPSOM, epsomG),
-            SaltAddition(Salt.TABLE_SALT, tableSaltG),
-            SaltAddition(Salt.BAKING_SODA, bakingSodaG),
-        ).filter { it.grams > 0.0 }
+        get() = WaterAddition.entries.mapNotNull { a -> a.salt?.let { SaltAddition(it, a.amountIn(this)) } }.filter { it.grams > 0.0 }
+
+    val additions get() = WaterAddition.entries.filter { it.amountIn(this) > 0.0 }
 
     val blends get() = blendSource != null && blendPercent > 0.0
+}
+
+enum class WaterAddition(
+    val field: String,
+    val label: String,
+    val unit: String,
+    val salt: Salt?,
+    val amountIn: (RecipeWater) -> Double,
+) {
+    GYPSUM("gypsumG", "Gypsum", "g", Salt.GYPSUM, RecipeWater::gypsumG),
+    CALCIUM_CHLORIDE("calciumChlorideG", "Calcium chloride", "g", Salt.CALCIUM_CHLORIDE, RecipeWater::calciumChlorideG),
+    EPSOM("epsomG", "Epsom salt", "g", Salt.EPSOM, RecipeWater::epsomG),
+    TABLE_SALT("tableSaltG", "Table salt", "g", Salt.TABLE_SALT, RecipeWater::tableSaltG),
+    BAKING_SODA("bakingSodaG", "Baking soda", "g", Salt.BAKING_SODA, RecipeWater::bakingSodaG),
+    LACTIC("lacticMl", "Lactic acid 80%", "ml", null, RecipeWater::lacticMl);
+
+    // Acid is there to bring the mash pH down, so all of it goes in the mash.
+    val mashOnly get() = salt == null
+}
+
+data class WaterDose(val addition: WaterAddition, val strike: Double, val sparge: Double)
+
+// Salts go in at the same strength across all the water, so each share follows its volume.
+fun WaterReport.doses(water: RecipeWater): List<WaterDose> {
+    val strikeShare = strikeL?.let { it / totalL } ?: 1.0
+    return water.additions.map { a ->
+        val total = a.amountIn(water)
+        val strike = if (a.mashOnly) total else total * strikeShare
+        WaterDose(a, strike, total - strike)
+    }
 }
 
 // What a brew was made with: the sources are copied so later edits in Settings leave the brew log alone.

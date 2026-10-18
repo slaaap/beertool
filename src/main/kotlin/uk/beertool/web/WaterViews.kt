@@ -3,10 +3,8 @@ package uk.beertool.web
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
 import uk.beertool.batch.Batch
-import uk.beertool.brewing.Salt
 import uk.beertool.common.MISSING
 import uk.beertool.common.fmt
-import uk.beertool.common.prettify
 import uk.beertool.recipe.MAX_MASH_PH
 import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.NewRecipe
@@ -14,28 +12,13 @@ import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeWater
 import uk.beertool.recipe.TARGET_MASH_PH
+import uk.beertool.recipe.WaterAddition
 import uk.beertool.recipe.WaterReport
 import uk.beertool.recipe.defaultRecipeWater
 import uk.beertool.recipe.describe
+import uk.beertool.recipe.doses
 import uk.beertool.recipe.waterReport
 import uk.beertool.user.BrewerPreferences
-
-private class Addition(
-    val field: String,
-    val label: String,
-    val unit: String,
-    val of: (RecipeWater) -> Double,
-    val mashOnly: Boolean = false,
-)
-
-private val ADDITIONS = listOf(
-    Addition("gypsumG", prettify(Salt.GYPSUM.name), "g", RecipeWater::gypsumG),
-    Addition("calciumChlorideG", prettify(Salt.CALCIUM_CHLORIDE.name), "g", RecipeWater::calciumChlorideG),
-    Addition("epsomG", "Epsom salt", "g", RecipeWater::epsomG),
-    Addition("tableSaltG", prettify(Salt.TABLE_SALT.name), "g", RecipeWater::tableSaltG),
-    Addition("bakingSodaG", prettify(Salt.BAKING_SODA.name), "g", RecipeWater::bakingSodaG),
-    Addition("lacticMl", "Lactic acid 80%", "ml", RecipeWater::lacticMl, mashOnly = true),
-)
 
 internal fun FlowContent.waterFormSection(recipe: Recipe?, prefs: BrewerPreferences) {
     val water = if (recipe == null) prefs.defaultRecipeWater() else recipe.water
@@ -79,8 +62,8 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                 }
             }
             fieldGrid(columns = 3) {
-                ADDITIONS.forEach { a ->
-                    val amount = water?.let(a.of)?.takeIf { it > 0.0 }
+                WaterAddition.entries.forEach { a ->
+                    val amount = water?.let(a.amountIn)?.takeIf { it > 0.0 }
                     removableField("${a.label} (${a.unit})", "waterDrop(this)", "Remove ${a.label.lowercase()}", hidden = amount == null, dataAdd = a.field) {
                         numberInput(name = "water.${a.field}") {
                             value = amount?.toString() ?: ""; numAttrs("0.1"); disabled = !open
@@ -92,20 +75,20 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                 details(classes = "more-stages") {
                     summary(classes = "btn small") { iconSvg(Icon.PLUS); span { +"Salt" } }
                     div {
-                        ADDITIONS.filterNot { it.mashOnly }.forEach { a ->
+                        WaterAddition.entries.filterNot { it.mashOnly }.forEach { a ->
                             button(type = ButtonType.button, classes = "btn small") {
                                 attributes["data-adds"] = a.field
-                                hidden = water?.let(a.of)?.let { it > 0.0 } == true
+                                hidden = water?.let(a.amountIn)?.let { it > 0.0 } == true
                                 onClick = "waterAdd('${a.field}')"
                                 +a.label
                             }
                         }
                     }
                 }
-                ADDITIONS.filter { it.mashOnly }.forEach { a ->
+                WaterAddition.entries.filter { it.mashOnly }.forEach { a ->
                     addButton(a.label, "waterAdd('${a.field}')") {
                         attributes["data-adds"] = a.field
-                        hidden = water?.let(a.of)?.let { it > 0.0 } == true
+                        hidden = water?.let(a.amountIn)?.let { it > 0.0 } == true
                     }
                 }
                 submitLabel?.let { submitInput(classes = "btn primary small") { value = it } }
@@ -180,7 +163,7 @@ internal fun FlowContent.waterSummary(water: RecipeWater?, report: WaterReport?)
     sectionHead("Water")
     div("stats auto") {
         statTile("Water", water.describe(), null, tone = "text")
-        ADDITIONS.filter { it.of(water) > 0.0 }.forEach { a -> statTile(a.label, fmt(a.of(water), 1), a.unit) }
+        water.additions.forEach { a -> statTile(a.label, fmt(a.amountIn(water), 1), a.unit) }
     }
     waterResult(report)
 }
@@ -205,7 +188,6 @@ internal fun FlowContent.brewDayWater(recipe: Recipe, batch: Batch, prefs: Brewe
 private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
     val strike = report.strikeL ?: return
     val sparge = report.spargeL ?: return
-    val used = ADDITIONS.filter { it.of(water) > 0.0 }
     table("mash-plan water-plan") {
         thead {
             tr {
@@ -215,13 +197,12 @@ private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
             }
         }
         tbody {
-            used.forEach { a ->
-                val total = a.of(water)
-                val toStrike = if (a.mashOnly) total else total * strike / report.totalL
+            report.doses(water).forEach { dose ->
+                val unit = dose.addition.unit
                 tr {
-                    td { +a.label }
-                    td("num") { +"${fmt(toStrike, 1)} ${a.unit}" }
-                    td("num") { +(if (a.mashOnly || sparge <= 0.0) MISSING else "${fmt(total - toStrike, 1)} ${a.unit}") }
+                    td { +dose.addition.label }
+                    td("num") { +"${fmt(dose.strike, 1)} $unit" }
+                    td("num") { +(if (dose.addition.mashOnly || sparge <= 0.0) MISSING else "${fmt(dose.sparge, 1)} $unit") }
                 }
             }
         }

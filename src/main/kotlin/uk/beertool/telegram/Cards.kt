@@ -13,13 +13,20 @@ import uk.beertool.recipe.BoilAddition
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
+import uk.beertool.recipe.MAX_MASH_PH
+import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
+import uk.beertool.recipe.RecipeWater
+import uk.beertool.recipe.WaterReport
 import uk.beertool.recipe.YeastUsage
 import uk.beertool.recipe.boilAdditions
+import uk.beertool.recipe.describe
+import uk.beertool.recipe.doses
 import uk.beertool.recipe.inBrewOrder
 import uk.beertool.recipe.mashWater
+import uk.beertool.recipe.waterReport
 import uk.beertool.user.BrewerPreferences
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -195,11 +202,15 @@ fun brewDayCard(recipe: Recipe, batch: Batch, prefs: BrewerPreferences, today: L
         title("🔥", "Brew day · ${batchName(recipe, batch)}", "/recipes/${recipe.no}/batches/${batch.no}/brew", publicUrl),
         subtitle((batch.brewDate ?: today).let { if (it == today) "Today" else friendlyDate(it, today) }),
     )
-    recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg)?.let {
+    val volumes = recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg)?.let {
+        listOf("Strike ${fmt(it.strikeVolumeL, 1)} L at ${fmt(it.strikeTempC, 1)} °C", "Sparge ${fmt(it.spargeVolumeL, 1)} L")
+    }.orEmpty()
+    val treatment = batch.water?.let { waterTreatment(it.water, recipe.waterReport(it, prefs)) }.orEmpty()
+    if (volumes.isNotEmpty() || treatment.isNotEmpty()) {
         lines += ""
         lines += bold("Water")
-        lines += "Strike ${fmt(it.strikeVolumeL, 1)} L at ${fmt(it.strikeTempC, 1)} °C"
-        lines += "Sparge ${fmt(it.spargeVolumeL, 1)} L"
+        lines += volumes
+        lines += treatment
     }
     if (recipe.mashSteps.isNotEmpty()) {
         lines += ""
@@ -214,6 +225,21 @@ fun brewDayCard(recipe: Recipe, batch: Batch, prefs: BrewerPreferences, today: L
     lines += ""
     lines += "<i>Send readings as they come:</i> $READINGS_HINT"
     return clip(lines)
+}
+
+private fun waterTreatment(water: RecipeWater, report: WaterReport): List<String> {
+    val lines = mutableListOf("<i>${water.describe().escapeHtml()}</i>")
+    report.doses(water).forEach { dose ->
+        val unit = dose.addition.unit
+        val where = if (dose.addition.mashOnly || dose.sparge <= 0.0) "${fmt(dose.strike, 1)} $unit in the mash"
+        else "${fmt(dose.strike, 1)} $unit strike + ${fmt(dose.sparge, 1)} $unit sparge"
+        lines += "• ${dose.addition.label}: $where"
+    }
+    report.mashPh?.let { ph ->
+        val inRange = ph in MIN_MASH_PH..MAX_MASH_PH
+        lines += "Mash pH about ${fmt(ph, 2)}" + if (inRange) "" else " ⚠️ aim for $MIN_MASH_PH-$MAX_MASH_PH"
+    }
+    return lines
 }
 
 fun additionLine(addition: BoilAddition) =
