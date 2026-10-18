@@ -48,8 +48,7 @@ internal fun TR.mashHead() {
     propertySpacer()
 }
 
-// Fermentables are entered per brew stage too. The stage supplies the usage, and with it the only
-// types that are legal there, so an impossible pairing such as sugar in the mash cannot be offered.
+// The stage supplies the usage, so only the types legal there are offered: no sugar in the mash.
 internal class FermentableSection(val usage: FermentableUsage, val primary: Boolean) {
     val key get() = "ferm-${usage.code}"
     val bodyId get() = "$key-body"
@@ -70,8 +69,7 @@ internal fun TR.fermentableStageColumns(section: FermentableSection) {
     numHead("Extract", "%")
 }
 
-// Hops are shown and entered per brew stage, so each stage carries only the columns that mean
-// something there: minutes in the kettle, or days in the fermenter.
+// Each hop stage shows only the time that means something there: minutes in the kettle or days in the fermenter.
 internal class HopSection(
     val usage: HopUsage,
     val timeLabel: String?,
@@ -218,6 +216,6 @@ internal fun DIV.statTile(
 internal fun FlowContent.unmaltedWarning(unmalted: Double) {
     if (unmalted <= MAX_UNMALTED_FRACTION) return
     div("alert") {
-        +"${fmt(unmalted.asPercent(), 0)}% of the grist is unmalted — the malt may not convert it all."
+        +"${fmt(unmalted.asPercent(), 0)}% of the grist is unmalted, so the malt may not convert it all."
     }
 }

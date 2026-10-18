@@ -55,7 +55,7 @@ class RecipeStatsTest {
     }
 
     @Test
-    fun `should not let kettle retention change OG, IBU or colour — they are concentrations in the wort`() {
+    fun `should not let kettle retention change OG, IBU or colour, which are concentrations in the wort`() {
         val noLoss = NewRecipe(
             name = "Pale Ale", postBoilVolumeL = 22.0, fermenterVolumeL = 22.0,
             fermentables = listOf(RecipeFermentable(name = "Pale Malt", amountKg = 5.0, colourEbc = 6.0)),

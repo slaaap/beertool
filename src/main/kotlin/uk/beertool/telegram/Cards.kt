@@ -44,7 +44,7 @@ private fun clip(lines: List<String>): String {
     return kept.joinToString("\n")
 }
 
-// Titles link to the matching page on the site when its address is known; buttons are kept for actions.
+// Titles carry the link to the site, which leaves the buttons for actions.
 private fun title(icon: String, text: String, path: String, publicUrl: String?): String {
     val name = text.escapeHtml()
     val linked = publicUrl?.let { "<a href=\"${"$it$path".escapeAttribute()}\">$name</a>" } ?: name

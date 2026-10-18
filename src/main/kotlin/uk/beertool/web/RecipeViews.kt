@@ -31,7 +31,7 @@ fun HTML.recipeListPage(user: User, recipes: Page<RecipeSummary>, brews: Map<Lon
 
         if (recipes.total == 0) {
             div("empty") {
-                if (term.isBlank()) +"No recipes yet — write your first one and the numbers will follow."
+                if (term.isBlank()) +"No recipes yet. Write your first one and the numbers will follow."
                 else +"Nothing matches “$term”."
             }
             return@page

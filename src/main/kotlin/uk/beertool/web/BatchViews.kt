@@ -46,7 +46,7 @@ fun HTML.batchLogPage(user: User, brews: Page<BatchSummary>) {
     page("Brew log", user) {
         h1 { +"Brew log" }
         if (brews.total == 0) {
-            div("empty") { +"Nothing brewed yet — open a recipe and log a brew." }
+            div("empty") { +"Nothing brewed yet. Open a recipe and log a brew." }
             actionBar { btnLink("/recipes", "Go to recipes", Icon.BACK) }
         } else {
             batchTable(brews.items, showRecipe = true)

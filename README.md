@@ -1,33 +1,38 @@
 # beertool 🍺
 
-A web app for writing beer recipes, watching the numbers as you go, and keeping a log of every brew —
+A web app for writing beer recipes, watching the numbers as you go, and keeping a log of every brew,
 including a phone-first **Brew Day** mode for using it at the kettle.
 
-> Built entirely with [Claude Code](https://claude.com/claude-code) — fully vibe-coded, no hand-written lines.
+> Built entirely with [Claude Code](https://claude.com/claude-code): fully vibe-coded, no hand-written lines.
 
 ## Features
 
-- **Recipes** — fermentables, hops, yeasts, extras and a step mash, with live estimates as you type:
+- **Recipes** - fermentables, hops, yeasts, extras and a step mash, with live estimates as you type:
   OG, FG, ABV, IBU (Tinseth), colour (Morey, in EBC), and a mash-temperature-driven attenuation shift.
+- **Water chemistry** (optional per recipe) - pick one of your saved waters or mix two, add brewing salts
+  and lactic acid, and see the resulting minerals, the chloride-to-sulphate balance and an estimated mash
+  pH, with a one-tap lactic acid amount to reach pH 5.4.
 - **Full-text search** across recipe and ingredient names ("citra" finds the beer it's dry-hopped with).
-- **Brew Day mode** (phone-first) — a mash-water guide (strike volume + temperature, sparge volume), a
-  wall-clock boil timer that survives the phone locking and beeps/vibrates when each hop addition is due,
-  and a live readings form.
-- **Brew log** — every batch numbered per recipe, with measured OG/FG/volumes and a stamped ABV and mash
-  efficiency (recorded at the time, so later recipe edits never rewrite a brew's history).
-- **Per-user settings** — your kit volumes, efficiency, default mash, and mash-water ratios; new recipes
-  open pre-filled from them.
+- **Brew Day mode** (phone-first) - a mash-water guide (strike volume + temperature, sparge volume), the
+  salts and acid split between strike and sparge water, a wall-clock boil timer that survives the phone
+  locking and beeps/vibrates when each hop addition is due, and a live readings form.
+- **Brew log** - every batch numbered per recipe, with measured OG/FG/volumes, a stamped ABV and mash
+  efficiency, and the water it was actually made with (all recorded at the time, so later edits to the
+  recipe or your settings never rewrite a brew's history). The water can be changed on brew day until the
+  OG is in.
+- **Per-user settings** - your kit volumes, efficiency, default mash, mash-water ratios and water sources
+  (mineral figures from your water report or bottle label); new recipes open pre-filled from them.
 - **Telegram bot** (optional) - browse and search recipes, share recipe cards inline in any chat, get the
   brew day plan, a boil timer that messages you at each addition, and log readings by just typing `og 1.052`.
 - **AI assistant access** (optional) - an MCP endpoint, so an assistant such as Claude or ChatGPT can read your
   recipes and brew log, estimate drafts with beertool's own maths, and save recipes you agree on.
-- **Two modes** — multi-user with accounts, or a **single-user public-showcase mode** where visitors browse
+- **Two modes** - multi-user with accounts, or a **single-user public-showcase mode** where visitors browse
   one brewer's recipes read-only.
 
 ## Requirements
 
 - **JDK 21**
-- **Docker** — for a local Postgres, and for the tests (which spin up a throwaway Postgres via Testcontainers)
+- **Docker** - for a local Postgres, and for the tests (which spin up a throwaway Postgres via Testcontainers)
 
 ## Quick start
 
@@ -37,7 +42,7 @@ docker compose up -d     # start a local Postgres (creds match docker-compose.ym
 ```
 
 Open <http://localhost:8080>, register an account, and start writing recipes. The app connects to the
-database given by the env vars below and **never provisions its own** — bring your own Postgres (the
+database given by the env vars below and **never provisions its own**: bring your own Postgres (the
 `docker compose` one, or any other).
 
 ## Configuration
@@ -49,7 +54,7 @@ All configuration is via environment variables:
 | `DATABASE_URL`      | `jdbc:postgresql://localhost:5432/beertool`      | JDBC URL of the Postgres to use                               |
 | `DATABASE_USER`     | `beertool`                                        | Database user                                                 |
 | `DATABASE_PASSWORD` | `beertool`                                        | Database password                                             |
-| `SESSION_SECRET`    | *(random per boot)*                               | Signs the session cookie — **set a long random value in production** (otherwise sessions don't survive a restart) |
+| `SESSION_SECRET`    | *(random per boot)*                               | Signs the session cookie; **set a long random value in production** (otherwise sessions don't survive a restart) |
 | `SINGLE_USER_EMAIL` | *(unset → normal multi-user mode)*                | Enables single-user mode for this account (see below)         |
 | `PORT`              | `8080`                                            | HTTP port to listen on                                        |
 | `TELEGRAM_BOT_TOKEN`| *(unset → bot off)*                               | Turns on the Telegram bot (see below)                         |
@@ -163,12 +168,12 @@ claude mcp add --transport http beertool https://beer.example.com/mcp --header "
 
 | Tool                 | What it does                                                                 |
 |----------------------|------------------------------------------------------------------------------|
-| `get_brewer_profile` | Your kit volumes, efficiency, boil and default mash, so drafts fit your setup |
+| `get_brewer_profile` | Your kit volumes, efficiency, boil, default mash and water sources, so drafts fit your setup |
 | `search_recipes`     | Find recipes by name or ingredient                                           |
-| `get_recipe`         | A whole recipe with its estimate and every brew of it                        |
-| `list_brews`         | The brew log with measured figures and notes                                 |
+| `get_recipe`         | A whole recipe with its estimate, water and every brew of it                 |
+| `list_brews`         | The brew log with measured figures, notes and the water each brew used       |
 | `find_styles`        | BJCP 2021 style names                                                        |
-| `estimate_recipe`    | OG, FG, ABV, IBU and colour for a draft, without saving it                   |
+| `estimate_recipe`    | OG, FG, ABV, IBU, colour, minerals and mash pH for a draft, without saving it |
 | `create_recipe`      | Save a new recipe                                                            |
 | `update_recipe`      | Replace an existing recipe                                                   |
 
@@ -196,7 +201,7 @@ an HTTPS-terminating reverse proxy in production, and set `SESSION_SECRET`.
 ./gradlew test
 ```
 
-Tests start their own throwaway Postgres via Testcontainers — no `docker compose` needed.
+Tests start their own throwaway Postgres via Testcontainers, so no `docker compose` is needed.
 
 ## Tech
 
@@ -207,4 +212,4 @@ Testcontainers.
 
 ## License
 
-Released into the public domain under [The Unlicense](LICENSE) — do whatever you like with it.
+Released into the public domain under [The Unlicense](LICENSE): do whatever you like with it.

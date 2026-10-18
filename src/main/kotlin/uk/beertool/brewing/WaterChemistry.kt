@@ -73,8 +73,7 @@ object WaterChemistry {
         return salts.fold(water) { acc, s -> acc + s.salt.mgPerLitrePerGram * (s.grams / volumeL) }
     }
 
-    // A heuristic fitted to Troester's distilled-water mash pH: ~5.75 for pale malt, ~5.45 for Munich,
-    // ~5.0 for mid crystal, levelling out near 4.7 for roasted malt.
+    // Fitted to Troester's distilled-water mash pH: about 5.75 for pale malt down to 4.7 for roasted.
     fun distilledWaterPh(colourEbc: Double) = 4.65 + 1.15 * exp(-colourEbc / 60.0)
 
     fun mashPh(grist: List<FermentableAddition>, water: WaterProfile, strikeL: Double, lacticMl: Double): Double? {

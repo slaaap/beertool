@@ -7,14 +7,12 @@ data class HopAddition(
     val alphaAcidPercent: Double,
     val massGrams: Double,
 
-    // For a whirlpool hop: minutes it stands at the whirlpool temperature before chilling starts.
+    // For a whirlpool hop, the stand at whirlpool temperature before chilling starts.
     val boilTimeMinutes: Int,
 
     val whirlpool: Whirlpool? = null,
 )
 
-// How the brewer whirlpools: hops go in at [tempC] and the wort chills from there to pitching
-// temperature over [coolingMinutes].
 data class Whirlpool(
     val tempC: Double,
     val coolingMinutes: Int,
@@ -54,37 +52,28 @@ object Calculators {
     private const val EBC_PER_LOVIBOND = 1.97
     private const val EBC_PER_SRM = 1.97
 
-    // Extract-to-gravity yield of pure sucrose: 1 kg dissolved in 1 L raises gravity by ~384 points
-    // (1 point = 0.001 of specific gravity). A fermentable contributes this scaled by its extract %.
+    // 1 kg of sucrose in 1 L raises gravity by about 384 points (0.384 SG).
     private const val SUCROSE_POINTS_PER_KG_PER_L = 384.0
 
-    // ABV ≈ (OG − FG) × 131.25 — the standard hobby approximation (points of gravity drop → % alcohol).
+    // The standard homebrew approximation, ABV = (OG - FG) x 131.25.
     private const val ABV_PER_GRAVITY_POINT = 131.25
 
-    // Malowicki & Shellhammer's isomerisation rate constant is Arrhenius in temperature: this is its
-    // activation energy over the gas constant (K), and the boil it is measured against.
+    // Malowicki & Shellhammer's Arrhenius fit for hop isomerisation: activation energy over the gas constant, in kelvin.
     private const val ISOMERISATION_ACTIVATION_K = 11858.0
     private const val BOILING_K = 373.15
     private const val KELVIN_OFFSET = 273.15
 
     private const val PITCHING_TEMP_C = 20.0
 
-    // Ratio of grain's specific heat to water's, in the metric strike-temp balance below. Chosen so the
-    // L/kg form matches the classic imperial "0.2 / (qt·lb⁻¹)" rule (0.2 × 2.086 L·kg⁻¹ per qt·lb⁻¹ ≈ 0.41).
+    // The classic imperial strike rule's 0.2 per qt/lb, converted to L/kg.
     const val GRAIN_WATER_HEAT_RATIO = 0.41
 
     fun strikeTempCoefficient(thicknessLPerKg: Double) = GRAIN_WATER_HEAT_RATIO / thicknessLPerKg
 
-    // Strike water is poured onto room-temperature grain, so it must start ABOVE the target rest; the
-    // grain then pulls it down. From the heat balance mass_grain·c_grain·ΔT_grain = mass_water·ΔT_water,
-    // with the water:grain mass ratio = thickness (L/kg): Tstrike = Trest + (k/thickness)·(Trest − Tgrain).
+    // Heat balance between strike water and grain: the water starts above the rest and the grain pulls it down.
     fun strikeTempC(thicknessLPerKg: Double, targetRestC: Double, grainTempC: Double) =
         targetRestC + strikeTempCoefficient(thicknessLPerKg) * (targetRestC - grainTempC)
 
-    // The water plan for a single-infusion mash + sparge:
-    //  - strike  = grain × thickness (the water that mashes in)
-    //  - sparge  = pre-boil volume + what the grain absorbs − strike (what's left to rinse to pre-boil);
-    //              clamped at 0 for a full-volume/BIAB mash that already holds everything.
     fun mashWater(
         grainKg: Double,
         firstRestTempC: Double,
@@ -100,24 +89,22 @@ object Calculators {
     fun mashVolumes(grainKg: Double, preBoilVolumeL: Double, thicknessLPerKg: Double, absorptionLPerKg: Double): MashVolumes {
         val strike = grainKg * thicknessLPerKg
         val absorbed = grainKg * absorptionLPerKg
+        // A full-volume mash already holds the whole pre-boil volume, so there is nothing to sparge.
         return MashVolumes(strike, (preBoilVolumeL + absorbed - strike).coerceAtLeast(0.0))
     }
 
     fun abv(og: Double, fg: Double) = (og - fg) * ABV_PER_GRAVITY_POINT
 
-    // Sugar/fruit added AFTER the wort (in the fermenter) ferments out fully and isn't in the OG/FG the
-    // brewer reads, so its alcohol is counted on its own: full-efficiency gravity points → ABV.
+    // Sugar added in the fermenter ferments out fully and never shows in the OG or FG the brewer reads.
     fun lateAdditionAbv(fermentables: List<FermentableAddition>, volumeL: Double): Double {
         val points = fermentables.filterNot { it.inWort }.gravityPoints(volumeL, efficiency = 1.0)
         return points / 1000.0 * ABV_PER_GRAVITY_POINT
     }
 
-    // OG = 1 + points/1000, where points come from every in-wort fermentable at the given efficiency.
     fun estimateOg(fermentables: List<FermentableAddition>, volumeL: Double, efficiency: Double) =
         1.0 + fermentables.filter { it.inWort }.gravityPoints(volumeL, efficiency) / 1000.0
 
-    // FG: only the non-fully-fermentable extract (malt) leaves residual gravity — a fraction (1 −
-    // attenuation) of the malt points stays behind. Simple sugars ferment to nothing, so they're excluded.
+    // Simple sugars ferment out completely, so only malt extract leaves residual gravity.
     fun estimateFg(
         fermentables: List<FermentableAddition>,
         volumeL: Double,
@@ -129,9 +116,7 @@ object Calculators {
         return 1.0 + maltPoints * (1.0 - attenuation) / 1000.0
     }
 
-    // Back out the mash efficiency a brew actually hit: convert the MEASURED OG to extract in the kettle,
-    // subtract the extract from unmashed sugars (which arrive at 100% regardless), and divide by the
-    // potential extract of the mashed grain. Inverse of [gravityPoints]. Null if there's nothing mashed.
+    // The inverse of [gravityPoints]: unmashed sugars always yield fully, so only mashed grain carries the efficiency.
     fun impliedEfficiency(
         fermentables: List<FermentableAddition>,
         volumeL: Double,
@@ -147,23 +132,16 @@ object Calculators {
         return (measuredExtractKg - freeExtractKg) / mashedExtractKg
     }
 
-    // Hop utilisation happens during the boil, when the wort is more concentrated than the final OG. This
-    // approximates the average gravity the hops saw as the mean of pre-boil and post-boil gravity (the
-    // wort concentrates as it boils down), so IBUs aren't over-counted. Falls back to OG if pre-boil ≤ post.
+    // Hops see thinner wort early in the boil, so utilisation uses the mean of pre- and post-boil gravity.
     fun averageBoilGravity(og: Double, postBoilVolumeL: Double, preBoilVolumeL: Double?): Double {
         require(postBoilVolumeL > 0) { "volume must be > 0" }
         if (preBoilVolumeL == null || preBoilVolumeL <= postBoilVolumeL) return og
         val ogPoints = (og - 1.0) * 1000.0
-        // Same sugar in a larger pre-boil volume → proportionally lower gravity.
         val preBoilPoints = ogPoints * postBoilVolumeL / preBoilVolumeL
         return 1.0 + (ogPoints + preBoilPoints) / 2.0 / 1000.0
     }
 
-    // Bitterness by Tinseth's model. Utilisation = bigness × boil-time factor:
-    //  - bigness (gravity factor): denser wort extracts less; 1.65 × 0.000125^(SG−1).
-    //  - boil-time factor: iso-alpha rises then plateaus with time; (1 − e^(−0.04·min)) / 4.15.
-    // IBU (mg/L iso-alpha) = Σ over hops of (AA% × grams × 1000 / L) × utilisation.
-    // A whirlpool hop's time is the boil time that would isomerise as much (see [whirlpoolBoilMinutes]).
+    // Tinseth's model; a whirlpool hop counts as the boil time that would isomerise as much.
     fun ibu(hops: List<HopAddition>, volumeL: Double, boilGravity: Double): Double {
         require(volumeL > 0) { "volume must be > 0" }
         val bigness = 1.65 * 0.000125.pow(boilGravity - 1.0)
@@ -177,14 +155,11 @@ object Calculators {
         }
     }
 
-    // Hops keep isomerising below the boil, only slower: relative to 100 °C the rate is
-    // e^(−11858·(1/T − 1/373.15)) with T in kelvin, so ~0.42 at 90 °C, ~0.17 at 80 °C, ~0.06 at 70 °C.
+    // Relative to the boil: about 0.42 at 90 °C, 0.17 at 80 °C and 0.06 at 70 °C.
     fun isomerisationRate(tempC: Double) =
         exp(-ISOMERISATION_ACTIVATION_K * (1.0 / (tempC + KELVIN_OFFSET) - 1.0 / BOILING_K))
 
-    // Tinseth's boil-time curve is first-order kinetics, so minutes at a lower rate fold into it as
-    // equivalent boil minutes: ∫ rate(T(t)) dt over the stand at whirlpool temperature and then the chill,
-    // taken as a linear drop to pitching temperature, integrated minute by minute at the midpoint.
+    // Tinseth's time curve is first-order, so slower minutes fold in as equivalent boil minutes; the chill is taken as linear.
     fun whirlpoolBoilMinutes(standMinutes: Int, whirlpool: Whirlpool): Double {
         val stand = standMinutes * isomerisationRate(whirlpool.tempC)
         val drop = whirlpool.tempC - PITCHING_TEMP_C
@@ -194,8 +169,7 @@ object Calculators {
         return stand + chill
     }
 
-    // Colour by Morey's equation. MCU = Σ(grain colour in °Lovibond × weight in lb) / volume in gal;
-    // SRM = 1.4922 × MCU^0.6859 (the curve that keeps dark beers from over-counting). Reported in EBC.
+    // Morey's equation, which works in imperial units and SRM.
     fun colourEbc(fermentables: List<FermentableAddition>, volumeL: Double): Double {
         require(volumeL > 0) { "volume must be > 0" }
         val gallons = volumeL * L_TO_GAL
@@ -205,18 +179,13 @@ object Calculators {
         return srm * EBC_PER_SRM
     }
 
-    // A NOT-textbook heuristic: mash temperature shapes how fermentable the wort is (a cooler rest
-    // favours beta-amylase → drier beer; a hotter rest favours alpha → sweeter). We model the two
-    // enzymes' work over the schedule, take beta's share of the total, and express the result as a shift
-    // in apparent attenuation relative to a reference 66.5 °C / 60 min mash. Feeds the FG estimate.
+    // Not a textbook model: beta-amylase's share of the enzyme work, as an attenuation shift from a 66.5 °C / 60 min mash.
     fun mashAttenuationShift(rests: List<MashRest>): Double? {
         val index = fermentabilityIndex(rests) ?: return null
         val reference = fermentabilityIndex(listOf(MashRest(REFERENCE_MASH_C, REFERENCE_MASH_MIN)))!!
         return (index - reference) * ATTENUATION_SPAN
     }
 
-    // Beta's fraction of the total enzyme work across the schedule (0 = all alpha/sweet, 1 = all
-    // beta/dry). Null when the rests do too little conversion to mean anything.
     fun fermentabilityIndex(rests: List<MashRest>): Double? {
         if (rests.isEmpty()) return null
         val beta = rests.enzymeWork(BETA)
@@ -225,9 +194,7 @@ object Calculators {
         return beta / (beta + alpha)
     }
 
-    // How much an enzyme converts over the whole schedule. Each rest contributes activity × time,
-    // weighted by the enzyme still surviving (it denatures as rests get hot), integrated rest by rest
-    // using the average of the surviving fraction before and after that rest.
+    // Each rest weighs its activity by the enzyme still alive, averaged over the rest as it denatures.
     private fun List<MashRest>.enzymeWork(enzyme: Enzyme): Double {
         var surviving = 1.0
         var work = 0.0
@@ -239,12 +206,8 @@ object Calculators {
         return work
     }
 
-    // Activity is a Gaussian bell around the enzyme's optimum temperature (full at the optimum, tailing
-    // off either side over `widthC`).
     private fun Enzyme.activityAt(tempC: Double) = exp(-((tempC - optimumC) / widthC).pow(2))
 
-    // Fraction of the enzyme surviving a rest: below its denature point it's stable; above, it decays
-    // with an exponentially shorter half-life the hotter the rest.
     private fun Enzyme.survives(rest: MashRest): Double {
         if (rest.tempC <= denaturesFromC) return 1.0
         val halfLifeMin = BASE_HALF_LIFE_MIN * exp(-(rest.tempC - denaturesFromC) * decayPerC)
@@ -258,10 +221,10 @@ object Calculators {
         val decayPerC: Double,
     )
 
-    // Beta-amylase: makes maltose (fermentable), works cool, denatures early.
+    // Beta-amylase makes fermentable maltose, works cool and denatures early.
     private val BETA = Enzyme(optimumC = 62.0, widthC = 6.0, denaturesFromC = 63.0, decayPerC = 0.55)
 
-    // Alpha-amylase: makes larger, less fermentable sugars, works hotter, hardier.
+    // Alpha-amylase makes larger, less fermentable sugars and survives hotter rests.
     private val ALPHA = Enzyme(optimumC = 72.0, widthC = 7.0, denaturesFromC = 73.0, decayPerC = 0.60)
 
     private const val BASE_HALF_LIFE_MIN = 1000.0
@@ -269,14 +232,12 @@ object Calculators {
     private const val REFERENCE_MASH_C = 66.5
     private const val REFERENCE_MASH_MIN = 60
 
-    // Full swing of the attenuation shift from an all-alpha to an all-beta mash (~±16.5 percentage pts).
+    // The attenuation swing between an all-alpha and an all-beta mash.
     private const val ATTENUATION_SPAN = 0.165
 
     private const val MIN_CONVERSION_WORK = 1.0
 
-    // The heart of the gravity maths: extract (kg of sugar) = Σ extract% × mass, at mash efficiency for
-    // mashed grain (some is lost in the tun) but at 100% for sugars/extract (they dissolve fully). Then
-    // points = extract × 384 / volume. Everything else here is built on this.
+    // Mashed grain loses some extract in the tun; sugars and extracts dissolve fully.
     private fun List<FermentableAddition>.gravityPoints(volumeL: Double, efficiency: Double): Double {
         require(volumeL > 0) { "volume must be > 0" }
         val extractKg = sumOf { (it.extractPercent / 100.0) * it.massKg * (if (it.mashed) efficiency else 1.0) }

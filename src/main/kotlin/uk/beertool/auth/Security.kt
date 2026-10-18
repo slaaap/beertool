@@ -15,7 +15,7 @@ private val log = LoggerFactory.getLogger("uk.beertool.auth.Security")
 
 fun Application.configureSecurity() {
     val secret = System.getenv("SESSION_SECRET")?.toByteArray() ?: run {
-        log.warn("SESSION_SECRET not set — generating a random key for this run; sessions won't survive a restart. Set it in production.")
+        log.warn("SESSION_SECRET not set - generating a random key for this run; sessions won't survive a restart. Set it in production.")
         SecureRandom().generateSeed(32)
     }
 

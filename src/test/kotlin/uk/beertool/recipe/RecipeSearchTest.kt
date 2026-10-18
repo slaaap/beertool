@@ -101,7 +101,7 @@ class RecipeSearchTest {
     }
 
     @Test
-    fun `should find an accented ingredient — the sanitiser must not strip non-ASCII letters`() {
+    fun `should find an accented ingredient, as the sanitiser must not strip non-ASCII letters`() {
         val userId = newUser()
         RecipeRepository.create(userId, draft("Festbier", hop = "Hallertauer Mittelfrüh"))
 
