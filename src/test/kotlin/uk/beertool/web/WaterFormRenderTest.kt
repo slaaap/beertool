@@ -10,8 +10,11 @@ import uk.beertool.brewing.WaterProfile
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeFermentable
+import uk.beertool.common.roundTo
+import uk.beertool.recipe.FlavourBalance
 import uk.beertool.recipe.RecipeWater
 import uk.beertool.recipe.estimatedStats
+import uk.beertool.recipe.waterReport
 import uk.beertool.user.BrewerPreferences
 import uk.beertool.user.User
 import uk.beertool.user.WaterSource
@@ -60,6 +63,26 @@ class WaterFormRenderTest {
 
         html shouldContain Regex("""onclick="waterUseAcid\('\d+\.\d'\)"""")
     }
+
+    @Test
+    fun `should offer the salts that reach the chosen balance`() {
+        val html = render(recipe(RecipeWater(source = "London tap", target = FlavourBalance.BITTER)))
+
+        html shouldContain Regex("""onclick="waterUseSalts\('\d+\.\d','0\.0'\)">Use \d+\.\d g gypsum<""")
+    }
+
+    @Test
+    fun `should not offer salts the recipe already uses`() {
+        val water = RecipeWater(source = "London tap", target = FlavourBalance.BITTER)
+        val treated = water.copy(gypsumG = suggestedGypsum(water))
+
+        val html = render(recipe(treated))
+
+        html shouldNotContain "waterUseSalts"
+    }
+
+    private fun suggestedGypsum(water: RecipeWater) =
+        recipe(water).waterReport(BrewerPreferences(waterSources = waters))!!.saltsForTarget!!.gypsumG.roundTo(1)
 
     private fun String.fieldIsHidden(field: String) =
         Regex("""<div class="field[^"]*"[^>]*data-add="$field"[^>]*>""").find(this)!!.value.contains("hidden")

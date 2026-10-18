@@ -25,6 +25,7 @@ import uk.beertool.recipe.Coded
 import uk.beertool.recipe.ExtraUsage
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
+import uk.beertool.recipe.FlavourBalance
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MAX_MASH_PH
 import uk.beertool.recipe.MAX_UNMALTED_FRACTION
@@ -301,7 +302,7 @@ private fun waterInputJson(w: RecipeWater) = buildJsonObject {
     put("source", w.source); put("blendSource", w.blendSource); put("blendPercent", w.blendPercent)
     put("gypsumG", w.gypsumG); put("calciumChlorideG", w.calciumChlorideG); put("epsomG", w.epsomG)
     put("tableSaltG", w.tableSaltG); put("bakingSodaG", w.bakingSodaG)
-    put("acid", w.acid.code); put("acidMl", w.acidMl); put("campdenTablets", w.campdenTablets)
+    put("acid", w.acid.code); put("acidMl", w.acidMl); put("campdenTablets", w.campdenTablets); put("target", w.target?.code)
 }
 
 private fun waterJson(r: WaterReport) = buildJsonObject {
@@ -313,6 +314,9 @@ private fun waterJson(r: WaterReport) = buildJsonObject {
     put("targetMashPh", TARGET_MASH_PH)
     put("acid", r.acid.code)
     put("acidMlForTarget", r.acidForTargetMl?.roundTo(1))
+    r.saltsForTarget?.let { s ->
+        put("saltsForTarget", buildJsonObject { put("gypsumG", s.gypsumG.roundTo(1)); put("calciumChlorideG", s.calciumChlorideG.roundTo(1)) })
+    }
     put("waterL", r.totalL.roundTo(1))
     put("strikeL", r.strikeL?.roundTo(1))
     put("spargeL", r.spargeL?.roundTo(1))
@@ -353,6 +357,9 @@ private fun validate(recipe: JsonObject) {
         numbers("water.", water, *fields.toTypedArray())
         water.string("acid")?.let { code ->
             if (Acid.fromCodeOrNull(code) == null) problems += "water.acid \"$code\" must be one of ${Acid.entries.joinToString { it.code }}"
+        }
+        water.string("target")?.let { code ->
+            if (FlavourBalance.fromCodeOrNull(code) == null) problems += "water.target \"$code\" must be one of ${FlavourBalance.entries.joinToString { it.code }}"
         }
         fields.forEach { field -> (water[field] as? JsonPrimitive)?.doubleOrNull?.let { if (it < 0.0) problems += "water.$field must not be negative" } }
     }

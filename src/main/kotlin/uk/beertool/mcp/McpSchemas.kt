@@ -13,6 +13,7 @@ import uk.beertool.recipe.Coded
 import uk.beertool.recipe.ExtraUsage
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
+import uk.beertool.recipe.FlavourBalance
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.YeastUsage
 
@@ -101,6 +102,7 @@ private val WATER = objectOf(
         "acid" to choices("Which acid acidMl measures; default lactic80", Acid.entries.map { it.code }),
         "acidMl" to number("Acid, ml. Lactic and phosphoric go in the mash; AMS treats all the brewing water and adds chloride and sulphate"),
         "campdenTablets" to number("Campden tablets, to clear chlorine and chloramine from tap water"),
+        "target" to choices("Flavour balance to suggest gypsum and calcium chloride for; estimate_recipe returns saltsForTarget", FlavourBalance.entries.map { it.code }),
     ),
     listOf("source"),
     "Brewing water and its treatment; omit for a recipe without water chemistry. Salts are dosed across strike and sparge water in proportion.",

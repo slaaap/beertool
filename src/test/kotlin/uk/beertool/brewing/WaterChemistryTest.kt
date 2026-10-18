@@ -125,6 +125,36 @@ class WaterChemistryTest {
     }
 
     @Test
+    fun `should suggest salts that land soft water on both the calcium and the ratio`() {
+        val soft = WaterProfile(calcium = 17.0, magnesium = 5.0, sodium = 10.0, chloride = 13.0, sulphate = 14.0, bicarbonate = 46.0)
+
+        val salts = WaterChemistry.saltsFor(soft, calcium = 100.0, chlorideToSulphate = 0.5, volumeL = 32.0)
+
+        val treated = WaterChemistry.withSalts(soft, listOf(SaltAddition(Salt.GYPSUM, salts.gypsumG), SaltAddition(Salt.CALCIUM_CHLORIDE, salts.calciumChlorideG)), 32.0)
+        treated.calcium shouldBe (100.0 plusOrMinus 0.01)
+        treated.chlorideToSulphate!! shouldBe (0.5 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should only fix the ratio, with the one salt it needs, when the water has calcium enough`() {
+        val salts = WaterChemistry.saltsFor(londonTap, calcium = 75.0, chlorideToSulphate = 2.0, volumeL = 32.0)
+
+        val treated = WaterChemistry.withSalts(londonTap, listOf(SaltAddition(Salt.CALCIUM_CHLORIDE, salts.calciumChlorideG)), 32.0)
+        salts.gypsumG shouldBe 0.0
+        treated.chlorideToSulphate!! shouldBe (2.0 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should reach a bitter ratio with gypsum alone when chloride is already too high for it`() {
+        val salts = WaterChemistry.saltsFor(londonTap, calcium = 100.0, chlorideToSulphate = 0.5, volumeL = 32.0)
+
+        val treated = WaterChemistry.withSalts(londonTap, listOf(SaltAddition(Salt.GYPSUM, salts.gypsumG)), 32.0)
+        salts.calciumChlorideG shouldBe 0.0
+        treated.chlorideToSulphate!! shouldBe (0.5 plusOrMinus 0.001)
+        treated.calcium shouldBeGreaterThan 100.0
+    }
+
+    @Test
     fun `should not guess a mash pH when nothing is mashed`() {
         val extract = listOf(FermentableAddition(extractPercent = 95.0, colourEbc = 15.0, massKg = 3.0, mashed = false))
 

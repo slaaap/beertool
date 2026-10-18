@@ -2,10 +2,12 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
-import uk.beertool.brewing.Acid
 import uk.beertool.batch.Batch
+import uk.beertool.brewing.Acid
 import uk.beertool.common.MISSING
 import uk.beertool.common.fmt
+import uk.beertool.common.roundTo
+import uk.beertool.recipe.FlavourBalance
 import uk.beertool.recipe.MAX_MASH_PH
 import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.NewRecipe
@@ -97,6 +99,17 @@ private fun FlowContent.waterEditor(water: RecipeWater?, prefs: BrewerPreference
                         hidden = water?.let(a.amountIn)?.let { it > 0.0 } == true
                     }
                 }
+                div("water-aim") {
+                    label { +"Aim" }
+                    select {
+                        name = "water.target"
+                        disabled = !open
+                        option { value = ""; if (water?.target == null) selected = true; +"None" }
+                        FlavourBalance.entries.forEach { b ->
+                            option { value = b.code; if (b == water?.target) selected = true; +b.label }
+                        }
+                    }
+                }
                 submitLabel?.let { submitInput(classes = "btn primary small") { value = it } }
             }
         }
@@ -164,7 +177,9 @@ private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
     val inRange = report.mashPh?.let { it in MIN_MASH_PH..MAX_MASH_PH }
     val acidMl = report.acidForTargetMl
     div(if (canApply) "stats trio chem" else "stats duo chem") {
-        statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label)
+        statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label) {
+            if (canApply) saltsAction(report)
+        }
         statTile("Mash pH", fmt(report.mashPh, 2), "$MIN_MASH_PH-$MAX_MASH_PH", tone = if (inRange == false) "bad" else if (inRange == true) "good" else null)
         if (canApply) statTile("${report.acid.shortLabel} for $TARGET_MASH_PH", fmt(acidMl, 1), "ml") {
             if (acidMl != null && acidMl >= 0.1) {
@@ -174,6 +189,21 @@ private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
                 }
             }
         }
+    }
+}
+
+private fun DIV.saltsAction(report: WaterReport) {
+    val salts = report.saltsForTarget ?: return
+    val gypsum = salts.gypsumG.roundTo(1)
+    val chloride = salts.calciumChlorideG.roundTo(1)
+    if (gypsum == report.water.gypsumG.roundTo(1) && chloride == report.water.calciumChlorideG.roundTo(1)) return
+    val parts = listOfNotNull(
+        "${fmt(gypsum, 1)} g gypsum".takeIf { gypsum > 0.0 },
+        "${fmt(chloride, 1)} g calcium chloride".takeIf { chloride > 0.0 },
+    )
+    button(type = ButtonType.button, classes = "tile-action") {
+        onClick = "waterUseSalts('${fmt(gypsum, 1)}','${fmt(chloride, 1)}')"
+        +(if (parts.isEmpty()) "Clear gypsum and calcium chloride" else "Use ${parts.joinToString(" + ")}")
     }
 }
 

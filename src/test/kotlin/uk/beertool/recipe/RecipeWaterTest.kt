@@ -185,6 +185,32 @@ class RecipeWaterTest {
     }
 
     @Test
+    fun `should suggest salts that bring the treated water to the chosen balance`() {
+        val water = RecipeWater(source = "Ashbeck", target = FlavourBalance.BITTER)
+
+        val salts = pale(water).waterReport(prefs)!!.saltsForTarget!!
+        val treated = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
+
+        treated.profile.calcium shouldBe (100.0 plusOrMinus 0.01)
+        treated.profile.chlorideToSulphate!! shouldBe (0.5 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should count AMS's chloride and sulphate when suggesting salts`() {
+        val water = RecipeWater(source = "London tap", acid = Acid.AMS, acidMl = 30.0, target = FlavourBalance.MALTY)
+
+        val salts = pale(water).waterReport(prefs)!!.saltsForTarget!!
+        val treated = pale(water.copy(gypsumG = salts.gypsumG, calciumChlorideG = salts.calciumChlorideG)).waterReport(prefs)!!
+
+        treated.profile.chlorideToSulphate!! shouldBe (2.0 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should suggest nothing until a balance is chosen`() {
+        pale(RecipeWater(source = "London tap")).waterReport(prefs)!!.saltsForTarget.shouldBeNull()
+    }
+
+    @Test
     fun `should describe a mix with each water's share`() {
         val water = RecipeWater(source = "London tap", blendSource = "Ashbeck", blendPercent = 40.0)
 

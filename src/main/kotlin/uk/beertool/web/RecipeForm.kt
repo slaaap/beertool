@@ -8,6 +8,7 @@ import uk.beertool.recipe.DEFAULT_ATTENUATION
 import uk.beertool.recipe.ExtraUsage
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
+import uk.beertool.recipe.FlavourBalance
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.NewRecipe
@@ -50,6 +51,7 @@ data class WaterForm(
     val acid: String = "",
     @Serializable(with = BlankAsNullDouble::class) val acidMl: Double? = null,
     @Serializable(with = BlankAsNullDouble::class) val campdenTablets: Double? = null,
+    val target: String = "",
 )
 
 fun WaterForm.toRecipeWater(): RecipeWater? {
@@ -68,6 +70,7 @@ fun WaterForm.toRecipeWater(): RecipeWater? {
         acid = Acid.fromCodeOrNull(acid) ?: Acid.LACTIC_80,
         acidMl = acidMl.amount(),
         campdenTablets = campdenTablets.amount(),
+        target = FlavourBalance.fromCodeOrNull(target),
     )
 }
 

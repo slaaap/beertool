@@ -57,6 +57,8 @@ enum class Salt(private val molarMass: Double, private val ions: WaterProfile) {
 
 data class SaltAddition(val salt: Salt, val grams: Double)
 
+data class SaltSuggestion(val gypsumG: Double, val calciumChlorideG: Double)
+
 @Serializable
 enum class Acid(
     val code: String,
@@ -101,6 +103,24 @@ object WaterChemistry {
         val perLitre = ml / volumeL
         val added = water + acid.mineralsPerMlPerLitre * perLitre
         return added.copy(bicarbonate = (added.bicarbonate - acid.meqPerMl * perLitre * HCO3_G_PER_MOL).coerceAtLeast(0.0))
+    }
+
+    // Solves gypsum and calcium chloride together so calcium and the chloride-to-sulphate ratio land on target.
+    fun saltsFor(water: WaterProfile, calcium: Double, chlorideToSulphate: Double, volumeL: Double): SaltSuggestion {
+        val gypsum = Salt.GYPSUM.mgPerLitrePerGram
+        val chloride = Salt.CALCIUM_CHLORIDE.mgPerLitrePerGram
+        val calciumShort = calcium - water.calcium
+        val chlorideShort = chlorideToSulphate * water.sulphate - water.chloride
+        val g = (calciumShort - chloride.calcium * chlorideShort / chloride.chloride) /
+            (gypsum.calcium + chloride.calcium * chlorideToSulphate * gypsum.sulphate / chloride.chloride)
+        val c = (chlorideShort + chlorideToSulphate * gypsum.sulphate * g) / chloride.chloride
+        // With calcium already there, or one salt going negative, only the ratio is fixed, using the one salt it needs.
+        val (gPerL, cPerL) = when {
+            calciumShort > 0 && g >= 0 && c >= 0 -> g to c
+            chlorideShort >= 0 -> 0.0 to chlorideShort / chloride.chloride
+            else -> (water.chloride / chlorideToSulphate - water.sulphate) / gypsum.sulphate to 0.0
+        }
+        return SaltSuggestion(gPerL * volumeL, cPerL * volumeL)
     }
 
     fun withSalts(water: WaterProfile, salts: List<SaltAddition>, volumeL: Double): WaterProfile {

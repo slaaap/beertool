@@ -62,12 +62,24 @@
     show(editor, field).focus();
   };
 
-  window.waterDrop = function (button) {
-    var editor = editorOf(button);
-    var row = button.closest('[data-add]');
+  function hide(editor, row) {
     row.querySelector('input').value = '';
     row.hidden = true;
     editor.querySelectorAll('[data-adds="' + row.dataset.add + '"]').forEach(function (b) { b.hidden = false; });
+  }
+
+  window.waterDrop = function (button) {
+    var editor = editorOf(button);
+    hide(editor, button.closest('[data-add]'));
+    changed(editor);
+  };
+
+  window.waterUseSalts = function (gypsum, chloride) {
+    var editor = document.querySelector('[data-water-editor]');
+    [['gypsumG', gypsum], ['calciumChlorideG', chloride]].forEach(function (pair) {
+      if (parseFloat(pair[1]) > 0) show(editor, pair[0]).value = pair[1];
+      else hide(editor, editor.querySelector('[data-add="' + pair[0] + '"]'));
+    });
     changed(editor);
   };
 
