@@ -190,6 +190,11 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .boil-adds li.now { border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
 .boil-adds li.now .at { color:var(--accent); }
 .boil-adds li.done { opacity:0.45; text-decoration:line-through; }
+.boil-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
+.water-change { margin:12px 0 4px; }
+.water-change > summary { list-style:none; display:inline-flex; }
+.water-change > summary::-webkit-details-marker { display:none; }
+.water-change[open] > summary { margin-bottom:6px; }
 
 .hero { text-align:center; padding:34px 0 8px; }
 .hero h1 { font-size:clamp(32px,6vw,46px); }
@@ -286,6 +291,7 @@ li { margin:3px 0; }
   table.hops .c-amount, table.hops .c-time, table.hops .c-last { width:19%; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
+  .mash-water .g3 { grid-template-columns:repeat(3,1fr); }
   .water-panel .field.acid { grid-column:auto; }
   .brew-water .g3 { grid-template-columns:repeat(2,1fr); }
   .brew-water .water-panel .field.acid { grid-column:span 2; }

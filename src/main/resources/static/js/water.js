@@ -13,6 +13,8 @@
 
   function show(editor, field) {
     var row = editor.querySelector('[data-add="' + field + '"]');
+    var folded = editor.closest('details.water-change');
+    if (folded) folded.open = true;
     row.hidden = false;
     editor.querySelectorAll('[data-adds="' + field + '"]').forEach(function (b) { b.hidden = true; });
     var menu = editor.querySelector('details[open]');

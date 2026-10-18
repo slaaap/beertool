@@ -22,6 +22,8 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
             }
             p("muted") { +"Brew day · ${fmt(batch.brewDate)}" }
 
+            brewDayWater(recipe, batch, user.preferences)
+
             sectionHead("Mash")
             if (recipe.mashSteps.isEmpty()) {
                 p("muted") { +"No mash schedule on this recipe." }
@@ -41,30 +43,30 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 }
             }
 
-            brewDayWater(recipe, batch, user.preferences)
-
             sectionHead("Boil")
-            div("boil-clock") {
-                id = "boil-clock"
-                attributes["data-boil"] = recipe.boilTimeMin.toString()
-                attributes["data-key"] = batch.id.toString()
-                +boilClock(recipe.boilTimeMin)
-            }
-            div("boil-controls") {
-                button(type = ButtonType.button, classes = "btn primary") { id = "boil-start"; +"Start" }
-                button(type = ButtonType.button, classes = "btn") { id = "boil-reset"; +"Reset" }
-            }
-            val additions = recipe.boilAdditions()
-            if (additions.isEmpty()) {
-                p("muted") { +"No boil additions on this recipe." }
-            } else {
-                ul("boil-adds") {
-                    id = "boil-adds"
-                    additions.forEach { a ->
-                        li {
-                            attributes["data-remaining"] = a.minutesBeforeEnd.toString()
-                            span("at") { +(if (a.minutesBeforeEnd == 0) "flame-out" else "${a.minutesBeforeEnd} min") }
-                            span("what") { +a.what }
+            div("boil-card") {
+                div("boil-clock") {
+                    id = "boil-clock"
+                    attributes["data-boil"] = recipe.boilTimeMin.toString()
+                    attributes["data-key"] = batch.id.toString()
+                    +boilClock(recipe.boilTimeMin)
+                }
+                div("boil-controls") {
+                    button(type = ButtonType.button, classes = "btn primary") { id = "boil-start"; +"Start" }
+                    button(type = ButtonType.button, classes = "btn") { id = "boil-reset"; +"Reset" }
+                }
+                val additions = recipe.boilAdditions()
+                if (additions.isEmpty()) {
+                    p("muted") { +"No boil additions on this recipe." }
+                } else {
+                    ul("boil-adds") {
+                        id = "boil-adds"
+                        additions.forEach { a ->
+                            li {
+                                attributes["data-remaining"] = a.minutesBeforeEnd.toString()
+                                span("at") { +(if (a.minutesBeforeEnd == 0) "flame-out" else "${a.minutesBeforeEnd} min") }
+                                span("what") { +a.what }
+                            }
                         }
                     }
                 }

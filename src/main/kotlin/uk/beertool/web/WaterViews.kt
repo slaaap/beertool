@@ -221,17 +221,26 @@ internal fun FlowContent.brewDayWater(recipe: Recipe, batch: Batch, prefs: Brewe
     val water = batch.water?.water
     val report = batch.water?.let { recipe.waterReport(it, prefs) }
     if (batch.waterLocked && (water == null || report == null)) return
-    sectionHead("Water")
-    if (!batch.waterLocked) {
-        form(action = "/recipes/${recipe.no}/batches/${batch.no}/water", method = FormMethod.post, classes = "brew-water") {
-            id = "water"
-            waterEditor(water, prefs, submitLabel = "Update water")
+    div {
+        id = "water"
+        sectionHead("Water")
+        if (water != null && report != null) {
+            treatmentPlan(water, report)
+            mashPhTiles(report, canApply = !batch.waterLocked)
+            report.warnings.forEach { div("alert") { +it } }
+        }
+        if (batch.waterLocked) return@div
+        val form: FlowContent.() -> Unit = {
+            form(action = "/recipes/${recipe.no}/batches/${batch.no}/water", method = FormMethod.post, classes = "brew-water") {
+                waterEditor(water, prefs, submitLabel = "Update water")
+            }
+        }
+        // The plan is what the brewer follows at the kettle, so changing it stays folded away until needed.
+        if (water == null) form() else details(classes = "water-change") {
+            summary(classes = "btn small") { +"Change water" }
+            form()
         }
     }
-    if (water == null || report == null) return
-    treatmentPlan(water, report)
-    mashPhTiles(report, canApply = !batch.waterLocked)
-    report.warnings.forEach { div("alert") { +it } }
 }
 
 private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
