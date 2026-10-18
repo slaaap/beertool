@@ -231,7 +231,7 @@ private fun waterTreatment(water: RecipeWater, report: WaterReport): List<String
     val lines = mutableListOf("<i>${water.describe().escapeHtml()}</i>")
     report.doses(water).forEach { dose ->
         val unit = dose.addition.unit
-        val where = if (dose.addition.mashOnly || dose.sparge <= 0.0) "${fmt(dose.strike, 1)} $unit in the mash"
+        val where = if (dose.mashOnly || dose.sparge <= 0.0) "${fmt(dose.strike, 1)} $unit in the mash"
         else "${fmt(dose.strike, 1)} $unit strike + ${fmt(dose.sparge, 1)} $unit sparge"
         lines += "• ${dose.addition.labelIn(water)}: $where"
     }

@@ -43,33 +43,34 @@ enum class WaterAddition(
     private val label: String,
     val unit: String,
     val salt: Salt?,
-    val mashOnly: Boolean,
     val amountIn: (RecipeWater) -> Double,
 ) {
-    GYPSUM("gypsumG", "Gypsum", "g", Salt.GYPSUM, false, RecipeWater::gypsumG),
-    CALCIUM_CHLORIDE("calciumChlorideG", "Calcium chloride", "g", Salt.CALCIUM_CHLORIDE, false, RecipeWater::calciumChlorideG),
-    EPSOM("epsomG", "Epsom salt", "g", Salt.EPSOM, false, RecipeWater::epsomG),
-    TABLE_SALT("tableSaltG", "Table salt", "g", Salt.TABLE_SALT, false, RecipeWater::tableSaltG),
-    BAKING_SODA("bakingSodaG", "Baking soda", "g", Salt.BAKING_SODA, false, RecipeWater::bakingSodaG),
-
-    // Acid is there to bring the mash pH down, so all of it goes in the mash.
-    ACID("acidMl", "Acid", "ml", null, true, RecipeWater::acidMl),
+    GYPSUM("gypsumG", "Gypsum", "g", Salt.GYPSUM, RecipeWater::gypsumG),
+    CALCIUM_CHLORIDE("calciumChlorideG", "Calcium chloride", "g", Salt.CALCIUM_CHLORIDE, RecipeWater::calciumChlorideG),
+    EPSOM("epsomG", "Epsom salt", "g", Salt.EPSOM, RecipeWater::epsomG),
+    TABLE_SALT("tableSaltG", "Table salt", "g", Salt.TABLE_SALT, RecipeWater::tableSaltG),
+    BAKING_SODA("bakingSodaG", "Baking soda", "g", Salt.BAKING_SODA, RecipeWater::bakingSodaG),
+    ACID("acidMl", "Acid", "ml", null, RecipeWater::acidMl),
 
     // Campden tablets clear chlorine and chloramine from all the water before it is heated; the minerals barely move.
-    CAMPDEN("campdenTablets", "Campden", "tablets", null, false, RecipeWater::campdenTablets);
+    CAMPDEN("campdenTablets", "Campden", "tablets", null, RecipeWater::campdenTablets);
 
     fun labelIn(water: RecipeWater?) = if (this == ACID && water != null) water.acid.label else label
+
+    // A mash acid is there to bring the mash pH down; AMS treats all the water, like the salts.
+    fun mashOnlyIn(water: RecipeWater) = this == ACID && !water.acid.treatsAllWater
 }
 
-data class WaterDose(val addition: WaterAddition, val strike: Double, val sparge: Double)
+data class WaterDose(val addition: WaterAddition, val strike: Double, val sparge: Double, val mashOnly: Boolean)
 
-// Salts go in at the same strength across all the water, so each share follows its volume.
+// Additions dosed across all the water go in at one strength, so each share follows its volume.
 fun WaterReport.doses(water: RecipeWater): List<WaterDose> {
     val strikeShare = strikeL?.let { it / totalL } ?: 1.0
     return water.additions.map { a ->
         val total = a.amountIn(water)
-        val strike = if (a.mashOnly) total else total * strikeShare
-        WaterDose(a, strike, total - strike)
+        val mashOnly = a.mashOnlyIn(water)
+        val strike = if (mashOnly) total else total * strikeShare
+        WaterDose(a, strike, total - strike, mashOnly)
     }
 }
 
@@ -118,6 +119,8 @@ data class WaterReport(
             if (profile.calcium < 50.0) add("Calcium is under 50 mg/L, which can slow the yeast and leave the beer hazy.")
             if (profile.magnesium > 30.0) add("Magnesium above 30 mg/L can taste sour and bitter.")
             if (profile.sodium > 150.0) add("Sodium above 150 mg/L can taste salty.")
+            if (profile.chloride > 250.0) add("Chloride above 250 mg/L can taste harsh and salty.")
+            if (profile.sulphate > 400.0) add("Sulphate above 400 mg/L can taste harsh and drying.")
             mashPh?.let { ph ->
                 if (ph > MAX_MASH_PH) add("Mash pH is above $MAX_MASH_PH: expect a harsher, duller beer. Add acid.")
                 if (ph < MIN_MASH_PH) add("Mash pH is below $MIN_MASH_PH: expect a thin, tart beer. Cut the acid or add baking soda.")
@@ -154,18 +157,22 @@ private fun waterReport(
     val preBoil = preBoilVolumeL ?: postBoilVolumeL
     val mash = if (grainKg > 0.0) Calculators.mashVolumes(grainKg, preBoil, prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg) else null
     val totalL = mash?.let { it.strikeL + it.spargeL } ?: preBoil
-    val profile = WaterChemistry.withSalts(mixed, water.salts, totalL)
+    val salted = WaterChemistry.withSalts(mixed, water.salts, totalL)
+    val acid = water.acid
+    val profile = if (acid.treatsAllWater) WaterChemistry.withAcid(salted, acid, water.acidMl, totalL) else salted
 
     val grist = fermentables.map { it.toCalcInput() }
     val strikeL = mash?.strikeL ?: 0.0
+    // An acid dosed across all the water only reaches the mash through the strike water.
+    val mashShare = if (acid.treatsAllWater) strikeL / totalL else 1.0
     return WaterReport(
         totalL = totalL,
         strikeL = mash?.strikeL,
         spargeL = mash?.spargeL,
         profile = profile,
-        mashPh = WaterChemistry.mashPh(grist, profile, strikeL, water.acidMl * water.acid.meqPerMl),
-        acid = water.acid,
-        acidForTargetMl = WaterChemistry.acidForPh(TARGET_MASH_PH, water.acid, grist, profile, strikeL),
+        mashPh = WaterChemistry.mashPh(grist, salted, strikeL, water.acidMl * mashShare * acid.meqPerMl),
+        acid = acid,
+        acidForTargetMl = WaterChemistry.acidForPh(TARGET_MASH_PH, acid, grist, salted, strikeL)?.takeIf { mashShare > 0.0 }?.let { it / mashShare },
         missingSources = missing.distinct(),
     )
 }

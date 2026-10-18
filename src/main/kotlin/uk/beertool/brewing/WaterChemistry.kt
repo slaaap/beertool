@@ -58,7 +58,14 @@ enum class Salt(private val molarMass: Double, private val ions: WaterProfile) {
 data class SaltAddition(val salt: Salt, val grams: Double)
 
 @Serializable
-enum class Acid(val code: String, val label: String, val shortLabel: String, val meqPerMl: Double) {
+enum class Acid(
+    val code: String,
+    val label: String,
+    val shortLabel: String,
+    val meqPerMl: Double,
+    val treatsAllWater: Boolean = false,
+    val mineralsPerMlPerLitre: WaterProfile = WaterProfile.DISTILLED,
+) {
     // 80% w/w at 1.18 g/ml is 10.5 mmol/ml, about 97% dissociated at mash pH.
     @SerialName("lactic80")
     LACTIC_80("lactic80", "Lactic acid 80%", "Lactic 80%", 10.2),
@@ -68,7 +75,11 @@ enum class Acid(val code: String, val label: String, val shortLabel: String, val
     PHOSPHORIC_75("phosphoric75", "Phosphoric acid 75%", "Phosphoric 75%", 12.3),
 
     @SerialName("phosphoric10")
-    PHOSPHORIC_10("phosphoric10", "Phosphoric acid 10%", "Phosphoric 10%", 1.09);
+    PHOSPHORIC_10("phosphoric10", "Phosphoric acid 10%", "Phosphoric 10%", 1.09),
+
+    // Murphy's TDS005 (2025): 5 ml per hL cuts alkalinity by 8.4 mg/L as CaCO3 and adds 3.1 mg/L chloride, 3.9 mg/L sulphate.
+    @SerialName("ams")
+    AMS("ams", "AMS (CRS)", "AMS", 3.37, treatsAllWater = true, mineralsPerMlPerLitre = WaterProfile(chloride = 62.0, sulphate = 78.0));
 
     companion object {
         fun fromCodeOrNull(code: String?) = entries.find { it.code == code }
@@ -82,6 +93,14 @@ object WaterChemistry {
     fun blend(base: WaterProfile, other: WaterProfile, otherFraction: Double): WaterProfile {
         val f = otherFraction.coerceIn(0.0, 1.0)
         return base * (1.0 - f) + other * f
+    }
+
+    // The acid's own minerals join the water, and its neutralising cuts the bicarbonate, which cannot fall below none.
+    fun withAcid(water: WaterProfile, acid: Acid, ml: Double, volumeL: Double): WaterProfile {
+        require(volumeL > 0) { "volume must be > 0" }
+        val perLitre = ml / volumeL
+        val added = water + acid.mineralsPerMlPerLitre * perLitre
+        return added.copy(bicarbonate = (added.bicarbonate - acid.meqPerMl * perLitre * HCO3_G_PER_MOL).coerceAtLeast(0.0))
     }
 
     fun withSalts(water: WaterProfile, salts: List<SaltAddition>, volumeL: Double): WaterProfile {

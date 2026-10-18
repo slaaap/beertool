@@ -221,7 +221,7 @@ private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
                 tr {
                     td { +dose.addition.labelIn(water) }
                     td("num") { +"${fmt(dose.strike, 1)} $unit" }
-                    td("num") { +(if (dose.addition.mashOnly || sparge <= 0.0) MISSING else "${fmt(dose.sparge, 1)} $unit") }
+                    td("num") { +(if (dose.mashOnly || sparge <= 0.0) MISSING else "${fmt(dose.sparge, 1)} $unit") }
                 }
             }
         }

@@ -203,7 +203,7 @@ class RecipeToolsTest {
 
         val error = shouldThrow<ToolError> { RecipeTools(user, null).estimateRecipe(args("recipe" to draft)) }
 
-        error.message shouldContain "water.acid \"citric\" must be one of lactic80, phosphoric75, phosphoric10"
+        error.message shouldContain "water.acid \"citric\" must be one of lactic80, phosphoric75, phosphoric10, ams"
     }
 
     @Test

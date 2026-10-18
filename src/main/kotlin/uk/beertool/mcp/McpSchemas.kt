@@ -99,7 +99,7 @@ private val WATER = objectOf(
         "tableSaltG" to number("Table salt (sodium chloride), grams for all the brewing water"),
         "bakingSodaG" to number("Baking soda (sodium bicarbonate), grams for all the brewing water"),
         "acid" to choices("Which acid acidMl measures; default lactic80", Acid.entries.map { it.code }),
-        "acidMl" to number("Acid, ml, added to the mash"),
+        "acidMl" to number("Acid, ml. Lactic and phosphoric go in the mash; AMS treats all the brewing water and adds chloride and sulphate"),
         "campdenTablets" to number("Campden tablets, to clear chlorine and chloramine from tap water"),
     ),
     listOf("source"),

@@ -3,6 +3,7 @@ package uk.beertool.recipe
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.doubles.plusOrMinus
+import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -133,6 +134,54 @@ class RecipeWaterTest {
 
         phosphoric.acid shouldBe Acid.PHOSPHORIC_10
         phosphoric.acidForTargetMl!! shouldBe (lactic.acidForTargetMl!! * Acid.LACTIC_80.meqPerMl / Acid.PHOSPHORIC_10.meqPerMl plusOrMinus 0.01)
+    }
+
+    @Test
+    fun `should count AMS's chloride and sulphate and cut the bicarbonate across all the water`() {
+        val water = RecipeWater(source = "London tap", acid = Acid.AMS, acidMl = 3.2)
+
+        val report = pale(water).waterReport(prefs)!!
+
+        report.profile.chloride shouldBe (45.0 + 6.2 plusOrMinus 0.01)
+        report.profile.sulphate shouldBe (47.0 + 7.8 plusOrMinus 0.01)
+        report.profile.bicarbonate shouldBe (250.0 - 0.337 * 61.017 plusOrMinus 0.01)
+    }
+
+    @Test
+    fun `should split AMS between strike and sparge water like a salt`() {
+        val water = RecipeWater(source = "London tap", acid = Acid.AMS, acidMl = 3.2)
+
+        val dose = pale(water).waterReport(prefs)!!.doses(water).single()
+
+        dose.mashOnly shouldBe false
+        dose.strike shouldBe (1.5 plusOrMinus 0.001)
+        dose.sparge shouldBe (1.7 plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should suggest enough AMS for all the water that its strike share hits the target pH`() {
+        val suggested = pale(RecipeWater(source = "London tap", acid = Acid.AMS)).waterReport(prefs)!!.acidForTargetMl!!
+
+        val report = pale(RecipeWater(source = "London tap", acid = Acid.AMS, acidMl = suggested)).waterReport(prefs)!!
+
+        report.mashPh!! shouldBe (TARGET_MASH_PH plusOrMinus 0.001)
+    }
+
+    @Test
+    fun `should show no bicarbonate left once AMS has neutralised it all, and keep acting on the mash`() {
+        val neutralised = pale(RecipeWater(source = "Ashbeck", acid = Acid.AMS, acidMl = 10.0)).waterReport(prefs)!!
+        val more = pale(RecipeWater(source = "Ashbeck", acid = Acid.AMS, acidMl = 20.0)).waterReport(prefs)!!
+
+        neutralised.profile.bicarbonate shouldBe 0.0
+        more.mashPh!! shouldBeLessThan neutralised.mashPh!!
+    }
+
+    @Test
+    fun `should warn when chloride or sulphate climb to levels that taste harsh`() {
+        val report = pale(RecipeWater(source = "London tap", calciumChlorideG = 15.0, gypsumG = 25.0)).waterReport(prefs)!!
+
+        report.warnings shouldContain "Chloride above 250 mg/L can taste harsh and salty."
+        report.warnings shouldContain "Sulphate above 400 mg/L can taste harsh and drying."
     }
 
     @Test
