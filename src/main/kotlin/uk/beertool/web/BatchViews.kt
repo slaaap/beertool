@@ -124,7 +124,7 @@ private fun DIV.measuredTiles(batch: Batch) {
     statTile("Efficiency", fmt(batch.mashEfficiency?.asPercent(), 0), "%", last = true)
 }
 
-fun HTML.batchFormPage(user: User, recipe: Recipe, batch: Batch?, packageToday: Boolean = false) {
+fun HTML.batchFormPage(user: User, recipe: Recipe, batch: Batch?, estimate: RecipeStats, packageToday: Boolean = false) {
     val editing = batch != null
     page(if (editing) "Edit brew" else "Log a brew", user) {
         h1 { +(if (editing) "Edit brew" else "Log a brew") }
@@ -146,38 +146,15 @@ fun HTML.batchFormPage(user: User, recipe: Recipe, batch: Batch?, packageToday: 
                     }
                 }
             }
+            val readings = ReadingInputs(recipe, batch, estimate)
             fieldGrid(columns = 2) {
-                field("Measured OG") {
-                    numberInput(name = "measuredOg") { value = batch?.measuredOg?.toString() ?: ""; numAttrs("0.001") }
-                }
-                field("Measured FG") {
-                    numberInput(name = "measuredFg") {
-                        value = batch?.measuredFg?.toString() ?: ""; numAttrs("0.001")
-                        if (packageToday) attributes["autofocus"] = "autofocus"
-                    }
-                }
+                readingField(readings.og)
+                readingField(readings.fg) { if (packageToday) attributes["autofocus"] = "autofocus" }
             }
-
             fieldGrid(columns = 3) {
-                field("Pre-boil (L)") {
-                    numberInput(name = "measuredPreBoilVolumeL") {
-                        value = batch?.measuredPreBoilVolumeL?.toString() ?: ""
-                        placeholder = recipe.preBoilVolumeL?.let { fmt(it, 1) } ?: ""
-                        numAttrs("0.5")
-                    }
-                }
-                field("Post-boil (L)") {
-                    numberInput(name = "measuredPostBoilVolumeL") {
-                        value = batch?.measuredPostBoilVolumeL?.toString() ?: ""
-                        placeholder = fmt(recipe.postBoilVolumeL, 1); numAttrs("0.5")
-                    }
-                }
-                field("Fermenter (L)") {
-                    numberInput(name = "measuredFermenterVolumeL") {
-                        value = batch?.measuredFermenterVolumeL?.toString() ?: ""
-                        placeholder = fmt(recipe.fermenterVolumeL, 1); numAttrs("0.5")
-                    }
-                }
+                readingField(readings.preBoil)
+                readingField(readings.postBoil)
+                readingField(readings.fermenter)
             }
             fieldGrid(columns = 1) {
                 field("Notes") { textArea { name = "notes"; +(batch?.notes ?: "") } }
@@ -191,5 +168,25 @@ fun HTML.batchFormPage(user: User, recipe: Recipe, batch: Batch?, packageToday: 
                 )
             }
         }
+    }
+}
+
+internal class ReadingInput(val name: String, val label: String, val value: Double?, val placeholder: String, val step: String)
+
+// The plan shows as placeholder text, so a blank field reads as "not measured" rather than zero.
+internal class ReadingInputs(recipe: Recipe, batch: Batch?, estimate: RecipeStats) {
+    val og = ReadingInput("measuredOg", "OG", batch?.measuredOg, fmt(estimate.og, 3), "0.001")
+    val fg = ReadingInput("measuredFg", "FG", batch?.measuredFg, fmt(estimate.fg, 3), "0.001")
+    val preBoil = ReadingInput("measuredPreBoilVolumeL", "Pre-boil (L)", batch?.measuredPreBoilVolumeL, recipe.preBoilVolumeL?.let { fmt(it, 1) }.orEmpty(), "0.5")
+    val postBoil = ReadingInput("measuredPostBoilVolumeL", "Post-boil (L)", batch?.measuredPostBoilVolumeL, fmt(recipe.postBoilVolumeL, 1), "0.5")
+    val fermenter = ReadingInput("measuredFermenterVolumeL", "Fermenter (L)", batch?.measuredFermenterVolumeL, fmt(recipe.fermenterVolumeL, 1), "0.5")
+}
+
+internal fun FlowContent.readingField(input: ReadingInput, attrs: INPUT.() -> Unit = {}) = field(input.label) {
+    numberInput(name = input.name) {
+        value = input.value?.toString().orEmpty()
+        placeholder = input.placeholder
+        numAttrs(input.step)
+        attrs()
     }
 }

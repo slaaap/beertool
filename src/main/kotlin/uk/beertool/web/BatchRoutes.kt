@@ -51,7 +51,7 @@ fun Route.batchRoutes() {
 
     get<BatchNewRes> { res ->
         withRecipe(res.recipeNo, write = true) { call, user, recipe ->
-            call.respondHtml { batchFormPage(user, recipe, null) }
+            call.respondHtml { batchFormPage(user, recipe, null, recipe.stats(user.preferences.whirlpool)) }
         }
     }
 
@@ -71,7 +71,7 @@ fun Route.batchRoutes() {
 
     get<BatchEditRes> { res ->
         withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
-            call.respondHtml { batchFormPage(user, recipe, batch, res.packageToday) }
+            call.respondHtml { batchFormPage(user, recipe, batch, recipe.stats(user.preferences.whirlpool), res.packageToday) }
         }
     }
 

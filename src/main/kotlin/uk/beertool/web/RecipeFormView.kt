@@ -117,6 +117,7 @@ fun HTML.recipeFormPage(user: User, recipe: Recipe?, stats: RecipeStats) {
 
         js("recipe-form.js")
         js("water.js")
+        js("ui.js")
         script(type = "application/json") { id = "bjcp-map"; unsafe { +BeerStyles.nameToUrlJson } }
         js("style-link.js")
     }
@@ -143,9 +144,6 @@ private fun FlowContent.editableBill(
         tbody { id = "$key-body"; rows() }
     }
 }
-
-private fun FlowContent.prototypeRow(key: String, row: TBODY.() -> Unit) =
-    table { style = "display:none"; tbody { id = "$key-proto"; row() } }
 
 private fun rowField(list: String, index: Int, field: String) = "$list.$index.$field"
 

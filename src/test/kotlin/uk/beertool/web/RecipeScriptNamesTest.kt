@@ -31,7 +31,7 @@ class RecipeScriptNamesTest {
 
         val pattern = Regex("""\^\(\[A-Za-z]\+\)\\\.\\d\+\\\.""")
 
-        pattern.containsMatchIn(script()) shouldBe true
+        pattern.containsMatchIn(File("src/main/resources/static/js/ui.js").readText()) shouldBe true
         Regex("^([A-Za-z]+)\\.\\d+\\.").containsMatchIn("fermentables.0.amountKg") shouldBe true
     }
 

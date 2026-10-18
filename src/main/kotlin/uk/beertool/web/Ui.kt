@@ -95,5 +95,9 @@ fun FlowContent.field(text: String, hint: String? = null, block: DIV.() -> Unit)
 
 fun FlowContent.fieldGrid(columns: Int = 2, block: DIV.() -> Unit) = div("grid g$columns") { block() }
 
+// A hidden row the page script clones whenever the brewer adds a row to the table called [key].
+fun FlowContent.prototypeRow(key: String, row: TBODY.() -> Unit) =
+    table { style = "display:none"; tbody { id = "$key-proto"; row() } }
+
 fun FlowContent.scrollTable(tableClass: String? = null, block: TABLE.() -> Unit) =
     div("table-scroll") { table(tableClass) { block() } }

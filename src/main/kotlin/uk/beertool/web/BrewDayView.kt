@@ -75,35 +75,13 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
             form(action = "/recipes/${recipe.no}/batches/${batch.no}/brew", method = FormMethod.post) {
                 hiddenInput(name = "brewDate") { value = batch.brewDate?.toString() ?: LocalDate.now().toString() }
                 hiddenInput(name = "packagedDate") { value = batch.packagedDate?.toString() ?: "" }
+                val readings = ReadingInputs(recipe, batch, estimate)
                 fieldGrid(columns = 2) {
-                    field("Pre-boil (L)") {
-                        numberInput(name = "measuredPreBoilVolumeL") {
-                            value = batch.measuredPreBoilVolumeL?.toString() ?: ""
-                            placeholder = recipe.preBoilVolumeL?.let { fmt(it, 1) } ?: ""; numAttrs("0.5")
-                        }
-                    }
-                    field("Post-boil (L)") {
-                        numberInput(name = "measuredPostBoilVolumeL") {
-                            value = batch.measuredPostBoilVolumeL?.toString() ?: ""
-                            placeholder = fmt(recipe.postBoilVolumeL, 1); numAttrs("0.5")
-                        }
-                    }
-                    field("OG") {
-                        numberInput(name = "measuredOg") {
-                            value = batch.measuredOg?.toString() ?: ""; placeholder = fmt(estimate.og, 3); numAttrs("0.001")
-                        }
-                    }
-                    field("Fermenter (L)") {
-                        numberInput(name = "measuredFermenterVolumeL") {
-                            value = batch.measuredFermenterVolumeL?.toString() ?: ""
-                            placeholder = fmt(recipe.fermenterVolumeL, 1); numAttrs("0.5")
-                        }
-                    }
-                    field("FG") {
-                        numberInput(name = "measuredFg") {
-                            value = batch.measuredFg?.toString() ?: ""; placeholder = fmt(estimate.fg, 3); numAttrs("0.001")
-                        }
-                    }
+                    readingField(readings.preBoil)
+                    readingField(readings.postBoil)
+                    readingField(readings.og)
+                    readingField(readings.fermenter)
+                    readingField(readings.fg)
                 }
                 fieldGrid(columns = 1) { field("Notes") { textArea { name = "notes"; +(batch.notes ?: "") } } }
                 actionBar {

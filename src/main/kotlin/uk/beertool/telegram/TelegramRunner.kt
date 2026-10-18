@@ -34,6 +34,7 @@ private val log = LoggerFactory.getLogger("uk.beertool.telegram.TelegramRunner")
 
 private const val POLL_TIMEOUT_SECONDS = 50
 private const val BOIL_TICK_MS = 10_000L
+private const val FIRST_BACKOFF_MS = 1_000L
 private const val MAX_BACKOFF_MS = 60_000L
 
 fun Application.configureTelegram(config: TelegramConfig? = TelegramConfig.fromEnv()) {
@@ -58,8 +59,22 @@ fun Application.configureTelegram(config: TelegramConfig? = TelegramConfig.fromE
     }
 }
 
+private class Backoff {
+    var millis = FIRST_BACKOFF_MS
+        private set
+
+    fun reset() {
+        millis = FIRST_BACKOFF_MS
+    }
+
+    suspend fun pause() {
+        delay(millis)
+        millis = (millis * 2).coerceAtMost(MAX_BACKOFF_MS)
+    }
+}
+
 private suspend fun connect(api: TelegramApi): TgUser? {
-    var backoff = 1_000L
+    val backoff = Backoff()
     while (currentCoroutineContext().isActive) {
         try {
             val me = api.getMe()
@@ -72,9 +87,8 @@ private suspend fun connect(api: TelegramApi): TgUser? {
                 log.error("Telegram rejected TELEGRAM_BOT_TOKEN - bot disabled. Check the token with @BotFather.")
                 return null
             }
-            log.warn("Telegram not reachable, retrying in {} s: {}", backoff / 1000, e.message)
-            delay(backoff)
-            backoff = (backoff * 2).coerceAtMost(MAX_BACKOFF_MS)
+            log.warn("Telegram not reachable, retrying in {} s: {}", backoff.millis / 1000, e.message)
+            backoff.pause()
         }
     }
     return null
@@ -82,16 +96,15 @@ private suspend fun connect(api: TelegramApi): TgUser? {
 
 private suspend fun pollForever(api: TelegramApi, bot: TelegramBot) {
     var offset: Long? = null
-    var backoff = 1_000L
+    val backoff = Backoff()
     while (currentCoroutineContext().isActive) {
         val updates = try {
-            api.getUpdates(offset, POLL_TIMEOUT_SECONDS).also { backoff = 1_000L }
+            api.getUpdates(offset, POLL_TIMEOUT_SECONDS).also { backoff.reset() }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn("Telegram poll failed, retrying in {} s: {}", backoff / 1000, e.message)
-            delay(backoff)
-            backoff = (backoff * 2).coerceAtMost(MAX_BACKOFF_MS)
+            log.warn("Telegram poll failed, retrying in {} s: {}", backoff.millis / 1000, e.message)
+            backoff.pause()
             continue
         }
         for (update in updates) {

@@ -23,7 +23,7 @@
     var row = document.querySelector(protoSel).cloneNode(true);
     var body = document.getElementById(bodyId);
     body.appendChild(row);
-    renumber(body);
+    renumberRows(body.rows);
     syncRow(row);
   };
 
@@ -41,21 +41,9 @@
     if (!stage.querySelector('tbody tr')) stage.hidden = true;
   }
 
-  function renumber(body) {
-    Array.prototype.forEach.call(body.rows, function (row, i) {
-      renumberRow(row, i);
-    });
-  }
-
   // A stage's rows are numbered across all of its sibling stages, since they post as one list.
   function renumberStages(container) {
-    container.querySelectorAll('tbody tr').forEach(renumberRow);
-  }
-
-  function renumberRow(row, i) {
-    row.querySelectorAll('[name]').forEach(function (input) {
-      input.name = input.name.replace(/^([A-Za-z]+)\.\d+\./, '$1.' + i + '.');
-    });
+    renumberRows(container.querySelectorAll('tbody tr'));
   }
 
   window.removeRow = function (button) {
@@ -68,7 +56,7 @@
       renumberStages(stages);
       hideWhenEmpty(stage);
     } else {
-      renumber(body);
+      renumberRows(body.rows);
     }
     recalc();
   };

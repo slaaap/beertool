@@ -13,21 +13,14 @@
 })();
 
 (function () {
-  function renumber(body) {
-    Array.prototype.forEach.call(body.rows, function (row, i) {
-      row.querySelectorAll('[name]').forEach(function (inp) {
-        inp.name = inp.name.replace(/^([A-Za-z]+)\.\d+\./, '$1.' + i + '.');
-      });
-    });
-  }
   window.rowAdd = function (key) {
     var body = document.getElementById(key + '-body');
     body.appendChild(document.querySelector('#' + key + '-proto tr').cloneNode(true));
-    renumber(body);
+    renumberRows(body.rows);
   };
   window.rowRemove = function (btn) {
     var body = btn.closest('tbody');
     btn.closest('tr').remove();
-    renumber(body);
+    renumberRows(body.rows);
   };
 })();

@@ -268,8 +268,8 @@ fun HTML.settingsPage(user: User, saved: Boolean) {
             }
         }
 
-        table { style = "display:none"; tbody { id = "sm-proto"; mashPrefRow(0, null) } }
-        table { style = "display:none"; tbody { id = "ws-proto"; waterSourceRow(0, null) } }
+        prototypeRow("sm") { mashPrefRow(0, null) }
+        prototypeRow("ws") { waterSourceRow(0, null) }
 
         js("settings.js")
         js("ui.js")
