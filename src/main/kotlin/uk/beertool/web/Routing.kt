@@ -7,6 +7,7 @@ import io.ktor.server.resources.get
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.routing
 import kotlinx.html.*
+import uk.beertool.common.io
 import uk.beertool.user.SingleUser
 
 fun Application.configureRouting() {
@@ -16,7 +17,7 @@ fun Application.configureRouting() {
         authRoutes()
 
         get<Home> {
-            if (call.currentUser() != null) call.respondRedirect("/recipes")
+            if (io { call.currentUser() } != null) call.respondRedirect("/recipes")
             else call.respondHtml { page("Home") { welcomeBody() } }
         }
 

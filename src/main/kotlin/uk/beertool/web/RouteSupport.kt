@@ -5,6 +5,7 @@ import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.RoutingContext
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
+import uk.beertool.common.io
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.user.User
@@ -13,11 +14,13 @@ suspend fun RoutingContext.withUser(
     write: Boolean = false,
     block: suspend (ApplicationCall, User) -> Unit,
 ) {
-    val user = call.currentUser()
-    when {
-        user == null -> call.respondRedirect("/login")
-        write && !user.canWrite -> call.respondRedirect("/login")
-        else -> block(call, user)
+    io {
+        val user = call.currentUser()
+        when {
+            user == null -> call.respondRedirect("/login")
+            write && !user.canWrite -> call.respondRedirect("/login")
+            else -> block(call, user)
+        }
     }
 }
 

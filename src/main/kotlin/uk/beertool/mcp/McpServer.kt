@@ -22,14 +22,13 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 import uk.beertool.common.Env
 import uk.beertool.common.flag
+import uk.beertool.common.io
 import uk.beertool.common.publicUrl
 import uk.beertool.common.systemEnv
 import uk.beertool.common.text
@@ -147,7 +146,7 @@ private val McpAuth = createRouteScopedPlugin("McpAuth", ::McpAuthConfig) {
             ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
             ?.substring("Bearer ".length)?.trim()
         val user = token?.let {
-            withContext(Dispatchers.IO) {
+            io {
                 (if (tokensEnabled) ApiTokenRepository.userFor(it) else null) ?: oauth?.let { o -> OAuthStore.userForAccessToken(it, o.resource) }
             }
         }
@@ -217,7 +216,7 @@ private fun Server.tool(
     toolAnnotations = ToolAnnotations(readOnlyHint = readOnly, destructiveHint = destructive, openWorldHint = false),
 ) { request ->
     try {
-        val result = withContext(Dispatchers.IO) { run(request.arguments ?: JsonObject(emptyMap())) }.withoutNulls()
+        val result = io { run(request.arguments ?: JsonObject(emptyMap())) }.withoutNulls()
         CallToolResult(content = listOf(TextContent(result.toString())))
     } catch (e: ToolError) {
         toolError(e.message.orEmpty())

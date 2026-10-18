@@ -13,6 +13,7 @@ import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.UserSession
+import uk.beertool.common.io
 import uk.beertool.user.SingleUser
 import uk.beertool.user.UserRepository
 import java.net.URI
@@ -43,7 +44,7 @@ fun Route.authRoutes() {
         val error = when {
             email.isBlank() || displayName.isBlank() -> "Email and display name are required."
             form.password.length < 8 -> "Password must be at least 8 characters."
-            UserRepository.findByEmail(email) != null -> "That email is already registered."
+            io { UserRepository.findByEmail(email) } != null -> "That email is already registered."
             else -> null
         }
         if (error != null) {
@@ -51,7 +52,7 @@ fun Route.authRoutes() {
             return@post
         }
 
-        val user = UserRepository.create(email, PasswordHasher.hash(form.password), displayName)
+        val user = io { UserRepository.create(email, PasswordHasher.hash(form.password), displayName) }
         call.sessions.set(UserSession(user.id))
         call.respondRedirect("/recipes")
     }
@@ -62,8 +63,8 @@ fun Route.authRoutes() {
         val form = call.receiveForm<LoginForm>()
         val email = form.email.trim()
 
-        val found = UserRepository.findByEmail(email)
-        if (found == null || !PasswordHasher.verify(form.password, found.passwordHash)) {
+        val found = io { UserRepository.findByEmail(email)?.takeIf { PasswordHasher.verify(form.password, it.passwordHash) } }
+        if (found == null) {
             call.respondLoginForm(email, "Invalid email or password.", safeNext(form.next))
             return@post
         }

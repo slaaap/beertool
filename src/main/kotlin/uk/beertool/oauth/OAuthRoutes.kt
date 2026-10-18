@@ -16,13 +16,12 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.html.*
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import uk.beertool.common.io
 import uk.beertool.user.User
 import uk.beertool.web.ButtonStyle
 import uk.beertool.web.actionBar
@@ -67,7 +66,7 @@ fun Route.oauthRoutes(config: OAuthConfig, clients: ClientRegistry) {
 
     get("/oauth/authorize") {
         val request = call.parseAuthorization(call.request.queryParameters, config, clients) ?: return@get
-        val user = call.currentUser()
+        val user = io { call.currentUser() }
         if (user == null || !user.canWrite) {
             call.respondRedirect("/login?next=${call.request.uri.encodeURLParameter()}")
             return@get
@@ -78,7 +77,7 @@ fun Route.oauthRoutes(config: OAuthConfig, clients: ClientRegistry) {
     post("/oauth/authorize") {
         val params = call.receiveParameters()
         val request = call.parseAuthorization(params, config, clients) ?: return@post
-        val user = call.currentUser()
+        val user = io { call.currentUser() }
         if (user == null || !user.canWrite) {
             call.respondRedirect("/login")
             return@post
@@ -87,7 +86,7 @@ fun Route.oauthRoutes(config: OAuthConfig, clients: ClientRegistry) {
             call.redirectBack(request, config, "error" to "access_denied")
             return@post
         }
-        val code = withContext(Dispatchers.IO) { OAuthStore.issueCode(user.id, request.request) }
+        val code = io { OAuthStore.issueCode(user.id, request.request) }
         call.redirectBack(request, config, "code" to code)
     }
 
@@ -97,7 +96,7 @@ fun Route.oauthRoutes(config: OAuthConfig, clients: ClientRegistry) {
         val clientId = params["client_id"]
         try {
             if (clientId.isNullOrBlank()) throw OAuthException("invalid_request", "client_id is required.")
-            val tokens = withContext(Dispatchers.IO) {
+            val tokens = io {
                 when (params["grant_type"]) {
                     "authorization_code" -> OAuthStore.redeemCode(
                         code = params.required("code"),
