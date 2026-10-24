@@ -1,5 +1,6 @@
 package uk.beertool.web
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import uk.beertool.brewing.WaterProfile
@@ -83,5 +84,21 @@ class SettingsFormTest {
         val merged = SettingsForm(mashSteps = emptyList()).toPreferences(current)
 
         merged.mashSteps shouldBe emptyList()
+    }
+
+    @Test
+    fun `should refuse losses that leave nothing for the fermenter`() {
+        val form = SettingsForm(preBoilVolumeL = 10.0, boilOffL = 6.0, kettleRetentionL = 4.0)
+
+        shouldThrow<InvalidInput> { form.toPreferences(BrewerPreferences()) }
+    }
+
+    @Test
+    fun `should refuse a water figure too large to be real`() {
+        val form = SettingsForm(waterSources = listOf(WaterSourceRow(name = "Tap", calcium = 1e9)))
+
+        val error = shouldThrow<InvalidInput> { form.toPreferences(BrewerPreferences()) }
+
+        error.message shouldBe "Tap calcium must be between 0 and 5000."
     }
 }

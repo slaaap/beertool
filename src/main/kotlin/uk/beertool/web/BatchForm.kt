@@ -20,11 +20,11 @@ fun BatchForm.toNewBatch(recipeId: Long): NewBatch = NewBatch(
     recipeId = recipeId,
     brewDate = brewDate,
     packagedDate = packagedDate,
-    measuredOg = measuredOg,
-    measuredFg = measuredFg,
-    measuredPreBoilVolumeL = measuredPreBoilVolumeL,
-    measuredPostBoilVolumeL = measuredPostBoilVolumeL,
-    measuredFermenterVolumeL = measuredFermenterVolumeL,
+    measuredOg = measuredOg.gravity("OG"),
+    measuredFg = measuredFg.gravity("FG"),
+    measuredPreBoilVolumeL = measuredPreBoilVolumeL.within("Pre-boil volume", VOLUME_L),
+    measuredPostBoilVolumeL = measuredPostBoilVolumeL.within("Post-boil volume", VOLUME_L),
+    measuredFermenterVolumeL = measuredFermenterVolumeL.within("Fermenter volume", VOLUME_L),
     notes = notes.trim().ifBlank { null },
 )
 

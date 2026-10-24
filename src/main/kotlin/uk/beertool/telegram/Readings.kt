@@ -1,6 +1,7 @@
 package uk.beertool.telegram
 
 import uk.beertool.batch.NewBatch
+import uk.beertool.brewing.gravityReading
 
 data class Readings(
     val og: Double? = null,
@@ -39,8 +40,8 @@ fun parseReadings(text: String): ReadingsParse {
         val typed = m.groupValues[2]
         val value = typed.replace(',', '.').toDouble()
         readings = when {
-            key == "og" -> readings.copy(og = gravity(value) ?: return invalidGravity(key, typed))
-            key == "fg" -> readings.copy(fg = gravity(value) ?: return invalidGravity(key, typed))
+            key == "og" -> readings.copy(og = gravityReading(value) ?: return invalidGravity(key, typed))
+            key == "fg" -> readings.copy(fg = gravityReading(value) ?: return invalidGravity(key, typed))
             else -> {
                 if (value <= 0.0 || value > MAX_VOLUME_L) return ReadingsParse.Invalid("$typed L doesn't look like a volume.")
                 when {
@@ -52,13 +53,6 @@ fun parseReadings(text: String): ReadingsParse {
         }
     }
     return ReadingsParse.Ok(readings)
-}
-
-// Brewers write gravity both ways, as 1.052 or as 1052 gravity points.
-private fun gravity(value: Double) = when (value) {
-    in 0.98..1.2 -> value
-    in 980.0..1200.0 -> value / 1000
-    else -> null
 }
 
 private fun invalidGravity(key: String, typed: String) =

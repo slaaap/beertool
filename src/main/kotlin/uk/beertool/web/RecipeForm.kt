@@ -60,18 +60,18 @@ fun WaterForm.toRecipeWater(): RecipeWater? {
         source = name,
         blendSource = partner?.takeIf { percent > 0.0 },
         blendPercent = percent,
-        gypsumG = gypsumG.amount(),
-        calciumChlorideG = calciumChlorideG.amount(),
-        epsomG = epsomG.amount(),
-        tableSaltG = tableSaltG.amount(),
-        bakingSodaG = bakingSodaG.amount(),
+        gypsumG = gypsumG.amount("Gypsum"),
+        calciumChlorideG = calciumChlorideG.amount("Calcium chloride"),
+        epsomG = epsomG.amount("Epsom salt"),
+        tableSaltG = tableSaltG.amount("Table salt"),
+        bakingSodaG = bakingSodaG.amount("Baking soda"),
         acid = Acid.fromCodeOrNull(acid) ?: Acid.LACTIC_80,
-        acidMl = acidMl.amount(),
-        campdenTablets = campdenTablets.amount(),
+        acidMl = acidMl.amount("Acid"),
+        campdenTablets = campdenTablets.amount("Campden tablets"),
     )
 }
 
-private fun Double?.amount() = (this ?: 0.0).coerceAtLeast(0.0)
+private fun Double?.amount(label: String) = within(label, WATER_ADDITION) ?: 0.0
 
 @Serializable
 data class MashStepRow(
@@ -121,57 +121,62 @@ data class ExtraRow(
 ) : FormRow
 
 fun RecipeForm.toNewRecipe(prefs: BrewerPreferences = BrewerPreferences()): NewRecipe {
-    val boilTime = boilTimeMin ?: prefs.boilTimeMin
+    val boilTime = boilTimeMin.within("Boil time", MINUTES) ?: prefs.boilTimeMin
     return NewRecipe(
         name = name.trim(),
         style = style.trim().ifBlank { null },
         description = description.trim().ifBlank { null },
-        preBoilVolumeL = preBoilVolumeL,
-        postBoilVolumeL = postBoilVolumeL ?: prefs.postBoilVolumeL,
-        fermenterVolumeL = fermenterVolumeL ?: prefs.fermenterVolumeL,
-        efficiency = efficiency?.let(::percentToFraction) ?: prefs.efficiency,
+        preBoilVolumeL = preBoilVolumeL.within("Pre-boil volume", VOLUME_L),
+        postBoilVolumeL = postBoilVolumeL.within("Post-boil volume", VOLUME_L) ?: prefs.postBoilVolumeL,
+        fermenterVolumeL = fermenterVolumeL.within("Fermenter volume", VOLUME_L) ?: prefs.fermenterVolumeL,
+        efficiency = efficiency.within("Efficiency", PERCENT)?.let(::percentToFraction) ?: prefs.efficiency,
         boilTimeMin = boilTime,
-        mashSteps = mashSteps.mapNotNull { row ->
-            MashStep(tempC = row.tempC ?: return@mapNotNull null, timeMin = row.timeMin ?: return@mapNotNull null)
-        },
+        mashSteps = mashSteps.toMashSteps(),
         fermentables = fermentables.filled().map {
             RecipeFermentable(
                 name = it.name.trim(),
-                amountKg = it.amountKg ?: 0.0,
+                amountKg = it.amountKg.within("${it.name} amount", GRAIN_KG) ?: 0.0,
                 type = it.type,
-                colourEbc = it.colourEbc,
-                extractPercent = it.extractPercent,
+                colourEbc = it.colourEbc.within("${it.name} colour", COLOUR_EBC),
+                extractPercent = it.extractPercent.within("${it.name} extract", PERCENT),
                 usage = it.usage,
-                boilTimeMin = it.usage.kettleTime(it.boilTimeMin, boilTime),
+                boilTimeMin = it.usage.kettleTime(it.boilTimeMin.within("${it.name} time", MINUTES), boilTime),
             )
         },
         hops = hops.filled().map {
             RecipeHop(
                 name = it.name.trim(),
-                amountG = it.amountG ?: 0.0,
-                alphaAcid = it.alphaAcid ?: 0.0,
+                amountG = it.amountG.within("${it.name} amount", HOP_G) ?: 0.0,
+                alphaAcid = it.alphaAcid.within("${it.name} alpha acid", ALPHA_ACID) ?: 0.0,
                 usage = it.usage,
-                boilTimeMin = it.usage.kettleTime(it.boilTimeMin, boilTime),
-                dryHopDays = it.dryHopDays?.takeIf { _ -> it.usage == HopUsage.DRY_HOP },
+                boilTimeMin = it.usage.kettleTime(it.boilTimeMin.within("${it.name} time", MINUTES), boilTime),
+                dryHopDays = it.dryHopDays.within("${it.name} days", DRY_HOP_DAYS)?.takeIf { _ -> it.usage == HopUsage.DRY_HOP },
             )
         },
         yeasts = yeasts.filled().map {
             RecipeYeast(
                 name = it.name.trim(),
-                attenuation = it.attenuation?.let(::percentToFraction) ?: DEFAULT_ATTENUATION,
+                attenuation = it.attenuation.within("${it.name} attenuation", PERCENT)?.let(::percentToFraction) ?: DEFAULT_ATTENUATION,
                 usage = it.usage,
             )
         },
         extras = extras.filled().map {
             RecipeExtra(
                 name = it.name.trim(),
-                amount = it.amount ?: 0.0,
+                amount = it.amount.within("${it.name} amount", EXTRA_AMOUNT) ?: 0.0,
                 unit = it.unit,
                 usage = it.usage,
-                boilTimeMin = it.usage.kettleTime(it.boilTimeMin, boilTime),
+                boilTimeMin = it.usage.kettleTime(it.boilTimeMin.within("${it.name} time", MINUTES), boilTime),
             )
         },
         water = water.toRecipeWater(),
+    )
+}
+
+internal fun List<MashStepRow>.toMashSteps() = mapNotNull { row ->
+    MashStep(
+        tempC = row.tempC.within("Mash temperature", TEMP_C) ?: return@mapNotNull null,
+        timeMin = row.timeMin.within("Mash time", MINUTES) ?: return@mapNotNull null,
     )
 }
 

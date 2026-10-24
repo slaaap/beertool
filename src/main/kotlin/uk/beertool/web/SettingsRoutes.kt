@@ -60,30 +60,30 @@ data class WaterSourceRow(
 private fun WaterSourceRow.toWaterSource() = WaterSource(
     name = name.trim(),
     profile = WaterProfile(
-        calcium = calcium ?: 0.0,
-        magnesium = magnesium ?: 0.0,
-        sodium = sodium ?: 0.0,
-        chloride = chloride ?: 0.0,
-        sulphate = sulphate ?: 0.0,
-        bicarbonate = bicarbonate ?: 0.0,
+        calcium = calcium.within("$name calcium", ION_PPM) ?: 0.0,
+        magnesium = magnesium.within("$name magnesium", ION_PPM) ?: 0.0,
+        sodium = sodium.within("$name sodium", ION_PPM) ?: 0.0,
+        chloride = chloride.within("$name chloride", ION_PPM) ?: 0.0,
+        sulphate = sulphate.within("$name sulphate", ION_PPM) ?: 0.0,
+        bicarbonate = bicarbonate.within("$name bicarbonate", ION_PPM) ?: 0.0,
     ),
 )
 
 fun SettingsForm.toPreferences(current: BrewerPreferences) = current.copy(
-    preBoilVolumeL = preBoilVolumeL ?: current.preBoilVolumeL,
-    boilOffL = boilOffL ?: current.boilOffL,
-    kettleRetentionL = kettleRetentionL ?: current.kettleRetentionL,
-    efficiency = efficiency?.let(::percentToFraction) ?: current.efficiency,
-    boilTimeMin = boilTimeMin ?: current.boilTimeMin,
-    whirlpoolTempC = whirlpoolTempC ?: current.whirlpoolTempC,
-    coolingTimeMin = coolingTimeMin ?: current.coolingTimeMin,
-    mashThicknessLPerKg = mashThicknessLPerKg ?: current.mashThicknessLPerKg,
-    grainAbsorptionLPerKg = grainAbsorptionLPerKg ?: current.grainAbsorptionLPerKg,
-    mashSteps = mashSteps.mapNotNull { row ->
-        MashStep(tempC = row.tempC ?: return@mapNotNull null, timeMin = row.timeMin ?: return@mapNotNull null)
-    },
+    preBoilVolumeL = preBoilVolumeL.within("Pre-boil volume", VOLUME_L) ?: current.preBoilVolumeL,
+    boilOffL = boilOffL.within("Boil-off", LOSS_L) ?: current.boilOffL,
+    kettleRetentionL = kettleRetentionL.within("Kettle loss", LOSS_L) ?: current.kettleRetentionL,
+    efficiency = efficiency.within("Efficiency", PERCENT)?.let(::percentToFraction) ?: current.efficiency,
+    boilTimeMin = boilTimeMin.within("Boil time", MINUTES) ?: current.boilTimeMin,
+    whirlpoolTempC = whirlpoolTempC.within("Whirlpool temperature", TEMP_C) ?: current.whirlpoolTempC,
+    coolingTimeMin = coolingTimeMin.within("Cooling time", MINUTES) ?: current.coolingTimeMin,
+    mashThicknessLPerKg = mashThicknessLPerKg.within("Mash thickness", L_PER_KG) ?: current.mashThicknessLPerKg,
+    grainAbsorptionLPerKg = grainAbsorptionLPerKg.within("Grain absorption", L_PER_KG) ?: current.grainAbsorptionLPerKg,
+    mashSteps = mashSteps.toMashSteps(),
     waterSources = waterSources.filter { it.name.isNotBlank() }.map { it.toWaterSource() }.distinctBy { it.name },
-)
+).also {
+    if (it.fermenterVolumeL < VOLUME_L.start) throw InvalidInput("Boil-off and kettle loss leave nothing for the fermenter. Raise the pre-boil volume.")
+}
 
 fun Route.settingsRoutes() {
     get<Settings> { res ->

@@ -338,6 +338,29 @@ class BatchRepositoryTest {
         BatchRepository.findByRecipeAndNo(recipe, 2, newUser()).shouldBeNull()
     }
 
+    @Test
+    fun `should save a brew whose post-boil volume reads zero, leaving its efficiency blank`() {
+        val userId = newUser()
+        val draft = NewBatch(recipeId = newRecipe(userId), measuredOg = 1.050, measuredPostBoilVolumeL = 0.0)
+
+        val created = BatchRepository.create(userId, draft)
+
+        created!!.mashEfficiency.shouldBeNull()
+    }
+
+    @Test
+    fun `should save a brew whose readings imply an impossible efficiency, leaving it blank`() {
+        val userId = newUser()
+        val recipeId = RecipeRepository.create(
+            userId,
+            NewRecipe(name = "Tiny", fermentables = listOf(RecipeFermentable(name = "Pale Malt", amountKg = 0.01))),
+        ).id
+
+        val created = BatchRepository.create(userId, NewBatch(recipeId = recipeId, measuredOg = 1.100, measuredPostBoilVolumeL = 500.0))
+
+        created!!.mashEfficiency.shouldBeNull()
+    }
+
     private fun newUser() = UserRepository.create("u-${UUID.randomUUID()}@beertool.test", "hash", "Brewer").id
 
     private fun newRecipe(userId: Long, name: String = "Pale Ale") = RecipeRepository.create(

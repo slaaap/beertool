@@ -22,6 +22,7 @@ import uk.beertool.recipe.snapshot
 import uk.beertool.user.UserRepository
 import java.time.Instant
 import java.time.LocalDate
+import kotlin.math.abs
 
 data class BatchSummary(
     val batch: Batch,
@@ -157,14 +158,23 @@ object BatchRepository {
     private fun stamp(userId: Long, draft: NewBatch): Stamp {
         val recipe = RecipeRepository.findById(draft.recipeId, userId)
 
-        val lateAbv = recipe?.let { it.lateAdditionAbv(draft.measuredFermenterVolumeL ?: it.fermenterVolumeL) } ?: 0.0
+        val lateAbv = recipe?.let { it.lateAdditionAbv(draft.measuredFermenterVolumeL.positive() ?: it.fermenterVolumeL) } ?: 0.0
         val og = draft.measuredOg
+        val postBoilL = draft.measuredPostBoilVolumeL.positive()
         return Stamp(
-            abv = measuredAbv(og, draft.measuredFg, lateAbv),
-            mashEfficiency = if (og == null) null
-            else recipe?.let { it.measuredEfficiency(og, draft.measuredPostBoilVolumeL ?: it.postBoilVolumeL) },
+            abv = measuredAbv(og, draft.measuredFg, lateAbv).storable(MAX_ABV),
+            mashEfficiency = if (og == null || draft.measuredPostBoilVolumeL != null && postBoilL == null) null
+            else recipe?.let { it.measuredEfficiency(og, postBoilL ?: it.postBoilVolumeL) }.storable(MAX_EFFICIENCY),
         )
     }
+
+    // Odd readings can work out to figures the columns can't hold; those are better left blank than failing the save.
+    private fun Double?.positive() = this?.takeIf { it > 0 }
+
+    private fun Double?.storable(max: Double) = this?.takeIf { it.isFinite() && abs(it) < max }
+
+    private const val MAX_ABV = 100.0
+    private const val MAX_EFFICIENCY = 10.0
 
     private fun plannedWater(userId: Long, recipeId: Long): WaterSnapshot? {
         val water = RecipeRepository.findById(recipeId, userId)?.water ?: return null

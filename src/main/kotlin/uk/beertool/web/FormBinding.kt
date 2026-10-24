@@ -4,12 +4,19 @@ import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receiveParameters
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.properties.Properties
 import kotlinx.serialization.properties.decodeFromStringMap
 
 @OptIn(ExperimentalSerializationApi::class)
-suspend inline fun <reified T> ApplicationCall.receiveForm(): T =
-    Properties.decodeFromStringMap<T>(receiveParameters().toFormMap())
+suspend inline fun <reified T> ApplicationCall.receiveForm(): T {
+    val form = receiveParameters().toFormMap()
+    return try {
+        Properties.decodeFromStringMap<T>(form)
+    } catch (e: SerializationException) {
+        throw InvalidInput("The form didn't come through in a shape beertool understands.")
+    }
+}
 
 fun Parameters.toFormMap(): Map<String, String> {
     val flat = entries().associate { (key, values) -> key to values.first() }
@@ -25,7 +32,7 @@ fun Parameters.toFormMap(): Map<String, String> {
 
 private fun listIndex(key: String): Pair<String, Int>? {
     val (list, index) = LIST_KEY.matchEntire(key)?.destructured ?: return null
-    return list to index.toInt()
+    return list to (index.toIntOrNull() ?: return null)
 }
 
 private val LIST_KEY = Regex("""([A-Za-z]+)\.(\d+)\..+""")

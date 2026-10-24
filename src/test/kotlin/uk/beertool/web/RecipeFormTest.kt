@@ -1,5 +1,6 @@
 package uk.beertool.web
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe
 import io.ktor.http.parametersOf
@@ -255,6 +256,38 @@ class RecipeFormTest {
     }
 
     @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun `should refuse an alpha acid too large for its column`() {
+        val form = form("hops.0.name" to "Citra", "hops.0.alphaAcid" to "120")
+
+        val error = shouldThrow<InvalidInput> { form.toNewRecipe() }
+
+        error.message shouldBe "Citra alpha acid must be between 0 and 50."
+    }
+
+    @Test
+    fun `should refuse a fermenter volume of zero, which the estimate divides by`() {
+        val form = form("fermenterVolumeL" to "0")
+
+        shouldThrow<InvalidInput> { form.toNewRecipe() }
+    }
+
+    @Test
+    fun `should read a number too large to hold as not stated`() {
+        val form = form("efficiency" to "1e999")
+
+        form.efficiency shouldBe null
+    }
+
+    @Test
+    fun `should not trip over a row index too long to be a number`() {
+        val parameters = parametersOf("hops.99999999999.name" to listOf("Citra"))
+
+        val map = parameters.toFormMap()
+
+        map.keys shouldBe setOf("hops.99999999999.name")
+    }
+
     private fun form(vararg fields: Pair<String, String>): RecipeForm {
         val parameters = parametersOf(*fields.map { (k, v) -> k to listOf(v) }.toTypedArray())
         return Properties.decodeFromStringMap<RecipeForm>(parameters.toFormMap())

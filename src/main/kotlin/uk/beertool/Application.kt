@@ -12,6 +12,7 @@ import uk.beertool.common.text
 import uk.beertool.db.DatabaseFactory
 import uk.beertool.mcp.configureMcp
 import uk.beertool.telegram.configureTelegram
+import uk.beertool.web.configureErrorPages
 import uk.beertool.web.configureRouting
 
 fun main() {
@@ -26,6 +27,7 @@ fun Application.module() {
     install(CallLogging)
     install(Resources)
     configureSecurity()
+    configureErrorPages()
     configureRouting()
     configureMcp()
     configureTelegram()

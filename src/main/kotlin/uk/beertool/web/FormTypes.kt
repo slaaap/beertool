@@ -19,7 +19,7 @@ private fun stringDescriptor(name: String) = PrimitiveSerialDescriptor(name, Pri
 
 object BlankAsNullDouble : KSerializer<Double?> {
     override val descriptor = stringDescriptor("BlankAsNullDouble")
-    override fun deserialize(decoder: Decoder) = decoder.decodeString().trim().toDoubleOrNull()
+    override fun deserialize(decoder: Decoder) = decoder.decodeString().trim().toDoubleOrNull()?.takeIf { it.isFinite() }
     override fun serialize(encoder: Encoder, value: Double?) = encoder.encodeString(value?.toString().orEmpty())
 }
 

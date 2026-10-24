@@ -4,9 +4,11 @@ import kotlinx.html.*
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchSummary
 import uk.beertool.batch.attenuation
+import uk.beertool.brewing.MAX_GRAVITY
 import uk.beertool.common.Page
 import uk.beertool.common.asPercent
 import uk.beertool.common.fmt
+import uk.beertool.common.formatAmount
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.waterReport
@@ -171,22 +173,26 @@ fun HTML.batchFormPage(user: User, recipe: Recipe, batch: Batch?, estimate: Reci
     }
 }
 
-internal class ReadingInput(val name: String, val label: String, val value: Double?, val placeholder: String, val step: String)
+internal class ReadingInput(val name: String, val label: String, val value: Double?, val placeholder: String, val step: String, val max: String)
 
 // The plan shows as placeholder text, so a blank field reads as "not measured" rather than zero.
 internal class ReadingInputs(recipe: Recipe, batch: Batch?, estimate: RecipeStats) {
-    val og = ReadingInput("measuredOg", "OG", batch?.measuredOg, fmt(estimate.og, 3), "0.001")
-    val fg = ReadingInput("measuredFg", "FG", batch?.measuredFg, fmt(estimate.fg, 3), "0.001")
-    val preBoil = ReadingInput("measuredPreBoilVolumeL", "Pre-boil (L)", batch?.measuredPreBoilVolumeL, recipe.preBoilVolumeL?.let { fmt(it, 1) }.orEmpty(), "0.5")
-    val postBoil = ReadingInput("measuredPostBoilVolumeL", "Post-boil (L)", batch?.measuredPostBoilVolumeL, fmt(recipe.postBoilVolumeL, 1), "0.5")
-    val fermenter = ReadingInput("measuredFermenterVolumeL", "Fermenter (L)", batch?.measuredFermenterVolumeL, fmt(recipe.fermenterVolumeL, 1), "0.5")
+    val og = ReadingInput("measuredOg", "OG", batch?.measuredOg, fmt(estimate.og, 3), "0.001", GRAVITY_MAX)
+    val fg = ReadingInput("measuredFg", "FG", batch?.measuredFg, fmt(estimate.fg, 3), "0.001", GRAVITY_MAX)
+    val preBoil = ReadingInput("measuredPreBoilVolumeL", "Pre-boil (L)", batch?.measuredPreBoilVolumeL, recipe.preBoilVolumeL?.let { fmt(it, 1) }.orEmpty(), "0.5", VOLUME_MAX)
+    val postBoil = ReadingInput("measuredPostBoilVolumeL", "Post-boil (L)", batch?.measuredPostBoilVolumeL, fmt(recipe.postBoilVolumeL, 1), "0.5", VOLUME_MAX)
+    val fermenter = ReadingInput("measuredFermenterVolumeL", "Fermenter (L)", batch?.measuredFermenterVolumeL, fmt(recipe.fermenterVolumeL, 1), "0.5", VOLUME_MAX)
 }
+
+// Gravity may be typed as points, so the cap is the points form of the highest gravity.
+private val GRAVITY_MAX = formatAmount(MAX_GRAVITY * 1000)
+private val VOLUME_MAX = formatAmount(VOLUME_L.endInclusive)
 
 internal fun FlowContent.readingField(input: ReadingInput, attrs: INPUT.() -> Unit = {}) = field(input.label) {
     numberInput(name = input.name) {
         value = input.value?.toString().orEmpty()
         placeholder = input.placeholder
-        numAttrs(input.step)
+        numAttrs(input.step, input.max)
         attrs()
     }
 }
