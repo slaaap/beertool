@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import uk.beertool.db.TestDatabase
 import uk.beertool.user.UserRepository
 import java.util.UUID
+import java.util.concurrent.Executors
 
 class RecipeRepositoryTest {
 
@@ -170,4 +171,16 @@ class RecipeRepositoryTest {
         yeasts = listOf(RecipeYeast(name = "US-05", attenuation = 0.75)),
         extras = listOf(RecipeExtra(name = "Whirlfloc", amount = 1.0, unit = AmountUnit.EACH, usage = ExtraUsage.BOIL, boilTimeMin = 15)),
     )
+
+    @Test
+    fun `should number every recipe uniquely when several are saved at once`() {
+        val userId = UserRepository.create("race-${UUID.randomUUID()}@beertool.test", "hash", "Brewer").id
+        val pool = Executors.newFixedThreadPool(8)
+
+        val saved = (1..16).map { i -> pool.submit<Recipe> { RecipeRepository.create(userId, NewRecipe(name = "Race $i")) } }
+            .map { it.get() }
+        pool.shutdown()
+
+        saved.map { it.no }.sorted() shouldBe (1..16).toList()
+    }
 }

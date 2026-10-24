@@ -15,6 +15,7 @@ import uk.beertool.recipe.RecipeRepository
 import uk.beertool.user.UserRepository
 import java.time.LocalDate
 import java.util.UUID
+import java.util.concurrent.Executors
 
 class BatchRepositoryTest {
 
@@ -359,6 +360,33 @@ class BatchRepositoryTest {
         val created = BatchRepository.create(userId, NewBatch(recipeId = recipeId, measuredOg = 1.100, measuredPostBoilVolumeL = 500.0))
 
         created!!.mashEfficiency.shouldBeNull()
+    }
+
+    @Test
+    fun `should open a single brew day when the start is tapped several times at once`() {
+        val userId = newUser()
+        val recipeId = newRecipe(userId)
+        val pool = Executors.newFixedThreadPool(8)
+
+        val started = (1..8).map { pool.submit<Batch?> { BatchRepository.startBrewDay(recipeId, userId, LocalDate.of(2026, 7, 4)) } }
+            .map { it.get() }
+        pool.shutdown()
+
+        started.map { it!!.id }.distinct() shouldHaveSize 1
+        BatchRepository.listByRecipe(recipeId, userId) shouldHaveSize 1
+    }
+
+    @Test
+    fun `should number every brew of a recipe uniquely when several are logged at once`() {
+        val userId = newUser()
+        val recipeId = newRecipe(userId)
+        val pool = Executors.newFixedThreadPool(8)
+
+        val logged = (1..16).map { pool.submit<Batch?> { BatchRepository.create(userId, NewBatch(recipeId = recipeId, measuredOg = 1.050)) } }
+            .map { it.get() }
+        pool.shutdown()
+
+        logged.map { it!!.no }.sorted() shouldBe (1..16).toList()
     }
 
     private fun newUser() = UserRepository.create("u-${UUID.randomUUID()}@beertool.test", "hash", "Brewer").id

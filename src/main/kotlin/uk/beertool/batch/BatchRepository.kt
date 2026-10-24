@@ -20,6 +20,7 @@ import uk.beertool.recipe.lateAdditionAbv
 import uk.beertool.recipe.measuredEfficiency
 import uk.beertool.recipe.snapshot
 import uk.beertool.user.UserRepository
+import java.sql.Connection
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.math.abs
@@ -37,8 +38,9 @@ data class BrewInfo(
 
 object BatchRepository {
 
-    fun create(userId: Long, draft: NewBatch): Batch? = transaction {
-        if (!ownsRecipe(userId, draft.recipeId)) return@transaction null
+    // Numbers are max + 1, so creates for one recipe queue on its row; read committed lets each see the last one's number.
+    fun create(userId: Long, draft: NewBatch): Batch? = transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
+        if (!ownsRecipe(userId, draft.recipeId, lock = true)) return@transaction null
         val nextNo = nextBatchNo(draft.recipeId)
         val id = Batches.insertAndGetId {
             it.applyMeasured(userId, draft)
@@ -93,7 +95,9 @@ object BatchRepository {
             ?.toBatch()
     }
 
-    fun startBrewDay(recipeId: Long, userId: Long, on: LocalDate): Batch? = transaction {
+    // Holding the recipe row makes a double tap find the brew day the first tap opened.
+    fun startBrewDay(recipeId: Long, userId: Long, on: LocalDate): Batch? = transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
+        if (!ownsRecipe(userId, recipeId, lock = true)) return@transaction null
         activeBrewDay(recipeId, userId) ?: create(userId, NewBatch(recipeId = recipeId, brewDate = on))
     }
 
@@ -182,10 +186,12 @@ object BatchRepository {
         return prefs.snapshot(water)
     }
 
-    private fun ownsRecipe(userId: Long, recipeId: Long) =
+    private fun ownsRecipe(userId: Long, recipeId: Long, lock: Boolean = false) =
         Recipes.selectAll()
             .where { (Recipes.id eq recipeId) and (Recipes.userId eq userId) }
-            .any()
+            .let { if (lock) it.forUpdate() else it }
+            .toList()
+            .isNotEmpty()
 
     private data class RecipeRef(val name: String, val no: Int)
 

@@ -18,6 +18,8 @@ import uk.beertool.db.matches
 import uk.beertool.db.recipeSearchDoc
 import uk.beertool.db.tsQuery
 import uk.beertool.db.tsRank
+import uk.beertool.user.Users
+import java.sql.Connection
 import java.time.Instant
 
 data class RecipeSummary(
@@ -33,7 +35,9 @@ private val UNSEARCHABLE = """[^\p{L}\p{N}-]""".toRegex()
 
 object RecipeRepository {
 
-    fun create(userId: Long, draft: NewRecipe): Recipe = transaction {
+    // Numbers are max + 1, so creates for one brewer queue on their user row; read committed lets each see the last one's number.
+    fun create(userId: Long, draft: NewRecipe): Recipe = transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
+        Users.selectAll().where { Users.id eq userId }.forUpdate().toList()
         val now = Instant.now().forDb()
         val nextNo = nextRecipeNo(userId)
         val recipeId = Recipes.insertAndGetId {
