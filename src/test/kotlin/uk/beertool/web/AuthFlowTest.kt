@@ -2,7 +2,9 @@ package uk.beertool.web
 
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.request.header
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -89,6 +91,38 @@ class AuthFlowTest {
 
         response.status shouldBe HttpStatusCode.OK
         response.bodyAsText() shouldContain "Invalid email or password"
+    }
+
+    @Test
+    fun `should refuse even the right password after too many wrong guesses from one address`() = authApp {
+        val email = newOwner()
+        val address = randomAddress()
+        val client = createClient { followRedirects = false }
+        repeat(10) { client.login(email, "wrong-password", address) }
+
+        val response = client.login(email, "secret123", address)
+
+        response.status shouldBe HttpStatusCode.TooManyRequests
+        response.bodyAsText() shouldContain "Too many failed attempts"
+    }
+
+    @Test
+    fun `should judge each client behind the proxy by its own address`() = authApp {
+        val email = newOwner()
+        val client = createClient { followRedirects = false }
+        repeat(10) { client.login(email, "wrong-password", randomAddress()) }
+
+        val response = client.login(email, "secret123", randomAddress())
+
+        response.status shouldBe HttpStatusCode.Found
+    }
+
+    private fun randomAddress() = "203.0.113.${(1..254).random()}, 198.51.100.${(1..254).random()}"
+
+    private suspend fun HttpClient.login(email: String, password: String, forwardedFor: String) = post("/login") {
+        header("X-Forwarded-For", forwardedFor)
+        contentType(ContentType.Application.FormUrlEncoded)
+        setBody("email=$email&password=$password")
     }
 
     @Test

@@ -1,5 +1,6 @@
 package uk.beertool.web
 
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.server.resources.get
@@ -11,11 +12,13 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
+import uk.beertool.auth.LoginThrottle
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.UserSession
 import uk.beertool.common.io
 import uk.beertool.user.SingleUser
 import uk.beertool.user.UserRepository
+import java.net.InetAddress
 import java.net.URI
 
 @Serializable
@@ -62,13 +65,20 @@ fun Route.authRoutes() {
     post<Login> {
         val form = call.receiveForm<LoginForm>()
         val email = form.email.trim()
+        val address = call.clientAddress()
 
+        if (LoginThrottle.blocked(address, email)) {
+            call.respondLoginForm(email, "Too many failed attempts. Try again in a few minutes.", safeNext(form.next), HttpStatusCode.TooManyRequests)
+            return@post
+        }
         val found = io { UserRepository.findByEmail(email)?.takeIf { PasswordHasher.verify(form.password, it.passwordHash) } }
         if (found == null) {
+            LoginThrottle.fail(address, email)
             call.respondLoginForm(email, "Invalid email or password.", safeNext(form.next))
             return@post
         }
 
+        LoginThrottle.succeed(address, email)
         call.sessions.set(UserSession(found.user.id))
         call.respondRedirect(safeNext(form.next) ?: "/recipes")
     }
@@ -105,11 +115,20 @@ private suspend fun ApplicationCall.respondRegisterForm(
     }
 }
 
+// Behind the local reverse proxy every request comes from loopback, and the proxy appends the real client last.
+private fun ApplicationCall.clientAddress(): String {
+    val peer = request.local.remoteAddress
+    val forwarded = request.headers["X-Forwarded-For"]?.substringAfterLast(',')?.trim()
+    val viaProxy = runCatching { InetAddress.getByName(peer).isLoopbackAddress }.getOrDefault(false)
+    return if (viaProxy && !forwarded.isNullOrEmpty()) forwarded else peer
+}
+
 private suspend fun ApplicationCall.respondLoginForm(
     email: String = "",
     error: String? = null,
     next: String? = null,
-) = respondHtml {
+    status: HttpStatusCode = HttpStatusCode.OK,
+) = respondHtml(status) {
     page("Log in") {
         div("auth-card") {
             h1 { +"Log in" }
