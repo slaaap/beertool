@@ -190,6 +190,9 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .boil-adds li.now { border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
 .boil-adds li.now .at { color:var(--accent); }
 .boil-adds li.done { opacity:0.45; text-decoration:line-through; }
+.boil-adds li.late { opacity:1; text-decoration:none; border-color:var(--danger); background:var(--danger-soft); cursor:pointer; }
+.boil-adds li.late .at { color:var(--danger); }
+.boil-adds li.late::after { content:"late - add now"; margin-left:auto; color:var(--danger); font-size:13px; font-weight:600; }
 .boil-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
 .water-change { margin:12px 0 4px; }
 .water-change > summary { list-style:none; display:inline-flex; }

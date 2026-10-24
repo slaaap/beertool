@@ -6,7 +6,7 @@
   var key = 'boil:' + clock.getAttribute('data-key');
   var btn = document.getElementById('boil-start');
   var rows = [].slice.call(document.querySelectorAll('#boil-adds [data-remaining]'));
-  var left = total, running = false, endAt = 0, timer = null, audio = null, fired = {};
+  var left = total, running = false, endAt = 0, timer = null, audio = null, fired = {}, late = {};
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function save() {
@@ -40,16 +40,20 @@
       var at = parseInt(r.getAttribute('data-remaining'), 10);
       r.classList.toggle('now', at === 0 ? left === 0 : (m === at && left > 0));
       r.classList.toggle('done', at === 0 ? false : m < at);
+      r.classList.toggle('late', !!late[at]);
     });
   }
 
+  // A throttled or locked page can skip an addition's minute, so anything now due or past that hasn't sounded sounds late.
   function fireDue() {
-    var m = Math.ceil(left / 60);
+    var m = Math.ceil(left / 60), due = false;
     rows.forEach(function (r) {
       var at = parseInt(r.getAttribute('data-remaining'), 10);
-      var due = at === 0 ? left === 0 : (m === at && left > 0);
-      if (due && !fired[at]) { fired[at] = true; beep(); }
+      if (fired[at] || (at === 0 ? left > 0 : at < m)) return;
+      fired[at] = true; due = true;
+      if (at > m) late[at] = true;
     });
+    if (due) beep();
   }
 
   function tick() {
@@ -95,9 +99,14 @@
   btn.onclick = function () { running ? pause() : start(); };
   document.getElementById('boil-reset').onclick = function () {
     clearInterval(timer); timer = null; running = false;
-    left = total; fired = {}; clearSaved();
+    left = total; fired = {}; late = {}; clearSaved();
     btn.textContent = 'Start'; render();
   };
+  rows.forEach(function (r) {
+    r.addEventListener('click', function () {
+      delete late[parseInt(r.getAttribute('data-remaining'), 10)]; render();
+    });
+  });
   document.addEventListener('visibilitychange', function () { if (!document.hidden && running) tick(); });
 })();
 
