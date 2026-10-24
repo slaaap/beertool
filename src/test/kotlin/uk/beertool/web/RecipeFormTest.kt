@@ -27,13 +27,13 @@ class RecipeFormTest {
     }
 
     @Test
-    fun `should still understand a value typed as a fraction, out of old habit`() {
-        val form = form("efficiency" to "0.68", "yeasts.0.name" to "US-05", "yeasts.0.attenuation" to "0.75")
+    fun `should read a 1 in a percentage box as one percent, not as the whole`() {
+        val form = form("efficiency" to "1", "yeasts.0.name" to "US-05", "yeasts.0.attenuation" to "1")
 
         val recipe = form.toNewRecipe()
 
-        recipe.efficiency shouldBe (0.68 plusOrMinus 0.0001)
-        recipe.yeasts.single().attenuation shouldBe (0.75 plusOrMinus 0.0001)
+        recipe.efficiency shouldBe (0.01 plusOrMinus 0.0001)
+        recipe.yeasts.single().attenuation shouldBe (0.01 plusOrMinus 0.0001)
     }
 
     @Test

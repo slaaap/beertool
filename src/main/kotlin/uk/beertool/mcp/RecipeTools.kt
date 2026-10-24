@@ -18,6 +18,7 @@ import uk.beertool.brewing.Acid
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.common.asPercent
 import uk.beertool.common.fmt
+import uk.beertool.common.formatAmount
 import uk.beertool.common.roundTo
 import uk.beertool.recipe.AmountUnit
 import uk.beertool.recipe.CodeLookup
@@ -44,6 +45,7 @@ import uk.beertool.recipe.unmaltedFraction
 import uk.beertool.recipe.waterReport
 import uk.beertool.user.User
 import uk.beertool.web.BeerStyles
+import uk.beertool.web.InvalidInput
 import uk.beertool.web.RecipeForm
 import uk.beertool.web.toNewRecipe
 
@@ -184,7 +186,11 @@ class RecipeTools(private val user: User, private val publicUrl: String?) {
         validate(json)
         validateWater(json["water"] as? JsonObject)
         val form = ToolJson.decodeFromJsonElement(RecipeForm.serializer(), json)
-        val draft = form.toNewRecipe(prefs)
+        val draft = try {
+            form.toNewRecipe(prefs)
+        } catch (e: InvalidInput) {
+            throw ToolError(e.message.orEmpty())
+        }
         return draft.copy(
             preBoilVolumeL = draft.preBoilVolumeL ?: prefs.preBoilVolumeL,
             mashSteps = if ("mashSteps" in json) draft.mashSteps else prefs.mashSteps,
@@ -349,6 +355,11 @@ private fun validate(recipe: JsonObject) {
     fun named(row: Triple<String, Int, JsonObject>) {
         if (row.third.string("name").isNullOrBlank()) problems += "${row.first}[${row.second}].name is required"
     }
+    // No brewer gets 1% efficiency or attenuation, so a value that low is a fraction sent by mistake.
+    fun percent(where: String, obj: JsonObject, field: String) {
+        val v = (obj[field] as? JsonPrimitive)?.doubleOrNull ?: return
+        if (v > 0.0 && v <= 1.0) problems += "$where$field is a percentage (e.g. ${formatAmount(v * 100)}), not a fraction"
+    }
     fun numbers(where: String, obj: JsonObject, vararg fields: String) = fields.forEach { field ->
         val value = obj[field]
         if (value != null && value !is JsonNull && (value as? JsonPrimitive)?.doubleOrNull == null) problems += "$where$field must be a number"
@@ -363,6 +374,7 @@ private fun validate(recipe: JsonObject) {
         fields.forEach { field -> (water[field] as? JsonPrimitive)?.doubleOrNull?.let { if (it < 0.0) problems += "water.$field must not be negative" } }
     }
     numbers("", recipe, "preBoilVolumeL", "postBoilVolumeL", "fermenterVolumeL", "efficiency", "boilTimeMin")
+    percent("", recipe, "efficiency")
     rows("mashSteps").forEach { row ->
         listOf("tempC", "timeMin").forEach { if (row.third[it] == null) problems += "mashSteps[${row.second}].$it is required" }
         numbers("mashSteps[${row.second}].", row.third, "tempC", "timeMin")
@@ -382,7 +394,10 @@ private fun validate(recipe: JsonObject) {
         // Without a time the hop drops out of the IBU estimate unnoticed.
         if (usage.inBoil && row.third.int("boilTimeMin") == null) problems += "hops[${row.second}].boilTimeMin is required for a ${usage.code} hop"
     }
-    rows("yeasts").forEach { row -> named(row); code(row, "usage", YeastUsage); numbers("yeasts[${row.second}].", row.third, "attenuation") }
+    rows("yeasts").forEach { row ->
+        named(row); code(row, "usage", YeastUsage); numbers("yeasts[${row.second}].", row.third, "attenuation")
+        percent("yeasts[${row.second}].", row.third, "attenuation")
+    }
     rows("extras").forEach { row ->
         named(row); positive(row, "amount"); code(row, "unit", AmountUnit); code(row, "usage", ExtraUsage)
         numbers("extras[${row.second}].", row.third, "boilTimeMin")

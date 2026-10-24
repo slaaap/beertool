@@ -86,6 +86,27 @@ class RecipeToolsTest {
     }
 
     @Test
+    fun `should refuse an efficiency or attenuation sent as a fraction`() {
+        val tools = RecipeTools(newUser(), null)
+        val draft = """{"name": "X", "efficiency": 0.72, "yeasts": [{"name": "US-05", "attenuation": 0.78}]}"""
+
+        val error = shouldThrow<ToolError> { tools.estimateRecipe(args("recipe" to draft)) }
+
+        error.message shouldContain "efficiency is a percentage (e.g. 72), not a fraction"
+        error.message shouldContain "yeasts[0].attenuation is a percentage (e.g. 78), not a fraction"
+    }
+
+    @Test
+    fun `should say which figure is out of range rather than failing inside`() {
+        val tools = RecipeTools(newUser(), null)
+        val draft = """{"name": "X", "hops": [{"name": "Citra", "amountG": 30, "alphaAcid": 130, "usage": "whirlpool"}]}"""
+
+        val error = shouldThrow<ToolError> { tools.createRecipe(args("recipe" to draft)) }
+
+        error.message shouldBe "Citra alpha acid must be between 0 and 50."
+    }
+
+    @Test
     fun `should refuse grain where it cannot go and a boil hop without a time`() {
         val tools = RecipeTools(newUser(), null)
         val draft = """
