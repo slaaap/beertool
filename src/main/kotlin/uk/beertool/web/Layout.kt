@@ -11,6 +11,10 @@ fun HTML.page(pageTitle: String, currentUser: User? = null, block: MAIN.() -> Un
         title("$pageTitle · beertool")
         meta(name = "viewport", content = "width=device-width, initial-scale=1")
         link(rel = "icon", href = LOGO, type = "image/svg+xml")
+        link(rel = "manifest", href = "/static/manifest.webmanifest")
+        link(rel = "apple-touch-icon", href = "/static/icons/app-180.png")
+        meta(name = "theme-color", content = "#FBF8F2") { attributes["media"] = "(prefers-color-scheme: light)" }
+        meta(name = "theme-color", content = "#16120E") { attributes["media"] = "(prefers-color-scheme: dark)" }
         link(rel = "stylesheet", href = "/static/css/app.css")
     }
     body {

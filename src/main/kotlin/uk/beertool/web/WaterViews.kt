@@ -216,8 +216,6 @@ internal fun FlowContent.brewDayWater(recipe: Recipe, batch: Batch, prefs: Brewe
     val report = batch.water?.let { recipe.waterReport(it, prefs) }
     if (batch.waterLocked && (water == null || report == null)) return
     div {
-        id = "water"
-        sectionHead("Water")
         if (water != null && report != null) {
             treatmentPlan(water, report)
             mashPhTiles(report, canApply = !batch.waterLocked)

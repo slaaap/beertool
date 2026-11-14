@@ -1,0 +1,13 @@
+{
+  "name": "beertool",
+  "short_name": "beertool",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FBF8F2",
+  "theme_color": "#FBF8F2",
+  "icons": [
+    { "src": "/static/icons/app-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/app-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

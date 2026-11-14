@@ -21,6 +21,12 @@ var sound = (function () {
   };
 })();
 
+// A running timer keeps ticking on its tab, so it stays in sight from any other stage.
+function tabClock(stage, text) {
+  var el = document.querySelector('[data-tab="' + stage + '"] .tab-clock');
+  if (el) el.textContent = text;
+}
+
 (function () {
   var clock = document.getElementById('boil-clock');
   if (!clock) return;
@@ -40,6 +46,7 @@ var sound = (function () {
   function render() {
     if (left < 0) left = 0;
     clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
+    tabClock('boil', running ? clock.textContent : '');
     var m = Math.ceil(left / 60);
     rows.forEach(function (r) {
       var at = parseInt(r.getAttribute('data-remaining'), 10);
@@ -141,6 +148,7 @@ var sound = (function () {
     document.getElementById('mash-next').disabled = done;
     btn.textContent = running ? 'Pause' : fresh || done ? 'Start' : 'Resume';
     clock.textContent = done ? 'Done' : Math.floor(left / 60) + ':' + two(left % 60);
+    tabClock('mash', running ? clock.textContent : '');
     status.textContent =
       done ? 'Mash done. Time to sparge.' :
       running ? 'Step ' + (step + 1) + ' · holding ' + steps[step].temp + ' °C' :
@@ -227,4 +235,74 @@ var sound = (function () {
   }
   [gt, ratio, ret].forEach(function (e) { e.addEventListener('input', update); });
   update();
+})();
+
+(function () {
+  var root = document.getElementById('brewday');
+  if (!root) return;
+
+  var stages = [].slice.call(root.querySelectorAll('.stage'));
+  var keys = stages.map(function (s) { return s.getAttribute('data-stage'); });
+  var labels = stages.map(function (s) { return s.querySelector('.stage-title').textContent; });
+  var tabs = [].slice.call(root.querySelectorAll('[data-tab]'));
+  var prev = document.getElementById('stage-prev'), next = document.getElementById('stage-next');
+  var store = 'stage:' + root.getAttribute('data-key');
+  var at = 0;
+
+  function show(i) {
+    at = i;
+    stages.forEach(function (s, j) { s.hidden = j !== i; });
+    tabs.forEach(function (t, j) { t.classList.toggle('active', j === i); });
+    prev.hidden = i === 0;
+    next.hidden = i === keys.length - 1;
+    if (i > 0) prev.textContent = '◀ ' + labels[i - 1];
+    if (i < keys.length - 1) next.textContent = labels[i + 1] + ' ▶';
+    try { localStorage.setItem(store, keys[i]); } catch (e) {}
+  }
+  function go(i) { show(i); window.scrollTo(0, 0); history.replaceState(null, '', '#' + keys[i]); }
+
+  // A stage named in the link wins, so the water form can send the brewer back to #water.
+  var wanted = location.hash.slice(1), saved = null;
+  try { saved = localStorage.getItem(store); } catch (e) {}
+  var start = [wanted, saved, root.getAttribute('data-start')].map(function (k) { return keys.indexOf(k); }).filter(function (i) { return i >= 0; })[0];
+  root.classList.add('staged');
+  show(start || 0);
+
+  tabs.forEach(function (t, j) { t.addEventListener('click', function (e) { e.preventDefault(); go(j); }); });
+  prev.onclick = function () { go(at - 1); };
+  next.onclick = function () { go(at + 1); };
+})();
+
+(function () {
+  var btn = document.getElementById('wake');
+  if (!btn || !('wakeLock' in navigator)) return;
+
+  var store = 'wake', lock = null, want = true;
+  try { want = localStorage.getItem(store) !== 'off'; } catch (e) {}
+
+  function render() {
+    btn.hidden = false;
+    btn.classList.toggle('on', !!lock);
+    btn.textContent = lock ? 'Screen on' : want ? 'Tap to keep screen on' : 'Screen may sleep';
+  }
+  function acquire() {
+    if (!want || lock || document.hidden) return;
+    navigator.wakeLock.request('screen').then(function (l) {
+      lock = l;
+      l.addEventListener('release', function () { lock = null; render(); });
+      render();
+    }).catch(render);
+  }
+
+  // Safari only grants the lock from a tap, and drops it whenever the page is hidden, so both re-arm it.
+  btn.onclick = function () {
+    want = !lock;
+    try { localStorage.setItem(store, want ? 'on' : 'off'); } catch (e) {}
+    if (lock) lock.release(); else acquire();
+    render();
+  };
+  document.addEventListener('pointerdown', acquire);
+  document.addEventListener('visibilitychange', acquire);
+  render();
+  acquire();
 })();
