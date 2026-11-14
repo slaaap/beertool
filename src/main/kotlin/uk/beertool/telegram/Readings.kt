@@ -24,6 +24,16 @@ private val READING = Regex(
 )
 private val NOTE = Regex("""\bnotes?\b\s*:?\s*(.*)$""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
 private val SEPARATORS = Regex("""[\s,;]+""")
+private val BARE_FIGURE = Regex("""\d+(?:[.,]\d+)?\s*l?""", RegexOption.IGNORE_CASE)
+
+const val NOTE_KEY = "note"
+
+// After the bot has asked for one reading, the answer may be the figure alone; null means read it as ordinary readings.
+fun parseAnswer(key: String, text: String): ReadingsParse? = when {
+    key == NOTE_KEY -> ReadingsParse.Ok(Readings(note = text.trim()))
+    BARE_FIGURE.matches(text.trim()) -> parseReadings("$key $text")
+    else -> null
+}
 
 fun parseReadings(text: String): ReadingsParse {
     val noteMatch = NOTE.find(text)

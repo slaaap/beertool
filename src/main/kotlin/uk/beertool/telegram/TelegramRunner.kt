@@ -33,7 +33,7 @@ object Telegram {
 private val log = LoggerFactory.getLogger("uk.beertool.telegram.TelegramRunner")
 
 private const val POLL_TIMEOUT_SECONDS = 50
-private const val BOIL_TICK_MS = 10_000L
+private const val TIMER_TICK_MS = 10_000L
 private const val FIRST_BACKOFF_MS = 1_000L
 private const val MAX_BACKOFF_MS = 60_000L
 
@@ -124,12 +124,12 @@ private suspend fun pollForever(api: TelegramApi, bot: TelegramBot) {
 private suspend fun tickForever(bot: TelegramBot) {
     while (currentCoroutineContext().isActive) {
         try {
-            bot.tickBoilTimers()
+            bot.tickTimers()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn("Boil timer tick failed: {}", e.message)
+            log.warn("Brew timer tick failed: {}", e.message)
         }
-        delay(BOIL_TICK_MS)
+        delay(TIMER_TICK_MS)
     }
 }

@@ -69,4 +69,31 @@ class ReadingsTest {
 
         updated shouldBe draft.copy(measuredFg = 1.011, notes = "mashed in at 9\ndry hopped")
     }
+
+    @Test
+    fun `should take a bare figure as the reading that was asked for`() {
+        val text = "23,5"
+
+        val parsed = parseAnswer("post", text)
+
+        parsed shouldBe ReadingsParse.Ok(Readings(postBoilL = 23.5))
+    }
+
+    @Test
+    fun `should take any answer to a note prompt as the note`() {
+        val text = "mash pH 5.3, smelled great"
+
+        val parsed = parseAnswer(NOTE_KEY, text)
+
+        parsed shouldBe ReadingsParse.Ok(Readings(note = "mash pH 5.3, smelled great"))
+    }
+
+    @Test
+    fun `should leave a fully written reading to the ordinary parser even after a prompt`() {
+        val text = "og 1.050"
+
+        val parsed = parseAnswer("post", text)
+
+        parsed shouldBe null
+    }
 }

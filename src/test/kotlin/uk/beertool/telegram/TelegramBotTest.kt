@@ -19,6 +19,7 @@ import uk.beertool.batch.BatchRepository
 import uk.beertool.batch.NewBatch
 import uk.beertool.db.TestDatabase
 import uk.beertool.recipe.HopUsage
+import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeFermentable
@@ -197,17 +198,19 @@ class TelegramBotTest {
 
         press("boil:${recipe.no}:${batch.no}")
         now = now.plusSeconds(45 * 60)
-        bot.tickBoilTimers()
+        bot.tickTimers()
         now = now.plusSeconds(15 * 60)
-        bot.tickBoilTimers()
-        bot.tickBoilTimers()
+        bot.tickTimers()
+        bot.tickTimers()
 
         val alerts = api.sent.map { it.text }.filter { "<b>Add now</b>" in it || "<b>Flame-out</b>" in it }
         alerts shouldHaveSize 3
         alerts[0] shouldContain "Magnum 20 g"
         alerts[1] shouldContain "Cascade 30 g"
         alerts[2] shouldContain "<b>Flame-out</b> · Pale Ale #1"
-        BoilTimerRepository.find(batch.id).shouldBeNull()
+        val session = BrewSessionRepository.find(batch.id)!!
+        session.timer.shouldBeNull()
+        session.stage shouldBe BrewDayStage.CHILL
     }
 
     @Test
@@ -253,26 +256,26 @@ class TelegramBotTest {
         val user = linkedUser()
         val recipe = boilRecipe(user)
         val batch = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.of(2026, 10, 16))!!
-        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+        startBoil(user, batch.id, recipe.boilTimeMin)
         api.blocked = true
 
         now = now.plusSeconds(61 * 60)
-        bot.tickBoilTimers()
+        bot.tickTimers()
 
-        BoilTimerRepository.find(batch.id).shouldBeNull()
+        BrewSessionRepository.find(batch.id)!!.timer.shouldBeNull()
     }
 
     @Test
-    fun `should disconnect and silence running boil timers on unlink`() = runBlocking<Unit> {
+    fun `should disconnect and silence running brew timers on unlink`() = runBlocking<Unit> {
         val user = linkedUser()
         val recipe = boilRecipe(user)
         val batch = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.of(2026, 10, 16))!!
-        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+        startBoil(user, batch.id, recipe.boilTimeMin)
 
         send("/unlink")
 
         TelegramLinkRepository.findByTelegramUser(telegramId).shouldBeNull()
-        BoilTimerRepository.find(batch.id).shouldBeNull()
+        BrewSessionRepository.find(batch.id).shouldBeNull()
         api.last.text shouldContain "Disconnected"
     }
 
@@ -289,16 +292,16 @@ class TelegramBotTest {
     }
 
     @Test
-    fun `should package a finished batch and stop its boil timer`() = runBlocking<Unit> {
+    fun `should package a finished batch and close its brew panel`() = runBlocking<Unit> {
         val user = linkedUser()
         val recipe = boilRecipe(user)
         val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id, measuredOg = 1.050, measuredFg = 1.010))!!
-        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+        startBoil(user, batch.id, recipe.boilTimeMin)
 
         press("pkg:${recipe.no}:${batch.no}")
 
         BatchRepository.findById(batch.id, user.id)!!.packagedDate shouldBe LocalDate.of(2026, 10, 16)
-        BoilTimerRepository.find(batch.id).shouldBeNull()
+        BrewSessionRepository.find(batch.id).shouldBeNull()
         api.callbackAnswers.last().second shouldBe "Packaged 🍻"
     }
 
@@ -307,12 +310,12 @@ class TelegramBotTest {
         val user = linkedUser()
         val recipe = boilRecipe(user)
         val batch = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.of(2026, 10, 16))!!
-        BoilTimerRepository.start(batch.id, user.id, telegramId, recipe.boilTimeMin, now)
+        startBoil(user, batch.id, recipe.boilTimeMin)
 
         press("stop:${recipe.no}:${batch.no}")
 
-        BoilTimerRepository.find(batch.id).shouldBeNull()
-        api.callbackAnswers.last().second shouldBe "Boil timer stopped"
+        BrewSessionRepository.find(batch.id)!!.timer.shouldBeNull()
+        api.callbackAnswers.last().second shouldBe "Timer stopped"
     }
 
     @Test
@@ -322,11 +325,184 @@ class TelegramBotTest {
         val batch = BatchRepository.create(owner.id, NewBatch(recipeId = recipe.id, measuredOg = 1.050, measuredFg = 1.010))!!
         SingleUser.email = owner.email
 
-        listOf("boil", "pkg", "cur", "stop").forEach { press("$it:${recipe.no}:${batch.no}") }
+        listOf("boil", "pkg", "cur", "stop", "mash", "ask", "cxy").forEach { press("$it:${recipe.no}:${batch.no}") }
 
-        BoilTimerRepository.find(batch.id).shouldBeNull()
+        BrewSessionRepository.find(batch.id).shouldBeNull()
+        BatchRepository.findById(batch.id, owner.id).shouldNotBeNull()
         BatchRepository.findById(batch.id, owner.id)!!.packagedDate.shouldBeNull()
         api.sent.map { it.text }.forAll { it shouldContain "read-only showcase" }
+    }
+
+    @Test
+    fun `should time each mash step and tell the brewer the next rest when it ends`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(44.0, 15), MashStep(66.0, 40)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+
+        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+        now = now.plusSeconds(15 * 60)
+        bot.tickTimers()
+
+        api.sent.single { "<b>Step 1 done</b>" in it.text }.text shouldContain "Raise the mash to <b>66 °C</b>"
+        val session = BrewSessionRepository.find(batch.id)!!
+        session.mashStep shouldBe 1
+        session.timer.shouldBeNull()
+    }
+
+    @Test
+    fun `should move the panel to the foot of the chat after a timer calls`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        val first = panelId(batch.id)
+        press("mash:${recipe.no}:${batch.no}", messageId = first)
+
+        now = now.plusSeconds(60 * 60)
+        bot.tickTimers()
+
+        api.deleted shouldContain first
+        api.last.messageId shouldBe panelId(batch.id)
+        api.last.text shouldContain "✅ Mash done."
+    }
+
+    @Test
+    fun `should edit the countdown in place once a minute`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+        val editsBefore = api.edited.size
+
+        now = now.plusSeconds(60)
+        bot.tickTimers()
+        now = now.plusSeconds(10)
+        bot.tickTimers()
+
+        api.edited shouldHaveSize editsBefore + 1
+        api.edited.last().text shouldContain "59 min left"
+    }
+
+    @Test
+    fun `should edit the panel in place when stepping between stages`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        val sentBefore = api.sent.size
+
+        press("st:${recipe.no}:${batch.no}:BOIL", messageId = panelId(batch.id))
+
+        api.sent shouldHaveSize sentBefore
+        api.edited.last().text shouldContain "<b>Boil</b>"
+        BrewSessionRepository.find(batch.id)!!.stage shouldBe BrewDayStage.BOIL
+    }
+
+    @Test
+    fun `should file a bare figure under the reading the bot asked for`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+
+        press("ask:${recipe.no}:${batch.no}:pre")
+        send("27.5")
+
+        api.prompts.single().text shouldContain "Pre-boil volume, in litres?"
+        BatchRepository.findById(batch.id, user.id)!!.measuredPreBoilVolumeL shouldBe 27.5
+        api.last.text.lines().first() shouldBe "✅ Saved pre-boil 27.5 L"
+    }
+
+    @Test
+    fun `should file a reply under the brew whose prompt it answers`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val first = newRecipe(user, "Stout")
+        val second = newRecipe(user, "Lager")
+        press("sb:${first.no}")
+        val stout = BatchRepository.listByRecipe(first.id, user.id).single()
+        press("ask:${first.no}:${stout.no}:og")
+        val prompt = api.prompts.single().messageId
+        press("sb:${second.no}")
+
+        send("1.050", replyTo = prompt)
+
+        BatchRepository.findById(stout.id, user.id)!!.measuredOg shouldBe 1.050
+        BatchRepository.listByRecipe(second.id, user.id).single().measuredOg.shouldBeNull()
+    }
+
+    @Test
+    fun `should forget an unanswered prompt once the brewer moves on to a command`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("ask:${recipe.no}:${batch.no}:pre")
+
+        send("/recipes")
+        send("27.5")
+
+        BatchRepository.findById(batch.id, user.id)!!.measuredPreBoilVolumeL.shouldBeNull()
+    }
+
+    @Test
+    fun `should cancel a brew day once the brewer confirms`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        val panel = panelId(batch.id)
+
+        press("cx:${recipe.no}:${batch.no}", messageId = panel)
+        val asked = api.edited.last()
+        press("cxy:${recipe.no}:${batch.no}", messageId = panel)
+
+        asked.text shouldContain "Cancel Pale Ale #1 · batch 1?"
+        BatchRepository.findById(batch.id, user.id).shouldBeNull()
+        api.deleted shouldContain panel
+        api.last.text shouldContain "Cancelled the brew of Pale Ale #1"
+    }
+
+    @Test
+    fun `should not cancel a brew that already has an OG`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id, measuredOg = 1.050))!!
+
+        press("cxy:${recipe.no}:${batch.no}")
+
+        BatchRepository.findById(batch.id, user.id).shouldNotBeNull()
+        api.last.text shouldContain "already has an OG"
+    }
+
+    @Test
+    fun `should clear the first brew's panel when the next brew of the day starts`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val first = newRecipe(user, "Stout")
+        val second = newRecipe(user, "Lager")
+        press("sb:${first.no}")
+        val stout = BatchRepository.listByRecipe(first.id, user.id).single()
+        send("og 1.060")
+        val stoutPanel = panelId(stout.id)
+
+        press("sb:${second.no}")
+
+        api.deleted shouldContain stoutPanel
+        BrewSessionRepository.find(stout.id).shouldBeNull()
+        api.last.text shouldNotContain "still on brew day"
+    }
+
+    @Test
+    fun `should warn about a forgotten brew day when the next brew starts`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val first = newRecipe(user, "Stout")
+        val second = newRecipe(user, "Lager")
+        press("sb:${first.no}")
+
+        press("sb:${second.no}")
+
+        api.last.text.lines().first() shouldContain "Stout #1 · batch 1 is still on brew day"
     }
 
     private fun boilRecipe(user: User) = newRecipe(
@@ -334,13 +510,26 @@ class TelegramBotTest {
         hops = listOf(RecipeHop(name = "Magnum", amountG = 20.0, alphaAcid = 12.0, usage = HopUsage.BOIL, boilTimeMin = 60)),
     )
 
-    private suspend fun send(text: String, chatType: String = "private") = bot.handle(
-        Update(updateId = 1, message = Message(1, Chat(telegramId, chatType), TgUser(telegramId), text)),
+    private suspend fun send(text: String, chatType: String = "private", replyTo: Long? = null) = bot.handle(
+        Update(
+            updateId = 1,
+            message = Message(
+                1, Chat(telegramId, chatType), TgUser(telegramId), text,
+                replyToMessage = replyTo?.let { Message(it, Chat(telegramId, chatType)) },
+            ),
+        ),
     )
 
-    private suspend fun press(data: String) = bot.handle(
-        Update(updateId = 1, callbackQuery = CallbackQuery("cb", TgUser(telegramId), Message(2, Chat(telegramId, "private")), data)),
+    private suspend fun press(data: String, messageId: Long = 2) = bot.handle(
+        Update(updateId = 1, callbackQuery = CallbackQuery("cb", TgUser(telegramId), Message(messageId, Chat(telegramId, "private")), data)),
     )
+
+    private fun panelId(batchId: Long) = BrewSessionRepository.find(batchId)!!.panelMessageId!!
+
+    private fun startBoil(user: User, batchId: Long, minutes: Int) {
+        BrewSessionRepository.open(batchId, user.id, telegramId, BrewDayStage.BOIL)
+        BrewSessionRepository.startBoil(batchId, minutes, now)
+    }
 
     private fun newUser(): User = UserRepository.create("u-${UUID.randomUUID()}@beertool.test", "hash", "Brewer")
 
@@ -350,9 +539,18 @@ class TelegramBotTest {
         return user
     }
 
-    private fun newRecipe(user: User, name: String = "Pale Ale", hops: List<RecipeHop> = emptyList()): Recipe =
-        RecipeRepository.create(
-            user.id,
-            NewRecipe(name = name, fermentables = listOf(RecipeFermentable(name = "Pale Malt", amountKg = 4.5)), hops = hops),
-        )
+    private fun newRecipe(
+        user: User,
+        name: String = "Pale Ale",
+        hops: List<RecipeHop> = emptyList(),
+        mashSteps: List<MashStep> = listOf(MashStep(66.0, 60)),
+    ): Recipe = RecipeRepository.create(
+        user.id,
+        NewRecipe(
+            name = name,
+            fermentables = listOf(RecipeFermentable(name = "Pale Malt", amountKg = 4.5)),
+            hops = hops,
+            mashSteps = mashSteps,
+        ),
+    )
 }

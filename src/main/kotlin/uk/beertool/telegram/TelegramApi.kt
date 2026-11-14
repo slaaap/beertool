@@ -22,7 +22,9 @@ interface TelegramApi {
     suspend fun getUpdates(offset: Long?, timeoutSeconds: Int): List<Update>
     suspend fun deleteWebhook()
     suspend fun setMyCommands(commands: List<BotCommand>)
-    suspend fun sendMessage(chatId: Long, text: String, keyboard: InlineKeyboardMarkup? = null)
+    suspend fun sendMessage(chatId: Long, text: String, keyboard: InlineKeyboardMarkup? = null): Long
+    suspend fun sendPrompt(chatId: Long, text: String, placeholder: String): Long
+    suspend fun deleteMessage(chatId: Long, messageId: Long)
     suspend fun editMessageText(chatId: Long, messageId: Long, text: String, keyboard: InlineKeyboardMarkup? = null)
     suspend fun answerCallbackQuery(id: String, text: String? = null)
     suspend fun answerInlineQuery(id: String, results: List<InlineQueryResultArticle>)
@@ -59,8 +61,14 @@ class HttpTelegramApi(private val token: String, pollTimeoutSeconds: Int) : Tele
         call("setMyCommands", SetMyCommands(commands), SetMyCommands.serializer(), Boolean.serializer())
     }
 
-    override suspend fun sendMessage(chatId: Long, text: String, keyboard: InlineKeyboardMarkup?) {
-        call("sendMessage", SendMessage(chatId, text, keyboard), SendMessage.serializer(), Message.serializer())
+    override suspend fun sendMessage(chatId: Long, text: String, keyboard: InlineKeyboardMarkup?) =
+        call("sendMessage", SendMessage(chatId, text, keyboard), SendMessage.serializer(), Message.serializer()).messageId
+
+    override suspend fun sendPrompt(chatId: Long, text: String, placeholder: String) =
+        call("sendMessage", SendPrompt(chatId, text, ForceReply(placeholder)), SendPrompt.serializer(), Message.serializer()).messageId
+
+    override suspend fun deleteMessage(chatId: Long, messageId: Long) {
+        call("deleteMessage", DeleteMessage(chatId, messageId), DeleteMessage.serializer(), Boolean.serializer())
     }
 
     override suspend fun editMessageText(chatId: Long, messageId: Long, text: String, keyboard: InlineKeyboardMarkup?) {
@@ -133,6 +141,20 @@ class HttpTelegramApi(private val token: String, pollTimeoutSeconds: Int) : Tele
         @SerialName("reply_markup") val replyMarkup: InlineKeyboardMarkup?,
         @SerialName("parse_mode") val parseMode: String = HTML,
         @SerialName("link_preview_options") val linkPreviewOptions: LinkPreviewOptions = NO_PREVIEW,
+    )
+
+    @Serializable
+    private class SendPrompt(
+        @SerialName("chat_id") val chatId: Long,
+        val text: String,
+        @SerialName("reply_markup") val replyMarkup: ForceReply,
+        @SerialName("parse_mode") val parseMode: String = HTML,
+    )
+
+    @Serializable
+    private class DeleteMessage(
+        @SerialName("chat_id") val chatId: Long,
+        @SerialName("message_id") val messageId: Long,
     )
 
     @Serializable

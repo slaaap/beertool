@@ -82,9 +82,9 @@ object TelegramLinkRepository {
         TelegramLinks.selectAll().where { TelegramLinks.userId eq userId }.singleOrNull()?.toLink()
     }
 
-    // Running boil timers hold the chat id, so they go too, or the old chat would keep hearing about the brew.
+    // Brew sessions hold the chat id, so they go too, or the old chat would keep hearing about the brew.
     fun unlinkUser(userId: Long): Boolean = transaction {
-        BoilTimers.deleteWhere { BoilTimers.userId eq userId }
+        BrewSessions.deleteWhere { BrewSessions.userId eq userId }
         TelegramLinks.deleteWhere { TelegramLinks.userId eq userId } > 0
     }
 

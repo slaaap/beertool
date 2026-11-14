@@ -13,21 +13,11 @@ import uk.beertool.recipe.BoilAddition
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
-import uk.beertool.recipe.MAX_MASH_PH
-import uk.beertool.recipe.MIN_MASH_PH
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.RecipeSummary
-import uk.beertool.recipe.RecipeWater
-import uk.beertool.recipe.WaterReport
 import uk.beertool.recipe.YeastUsage
-import uk.beertool.recipe.boilAdditions
-import uk.beertool.recipe.describe
-import uk.beertool.recipe.doses
 import uk.beertool.recipe.inBrewOrder
-import uk.beertool.recipe.mashWater
-import uk.beertool.recipe.waterReport
-import uk.beertool.user.BrewerPreferences
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -36,13 +26,13 @@ private const val MAX_MESSAGE = 4000
 
 fun String.escapeHtml() = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-private fun bold(s: String) = "<b>${s.escapeHtml()}</b>"
+internal fun bold(s: String) = "<b>${s.escapeHtml()}</b>"
 
 private fun stage(usage: BrewStage, minutes: Int?) =
     prettify((usage as Enum<*>).name).lowercase() + if (usage.inBoil && minutes != null) " $minutes min" else ""
 
 // Cards are built as a list of entries that each close their own tags, so cutting between entries keeps the HTML valid.
-private fun clip(lines: List<String>): String {
+internal fun clip(lines: List<String>): String {
     val kept = mutableListOf<String>()
     var length = 0
     for (line in lines) {
@@ -54,7 +44,7 @@ private fun clip(lines: List<String>): String {
 }
 
 // Titles carry the link to the site, which leaves the buttons for actions.
-private fun title(icon: String, text: String, path: String, publicUrl: String?): String {
+internal fun title(icon: String, text: String, path: String, publicUrl: String?): String {
     val name = text.escapeHtml()
     val linked = publicUrl?.let { "<a href=\"${"$it$path".escapeAttribute()}\">$name</a>" } ?: name
     return "$icon <b>$linked</b>"
@@ -99,7 +89,7 @@ fun recipeCard(recipe: Recipe, stats: RecipeStats, publicUrl: String? = null): S
     return clip(lines)
 }
 
-private fun mashLines(recipe: Recipe) = recipe.mashSteps.mapIndexed { i, step -> "${i + 1}. ${formatAmount(step.tempC)} °C · ${step.timeMin} min" }
+internal fun mashLines(recipe: Recipe) = recipe.mashSteps.mapIndexed { i, step -> "${i + 1}. ${formatAmount(step.tempC)} °C · ${step.timeMin} min" }
 
 private const val MAX_NOTES = 1500
 
@@ -122,7 +112,7 @@ private fun statusIcon(batch: Batch) = when {
     else -> "🫧"
 }
 
-private fun batchProgress(batch: Batch, today: LocalDate): String {
+internal fun batchProgress(batch: Batch, today: LocalDate): String {
     fun day(date: LocalDate) = if (date == today) "today" else friendlyDate(date, today)
     val brewed = batch.brewDate
     val packaged = batch.packagedDate
@@ -139,22 +129,31 @@ private fun batchProgress(batch: Batch, today: LocalDate): String {
     }
 }
 
-private class Reading(val label: String, val key: String, val example: String, val actual: Double?, val plan: Double?, val unit: String, val show: (Double) -> String)
+internal class Reading(
+    val label: String,
+    val key: String,
+    val example: String,
+    val question: String,
+    val actual: Double?,
+    val plan: Double?,
+    val unit: String,
+    val show: (Double) -> String,
+)
 
 private fun gravity(v: Double) = fmt(v, 3)
 
 private fun volume(v: Double) = formatAmount(v.roundTo(1))
 
-private fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
-    Reading("OG", "og", "og 1.052", batch.measuredOg, estimate.og, "", ::gravity),
-    Reading("FG", "fg", "fg 1.010", batch.measuredFg, estimate.fg, "", ::gravity),
-    Reading("pre-boil", "pre", "pre 27.5", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, " L", ::volume),
-    Reading("post-boil", "post", "post 23", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, " L", ::volume),
-    Reading("fermenter", "fermenter", "fermenter 21", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, " L", ::volume),
+internal fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
+    Reading("OG", "og", "og 1.052", "Original gravity", batch.measuredOg, estimate.og, "", ::gravity),
+    Reading("FG", "fg", "fg 1.010", "Final gravity", batch.measuredFg, estimate.fg, "", ::gravity),
+    Reading("pre-boil", "pre", "pre 27.5", "Pre-boil volume, in litres", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, " L", ::volume),
+    Reading("post-boil", "post", "post 23", "Post-boil volume, in litres", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, " L", ::volume),
+    Reading("fermenter", "fermenter", "fermenter 21", "Fermenter volume, in litres", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, " L", ::volume),
 )
 
 // The plan is only worth reading where it differs from what was measured, as shown.
-private fun Reading.text(): String {
+internal fun Reading.text(): String {
     val measured = show(actual!!)
     val planned = plan?.let(show)
     return "$label $measured$unit" + if (planned != null && planned != measured) " (plan $planned$unit)" else ""
@@ -197,51 +196,6 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
 const val READINGS_HINT =
     "<code>pre 27.5</code>, <code>og 1.052</code>, <code>post 23</code>, <code>fermenter 21</code>, <code>fg 1.010</code>, <code>note …</code>"
 
-fun brewDayCard(recipe: Recipe, batch: Batch, prefs: BrewerPreferences, today: LocalDate, publicUrl: String? = null): String {
-    val lines = mutableListOf(
-        title("🔥", "Brew day · ${batchName(recipe, batch)}", "/recipes/${recipe.no}/batches/${batch.no}/brew", publicUrl),
-        subtitle((batch.brewDate ?: today).let { if (it == today) "Today" else friendlyDate(it, today) }),
-    )
-    val volumes = recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg)?.let {
-        listOf("Strike ${fmt(it.strikeVolumeL, 1)} L at ${fmt(it.strikeTempC, 1)} °C", "Sparge ${fmt(it.spargeVolumeL, 1)} L")
-    }.orEmpty()
-    val treatment = batch.water?.let { waterTreatment(it.water, recipe.waterReport(it, prefs)) }.orEmpty()
-    if (volumes.isNotEmpty() || treatment.isNotEmpty()) {
-        lines += ""
-        lines += bold("Water")
-        lines += volumes
-        lines += treatment
-    }
-    if (recipe.mashSteps.isNotEmpty()) {
-        lines += ""
-        lines += bold("Mash")
-        lines += mashLines(recipe)
-    }
-    lines += ""
-    lines += bold("Boil · ${recipe.boilTimeMin} min")
-    val additions = recipe.boilAdditions()
-    if (additions.isEmpty()) lines += "No additions."
-    additions.forEach { lines += "• ${additionLine(it)}" }
-    lines += ""
-    lines += "<i>Send readings as they come:</i> $READINGS_HINT"
-    return clip(lines)
-}
-
-private fun waterTreatment(water: RecipeWater, report: WaterReport): List<String> {
-    val lines = mutableListOf("<i>${water.describe().escapeHtml()}</i>")
-    report.doses(water).forEach { dose ->
-        val unit = dose.addition.unit
-        val where = if (dose.mashOnly || dose.sparge <= 0.0) "${fmt(dose.strike, 1)} $unit in the mash"
-        else "${fmt(dose.strike, 1)} $unit strike + ${fmt(dose.sparge, 1)} $unit sparge"
-        lines += "• ${dose.addition.labelIn(water)}: $where"
-    }
-    report.mashPh?.let { ph ->
-        val inRange = ph in MIN_MASH_PH..MAX_MASH_PH
-        lines += "Mash pH about ${fmt(ph, 2)}" + if (inRange) "" else " ⚠️ aim for $MIN_MASH_PH-$MAX_MASH_PH"
-    }
-    return lines
-}
-
 fun additionLine(addition: BoilAddition) =
     (if (addition.minutesBeforeEnd == 0) "flame-out" else "${addition.minutesBeforeEnd} min") + " · ${addition.what.escapeHtml()}"
 
@@ -258,7 +212,7 @@ fun boilAlertText(recipe: Recipe, alert: BoilAlert, minutesLeft: Long): String {
         lines += "🔥 <b>Flame-out</b> · ${recipeName(recipe).escapeHtml()}"
         alert.additions.filter { it.minutesBeforeEnd == 0 }.forEach { lines += "• ${it.what.escapeHtml()}" }
         lines += ""
-        lines += "<i>Once it's chilled and in the fermenter, send</i> <code>post 23 og 1.052 fermenter 21</code>"
+        lines += "<i>Chill, transfer and pitch. The readings to log are on the panel below.</i>"
     }
     return clip(lines)
 }
