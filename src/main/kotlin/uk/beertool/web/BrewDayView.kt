@@ -29,14 +29,30 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 p("muted") { +"No mash schedule on this recipe." }
             } else {
                 mashWaterGuide(recipe, user)
-                table("mash-plan") {
-                    thead { tr { th { +"Rest" }; th(classes = "num") { +"Temp (°C)" }; th(classes = "num") { +"Time (min)" } } }
-                    tbody {
-                        recipe.mashSteps.forEach { s ->
-                            tr {
-                                td("step") {}
-                                td("num") { +fmt(s.tempC, 1) }
-                                td("num") { +s.timeMin.toString() }
+                div("timer-card") {
+                    val first = recipe.mashSteps.first()
+                    div("timer-clock") {
+                        id = "mash-clock"
+                        attributes["data-key"] = batch.id.toString()
+                        +clock(first.timeMin)
+                    }
+                    p("timer-status") { id = "mash-status"; +"Bring the mash to ${fmt(first.tempC, 1)} °C, then start." }
+                    div("timer-controls") {
+                        button(type = ButtonType.button, classes = "btn primary") { id = "mash-start"; +"Start" }
+                        button(type = ButtonType.button, classes = "btn") { id = "mash-next"; +"End step" }
+                        button(type = ButtonType.button, classes = "btn") { id = "mash-reset"; +"Reset" }
+                    }
+                    table("mash-plan") {
+                        thead { tr { th { +"Rest" }; th(classes = "num") { +"Temp (°C)" }; th(classes = "num") { +"Time (min)" } } }
+                        tbody {
+                            recipe.mashSteps.forEach { s ->
+                                tr {
+                                    attributes["data-temp"] = fmt(s.tempC, 1)
+                                    attributes["data-min"] = s.timeMin.toString()
+                                    td("step") {}
+                                    td("num") { +fmt(s.tempC, 1) }
+                                    td("num") { +s.timeMin.toString() }
+                                }
                             }
                         }
                     }
@@ -44,14 +60,14 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
             }
 
             sectionHead("Boil")
-            div("boil-card") {
-                div("boil-clock") {
+            div("timer-card") {
+                div("timer-clock") {
                     id = "boil-clock"
                     attributes["data-boil"] = recipe.boilTimeMin.toString()
                     attributes["data-key"] = batch.id.toString()
-                    +boilClock(recipe.boilTimeMin)
+                    +clock(recipe.boilTimeMin)
                 }
-                div("boil-controls") {
+                div("timer-controls") {
                     button(type = ButtonType.button, classes = "btn primary") { id = "boil-start"; +"Start" }
                     button(type = ButtonType.button, classes = "btn") { id = "boil-reset"; +"Reset" }
                 }
@@ -132,4 +148,4 @@ private fun FlowContent.mashWaterGuide(recipe: Recipe, user: User) {
     }
 }
 
-private fun boilClock(min: Int) = "$min:00"
+private fun clock(min: Int) = "$min:00"

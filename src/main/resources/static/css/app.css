@@ -177,13 +177,17 @@ td .btn { padding:5px; }
 .brewday input[type=number] { font-size:18px; padding:11px 12px; }
 .brewday .field label { font-size:13px; }
 .brewday .grid { align-items:end; }
-.boil-clock { font-family:var(--font-mono); font-size:52px; font-weight:600; text-align:center;
+.timer-clock { font-family:var(--font-mono); font-size:52px; font-weight:600; text-align:center;
   font-variant-numeric:tabular-nums; letter-spacing:-0.02em; margin:6px 0; }
-.boil-controls { display:flex; gap:10px; justify-content:center; margin:0 0 16px; }
-.boil-controls .btn { padding:11px 22px; font-size:15px; }
+.timer-controls { display:flex; gap:10px; justify-content:center; margin:0 0 16px; }
+.timer-controls .btn { padding:11px 22px; font-size:15px; }
 table.mash-plan tbody { counter-reset:step; }
 table.mash-plan td.step { color:var(--muted); font-family:var(--font-mono); padding-right:16px; }
 table.mash-plan td.step::before { counter-increment:step; content:counter(step) "."; }
+.timer-status { text-align:center; color:var(--muted); margin:0 0 12px; }
+.timer-card table.mash-plan { margin-bottom:8px; }
+table.mash-plan tr.now td { color:var(--accent); font-weight:600; }
+table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .boil-adds { list-style:none; padding:0; margin:0 0 8px; }
 .boil-adds li { display:flex; gap:14px; align-items:baseline; padding:12px 14px; margin-bottom:6px;
   border:1px solid var(--hairline); border-radius:9px; }
@@ -194,7 +198,7 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .boil-adds li.late { opacity:1; text-decoration:none; border-color:var(--danger); background:var(--danger-soft); cursor:pointer; }
 .boil-adds li.late .at { color:var(--danger); }
 .boil-adds li.late::after { content:"late - add now"; margin-left:auto; color:var(--danger); font-size:13px; font-weight:600; }
-.boil-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
+.timer-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
 .water-change { margin:12px 0 4px; }
 .water-change > summary { list-style:none; display:inline-flex; }
 .water-change > summary::-webkit-details-marker { display:none; }

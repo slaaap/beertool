@@ -1,3 +1,26 @@
+var sound = (function () {
+  var audio = null;
+  return {
+    unlock: function () {
+      try {
+        if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+        if (audio && audio.resume) audio.resume();
+      } catch (e) {}
+    },
+    beep: function () {
+      try {
+        if (audio) {
+          var o = audio.createOscillator(), g = audio.createGain();
+          o.connect(g); g.connect(audio.destination);
+          o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.25;
+          o.start(); o.stop(audio.currentTime + 0.18);
+        }
+      } catch (e) {}
+      if (navigator.vibrate) navigator.vibrate([200, 90, 200]);
+    }
+  };
+})();
+
 (function () {
   var clock = document.getElementById('boil-clock');
   if (!clock) return;
@@ -6,31 +29,13 @@
   var key = 'boil:' + clock.getAttribute('data-key');
   var btn = document.getElementById('boil-start');
   var rows = [].slice.call(document.querySelectorAll('#boil-adds [data-remaining]'));
-  var left = total, running = false, endAt = 0, timer = null, audio = null, fired = {}, late = {};
+  var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {};
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function save() {
     try { localStorage.setItem(key, JSON.stringify({ running: running, endAt: endAt, remaining: left })); } catch (e) {}
   }
   function clearSaved() { try { localStorage.removeItem(key); } catch (e) {} }
-
-  function ensureAudio() {
-    try {
-      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
-      if (audio && audio.resume) audio.resume();
-    } catch (e) {}
-  }
-  function beep() {
-    try {
-      if (audio) {
-        var o = audio.createOscillator(), g = audio.createGain();
-        o.connect(g); g.connect(audio.destination);
-        o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.25;
-        o.start(); o.stop(audio.currentTime + 0.18);
-      }
-    } catch (e) {}
-    if (navigator.vibrate) navigator.vibrate([200, 90, 200]);
-  }
 
   function render() {
     if (left < 0) left = 0;
@@ -53,7 +58,7 @@
       fired[at] = true; due = true;
       if (at > m) late[at] = true;
     });
-    if (due) beep();
+    if (due) sound.beep();
   }
 
   function tick() {
@@ -65,7 +70,7 @@
     if (left === 0) { running = false; clearInterval(timer); timer = null; btn.textContent = 'Start'; save(); }
   }
   function start() {
-    ensureAudio();
+    sound.unlock();
     endAt = Date.now() + left * 1000;
     running = true; save();
     timer = setInterval(tick, 500);
@@ -107,6 +112,90 @@
       delete late[parseInt(r.getAttribute('data-remaining'), 10)]; render();
     });
   });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && running) tick(); });
+})();
+
+(function () {
+  var clock = document.getElementById('mash-clock');
+  if (!clock) return;
+
+  var key = 'mash:' + clock.getAttribute('data-key');
+  var status = document.getElementById('mash-status');
+  var btn = document.getElementById('mash-start');
+  var rows = [].slice.call(document.querySelectorAll('table.mash-plan tr[data-min]'));
+  var steps = rows.map(function (r) { return { temp: r.getAttribute('data-temp'), min: parseInt(r.getAttribute('data-min'), 10) }; });
+  var step = 0, left = steps[0].min * 60, running = false, endAt = 0, timer = null;
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function save() {
+    try { localStorage.setItem(key, JSON.stringify({ step: step, running: running, endAt: endAt, remaining: left })); } catch (e) {}
+  }
+
+  function render() {
+    var done = step >= steps.length, fresh = !done && left === steps[step].min * 60;
+    rows.forEach(function (r, i) {
+      r.classList.toggle('now', i === step);
+      r.classList.toggle('done', i < step);
+    });
+    btn.disabled = done;
+    document.getElementById('mash-next').disabled = done;
+    btn.textContent = running ? 'Pause' : fresh || done ? 'Start' : 'Resume';
+    clock.textContent = done ? 'Done' : Math.floor(left / 60) + ':' + two(left % 60);
+    status.textContent =
+      done ? 'Mash done. Time to sparge.' :
+      running ? 'Step ' + (step + 1) + ' · holding ' + steps[step].temp + ' °C' :
+      !fresh ? 'Paused at step ' + (step + 1) + '.' :
+      step > 0 ? 'Step ' + step + ' done. Raise the mash to ' + steps[step].temp + ' °C, then start.' :
+      'Bring the mash to ' + steps[0].temp + ' °C, then start.';
+  }
+
+  // Each rest waits for the brewer to reach its temperature, so a finished step never starts the next one.
+  function finishStep() {
+    clearInterval(timer); timer = null; running = false;
+    step++;
+    left = step < steps.length ? steps[step].min * 60 : 0;
+    save(); render();
+  }
+
+  function tick() {
+    if (!running) return;
+    left = Math.round((endAt - Date.now()) / 1000);
+    if (left <= 0) { sound.beep(); finishStep(); return; }
+    render();
+  }
+
+  try {
+    var s = JSON.parse(localStorage.getItem(key));
+    if (s && s.step != null) {
+      step = Math.min(s.step, steps.length);
+      if (s.running) { endAt = s.endAt; running = true; }
+      else if (s.remaining != null) left = s.remaining;
+    }
+  } catch (e) {}
+  if (running) {
+    left = Math.round((endAt - Date.now()) / 1000);
+    if (left <= 0) finishStep();
+    else timer = setInterval(tick, 500);
+  }
+  render();
+
+  btn.onclick = function () {
+    if (running) {
+      clearInterval(timer); timer = null; running = false;
+    } else {
+      sound.unlock();
+      endAt = Date.now() + left * 1000; running = true;
+      timer = setInterval(tick, 500);
+    }
+    save(); render();
+  };
+  document.getElementById('mash-next').onclick = finishStep;
+  document.getElementById('mash-reset').onclick = function () {
+    clearInterval(timer); timer = null; running = false;
+    step = 0; left = steps[0].min * 60;
+    try { localStorage.removeItem(key); } catch (e) {}
+    render();
+  };
   document.addEventListener('visibilitychange', function () { if (!document.hidden && running) tick(); });
 })();
 
