@@ -10,6 +10,7 @@ buildscript {
         classpath(platform("org.apache.logging.log4j:log4j-bom:2.26.1"))
         constraints {
             classpath("org.codehaus.plexus:plexus-utils:4.1.0")
+            classpath("com.google.guava:guava:33.8.0-jre")
         }
     }
 }
