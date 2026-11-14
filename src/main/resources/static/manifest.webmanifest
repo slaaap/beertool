@@ -1,7 +1,7 @@
 {
   "name": "beertool",
   "short_name": "beertool",
-  "start_url": "/",
+  "start_url": "/brew",
   "scope": "/",
   "display": "standalone",
   "background_color": "#FBF8F2",

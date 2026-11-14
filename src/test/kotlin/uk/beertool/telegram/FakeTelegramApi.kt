@@ -15,6 +15,7 @@ class FakeTelegramApi : TelegramApi {
     val last get() = sent.last()
 
     var blocked = false
+    var editFailure: TelegramException? = null
     private var nextMessageId = 100L
 
     override suspend fun getMe() = TgUser(id = 1, isBot = true, firstName = "beertool", username = "beertool_test_bot")
@@ -35,6 +36,7 @@ class FakeTelegramApi : TelegramApi {
     }
 
     override suspend fun editMessageText(chatId: Long, messageId: Long, text: String, keyboard: InlineKeyboardMarkup?) {
+        editFailure?.let { throw it }
         edited += Sent(chatId, text, keyboard, messageId)
     }
 

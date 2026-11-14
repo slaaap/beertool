@@ -7,6 +7,7 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.Batch
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
@@ -73,6 +74,17 @@ class BrewPanelTest {
         panel.text shouldContain "⏱ <b>44 °C · 15 min</b>"
         panel.text shouldContain "░░░░░░░░░░ 20 min left"
         panel.buttons() shouldContain "⏭ End step now"
+    }
+
+    @Test
+    fun `should ask before stopping a running boil`() {
+        val timer = BrewTimer(TimerKind.BOIL, endsAt = now.plusSeconds(30 * 60), announcedDownTo = 60)
+
+        val confirm = timerConfirmation(recipe(), batch(), session(BrewDayStage.BOIL, timer = timer), now)!!
+
+        confirm.text shouldContain "Stop the boil timer?"
+        confirm.text shouldContain "30 min still to go"
+        confirm.keyboard.inlineKeyboard.flatten().map { it.callbackData } shouldContain "stop:7:1"
     }
 
     @Test

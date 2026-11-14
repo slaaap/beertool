@@ -2,6 +2,7 @@ package uk.beertool.web
 
 import kotlinx.html.*
 import uk.beertool.batch.Batch
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.brewing.Calculators
 import uk.beertool.common.fmt
 import uk.beertool.recipe.DEFAULT_GRAIN_TEMP_C
@@ -10,7 +11,6 @@ import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.boilAdditions
 import uk.beertool.recipe.mashGrainKg
 import uk.beertool.recipe.mashWater
-import uk.beertool.telegram.BrewDayStage
 import uk.beertool.user.User
 import java.time.LocalDate
 
@@ -33,7 +33,6 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                         +recipe.name
                         span("title-num") { +" #${batch.no}" }
                     }
-                    if (saved) span("saved-note") { id = "saved-note"; +"Saved ✓" }
                     button(type = ButtonType.button, classes = "wake") { id = "wake"; hidden = true; +"Screen on" }
                 }
                 nav("stage-bar") {
@@ -45,6 +44,7 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                         }
                     }
                 }
+                if (saved) span("saved-note") { id = "saved-note"; +"Saved ✓" }
             }
 
             val readings = ReadingInputs(recipe, batch, estimate)
@@ -70,6 +70,12 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 readingsRow(readings.fermenter, readings.og)
             }
             stage(BrewDayStage.FERMENT) {
+                batch.measuredOg?.let { og ->
+                    div("stats duo") {
+                        statTile("OG", fmt(og, 3), null)
+                        statTile("ABV", fmt(batch.abv, 1), "%")
+                    }
+                }
                 readingsRow(readings.fg)
                 field("Notes") { textArea { name = "notes"; attributes["form"] = READINGS_FORM; +(batch.notes ?: "") } }
                 saveButton()
@@ -150,6 +156,7 @@ private fun FlowContent.boilTimer(recipe: Recipe, batch: Batch) {
             attributes["data-key"] = batch.id.toString()
             +clock(recipe.boilTimeMin)
         }
+        p("timer-status") { id = "boil-status" }
         div("timer-controls") {
             button(type = ButtonType.button, classes = "btn primary") { id = "boil-start"; +"Start" }
             button(type = ButtonType.button, classes = "btn") { id = "boil-reset"; +"Reset" }

@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.BatchRepository
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.batch.NewBatch
 import uk.beertool.db.TestDatabase
 import uk.beertool.recipe.NewRecipe
@@ -65,6 +66,17 @@ class BrewSessionRepositoryTest {
 
         reopened.stage shouldBe BrewDayStage.BOIL
         reopened.chatId shouldBe 2
+    }
+
+    @Test
+    fun `should keep a newer panel when an older one is let go`() {
+        val (userId, batchId) = newBatch()
+        BrewSessionRepository.open(batchId, userId, chatId = 1, stage = BrewDayStage.BOIL)
+        BrewSessionRepository.setPanel(batchId, messageId = 11, now = now)
+
+        BrewSessionRepository.dropPanel(batchId, messageId = 10)
+
+        BrewSessionRepository.find(batchId)!!.panelMessageId shouldBe 11
     }
 
     private fun newBatch(): Pair<Long, Long> {

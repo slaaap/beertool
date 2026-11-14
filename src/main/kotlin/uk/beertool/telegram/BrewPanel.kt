@@ -1,6 +1,7 @@
 package uk.beertool.telegram
 
 import uk.beertool.batch.Batch
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.brewing.MashWater
 import uk.beertool.common.fmt
 import uk.beertool.common.formatAmount
@@ -88,6 +89,20 @@ fun cancelConfirmation(recipe: Recipe, batch: Batch, session: BrewSession): Brew
     )
 }
 
+// A stray tap on a wet screen shouldn't throw away a running timer, so ending one early asks first.
+fun timerConfirmation(recipe: Recipe, batch: Batch, session: BrewSession, now: Instant): BrewPanel? {
+    val timer = session.timer ?: return null
+    val ref = "${recipe.no}:${batch.no}"
+    val (question, yes) = when (timer.kind) {
+        TimerKind.MASH -> "End mash step ${session.mashStep + 1} now?" to button("⏭ Yes, end it", "mend:$ref")
+        TimerKind.BOIL -> "Stop the boil timer?" to button("⏹ Yes, stop", "stop:$ref")
+    }
+    return BrewPanel(
+        "⏱ <b>$question</b>\n<i>${timer.minutesLeft(now)} min still to go.</i>",
+        keyboard(listOf(yes, button("↩ Keep going", "st:$ref:${session.stage.name}"))),
+    )
+}
+
 // A timer keeps running while the brewer looks at another stage, so it stays in sight.
 private fun timerElsewhere(session: BrewSession, now: Instant): String? {
     val timer = session.timer ?: return null
@@ -155,7 +170,7 @@ private fun mashStage(recipe: Recipe, session: BrewSession, now: Instant, sparge
     return when {
         running != null -> {
             lines += "<i>I'll message you when the step is done.</i>"
-            StageView(lines, listOf(listOf(button("⏭ End step now", "mend:$ref"), button("⏹ Stop", "stop:$ref"))))
+            StageView(lines, listOf(listOf(button("⏭ End step now", "tq:$ref"))))
         }
         next != null -> {
             lines += "<i>Start each step once the mash is at temperature.</i>"
@@ -185,7 +200,7 @@ private fun boilStage(recipe: Recipe, session: BrewSession, now: Instant, preBoi
     }
     lines += ""
     lines += readingLine(preBoil)
-    val timer = if (running == null) button("⏱ Start boil timer", "boil:$ref") else button("⏹ Stop boil timer", "stop:$ref")
+    val timer = if (running == null) button("⏱ Start boil timer", "boil:$ref") else button("⏹ Stop boil timer", "tq:$ref")
     return StageView(lines, listOf(listOf(askButton(preBoil, ref), timer)))
 }
 

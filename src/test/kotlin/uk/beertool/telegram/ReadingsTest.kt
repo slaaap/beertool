@@ -89,6 +89,15 @@ class ReadingsTest {
     }
 
     @Test
+    fun `should not file a reading typed after a note prompt as the note`() {
+        val text = "og 1.052"
+
+        val parsed = parseAnswer(NOTE_KEY, text)
+
+        parsed shouldBe null
+    }
+
+    @Test
     fun `should leave a fully written reading to the ordinary parser even after a prompt`() {
         val text = "og 1.050"
 

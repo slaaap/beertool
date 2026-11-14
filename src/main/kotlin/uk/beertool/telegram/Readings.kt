@@ -30,7 +30,7 @@ const val NOTE_KEY = "note"
 
 // After the bot has asked for one reading, the answer may be the figure alone; null means read it as ordinary readings.
 fun parseAnswer(key: String, text: String): ReadingsParse? = when {
-    key == NOTE_KEY -> ReadingsParse.Ok(Readings(note = text.trim()))
+    key == NOTE_KEY -> if (parseReadings(text) is ReadingsParse.Ok) null else ReadingsParse.Ok(Readings(note = text.trim()))
     BARE_FIGURE.matches(text.trim()) -> parseReadings("$key $text")
     else -> null
 }

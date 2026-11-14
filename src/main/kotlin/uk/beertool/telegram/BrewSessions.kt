@@ -11,6 +11,7 @@ import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.db.forDb
 import uk.beertool.recipe.BoilAddition
 import java.time.Instant
@@ -28,17 +29,6 @@ object BrewSessions : Table("telegram_brew_sessions") {
     val announcedDownTo = integer("announced_down_to").nullable()
     val panelRefreshedAt = timestamp("panel_refreshed_at").nullable()
     override val primaryKey = PrimaryKey(batchId)
-}
-
-enum class BrewDayStage(val label: String) {
-    WATER("Water"),
-    MASH("Mash"),
-    BOIL("Boil"),
-    CHILL("Chill"),
-    FERMENT("Ferment");
-
-    val previous get() = entries.getOrNull(ordinal - 1)
-    val next get() = entries.getOrNull(ordinal + 1)
 }
 
 enum class TimerKind { MASH, BOIL }
@@ -109,6 +99,11 @@ object BrewSessionRepository {
             it[panelMessageId] = messageId
             it[panelRefreshedAt] = now.forDb()
         }
+    }
+
+    // Only the panel that failed is let go, so one posted meanwhile by another tick is kept.
+    fun dropPanel(batchId: Long, messageId: Long) = transaction {
+        BrewSessions.update({ (BrewSessions.batchId eq batchId) and (BrewSessions.panelMessageId eq messageId) }) { it[panelMessageId] = null }
     }
 
     fun panelRefreshed(batchId: Long, now: Instant) = transaction {

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.BatchRepository
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.batch.NewBatch
 import uk.beertool.db.TestDatabase
 import uk.beertool.recipe.HopUsage
@@ -373,16 +374,18 @@ class TelegramBotTest {
         val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
         press("sb:${recipe.no}")
         val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
-        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
-        val editsBefore = api.edited.size
+        val panel = panelId(batch.id)
+        press("mash:${recipe.no}:${batch.no}", messageId = panel)
+        val editsBefore = api.edited.count { it.chatId == telegramId && it.messageId == panel }
 
         now = now.plusSeconds(60)
         bot.tickTimers()
         now = now.plusSeconds(10)
         bot.tickTimers()
 
-        api.edited shouldHaveSize editsBefore + 1
-        api.edited.last().text shouldContain "59 min left"
+        val edits = api.edited.filter { it.chatId == telegramId && it.messageId == panel }
+        edits shouldHaveSize editsBefore + 1
+        edits.last().text shouldContain "59 min left"
     }
 
     @Test
@@ -444,6 +447,96 @@ class TelegramBotTest {
         send("27.5")
 
         BatchRepository.findById(batch.id, user.id)!!.measuredPreBoilVolumeL.shouldBeNull()
+    }
+
+    @Test
+    fun `should log a reading typed after an unanswered note prompt`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("ask:${recipe.no}:${batch.no}:$NOTE_KEY")
+
+        send("og 1.052")
+
+        val saved = BatchRepository.findById(batch.id, user.id)!!
+        saved.measuredOg shouldBe 1.052
+        saved.notes.shouldBeNull()
+    }
+
+    @Test
+    fun `should clear an answered prompt and its answer from the chat`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user)
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("ask:${recipe.no}:${batch.no}:pre")
+        val prompt = api.prompts.single().messageId
+
+        send("27.5")
+
+        api.deleted shouldContain prompt
+        api.deleted shouldContain 1L
+    }
+
+    @Test
+    fun `should not start the boil over a running mash step`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+
+        press("boil:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+
+        BrewSessionRepository.find(batch.id)!!.timer!!.kind shouldBe TimerKind.MASH
+        api.callbackAnswers.last().second shouldBe "Finish the mash step first"
+    }
+
+    @Test
+    fun `should ask before ending a running mash step early`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+
+        press("tq:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+
+        api.edited.last().text shouldContain "End mash step 1 now?"
+        api.edited.last().buttons.map { it.callbackData } shouldContain "mend:${recipe.no}:${batch.no}"
+        BrewSessionRepository.find(batch.id)!!.timer.shouldNotBeNull()
+    }
+
+    @Test
+    fun `should keep the panel through a network blip while counting down`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+        val panel = panelId(batch.id)
+        api.editFailure = TelegramException(null, "connect timed out")
+
+        now = now.plusSeconds(60)
+        bot.tickTimers()
+
+        panelId(batch.id) shouldBe panel
+    }
+
+    @Test
+    fun `should let go of a panel the brewer deleted`() = runBlocking<Unit> {
+        val user = linkedUser()
+        val recipe = newRecipe(user, mashSteps = listOf(MashStep(66.0, 60)))
+        press("sb:${recipe.no}")
+        val batch = BatchRepository.listByRecipe(recipe.id, user.id).single()
+        press("mash:${recipe.no}:${batch.no}", messageId = panelId(batch.id))
+        api.editFailure = TelegramException(400, "Bad Request: message to edit not found")
+
+        now = now.plusSeconds(60)
+        bot.tickTimers()
+
+        BrewSessionRepository.find(batch.id)!!.panelMessageId.shouldBeNull()
     }
 
     @Test

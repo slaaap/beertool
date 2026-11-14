@@ -1,5 +1,20 @@
 var sound = (function () {
-  var audio = null;
+  var audio = null, ringing = null;
+
+  function beep() {
+    try {
+      if (audio) {
+        var o = audio.createOscillator(), g = audio.createGain();
+        o.connect(g); g.connect(audio.destination);
+        o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.25;
+        o.start(); o.stop(audio.currentTime + 0.18);
+      }
+    } catch (e) {}
+    if (navigator.vibrate) navigator.vibrate([200, 90, 200]);
+  }
+  function hush() { clearInterval(ringing); ringing = null; }
+
+  document.addEventListener('pointerdown', hush);
   return {
     unlock: function () {
       try {
@@ -7,19 +22,27 @@ var sound = (function () {
         if (audio && audio.resume) audio.resume();
       } catch (e) {}
     },
-    beep: function () {
-      try {
-        if (audio) {
-          var o = audio.createOscillator(), g = audio.createGain();
-          o.connect(g); g.connect(audio.destination);
-          o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.25;
-          o.start(); o.stop(audio.currentTime + 0.18);
-        }
-      } catch (e) {}
-      if (navigator.vibrate) navigator.vibrate([200, 90, 200]);
+    // One blip is easy to miss over a roaring burner, so an alert repeats until the brewer touches the screen.
+    alarm: function () {
+      var stopAt = Date.now() + 3 * 60 * 1000;
+      hush(); beep();
+      ringing = setInterval(function () { if (Date.now() > stopAt) hush(); else beep(); }, 2500);
     }
   };
 })();
+
+function clockTime(ms) { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+
+// These buttons sit beside Start, so a stray wet tap only arms them and a second tap within three seconds acts.
+function confirmTap(btn, action) {
+  var label = btn.textContent, armed = null;
+  function disarm() { clearTimeout(armed); armed = null; btn.textContent = label; btn.classList.remove('armed'); }
+  btn.addEventListener('click', function () {
+    if (armed) { disarm(); action(); return; }
+    btn.textContent = 'Tap again'; btn.classList.add('armed');
+    armed = setTimeout(disarm, 3000);
+  });
+}
 
 // A running timer keeps ticking on its tab, so it stays in sight from any other stage.
 function tabClock(stage, text) {
@@ -34,6 +57,7 @@ function tabClock(stage, text) {
   var total = parseInt(clock.getAttribute('data-boil'), 10) * 60;
   var key = 'boil:' + clock.getAttribute('data-key');
   var btn = document.getElementById('boil-start');
+  var status = document.getElementById('boil-status');
   var rows = [].slice.call(document.querySelectorAll('#boil-adds [data-remaining]'));
   var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {};
 
@@ -47,6 +71,7 @@ function tabClock(stage, text) {
     if (left < 0) left = 0;
     clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('boil', running ? clock.textContent : '');
+    status.textContent = running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '';
     var m = Math.ceil(left / 60);
     rows.forEach(function (r) {
       var at = parseInt(r.getAttribute('data-remaining'), 10);
@@ -65,7 +90,7 @@ function tabClock(stage, text) {
       fired[at] = true; due = true;
       if (at > m) late[at] = true;
     });
-    if (due) sound.beep();
+    if (due) sound.alarm();
   }
 
   function tick() {
@@ -74,7 +99,7 @@ function tabClock(stage, text) {
     if (left <= 0) left = 0;
     fireDue();
     render();
-    if (left === 0) { running = false; clearInterval(timer); timer = null; btn.textContent = 'Start'; save(); }
+    if (left === 0) { running = false; clearInterval(timer); timer = null; btn.textContent = 'Start'; save(); render(); }
   }
   function start() {
     sound.unlock();
@@ -82,11 +107,13 @@ function tabClock(stage, text) {
     running = true; save();
     timer = setInterval(tick, 500);
     btn.textContent = 'Pause';
+    render();
   }
   function pause() {
     clearInterval(timer); timer = null;
     running = false; save();
     btn.textContent = 'Start';
+    render();
   }
 
   try {
@@ -109,11 +136,11 @@ function tabClock(stage, text) {
   render();
 
   btn.onclick = function () { running ? pause() : start(); };
-  document.getElementById('boil-reset').onclick = function () {
+  confirmTap(document.getElementById('boil-reset'), function () {
     clearInterval(timer); timer = null; running = false;
     left = total; fired = {}; late = {}; clearSaved();
     btn.textContent = 'Start'; render();
-  };
+  });
   rows.forEach(function (r) {
     r.addEventListener('click', function () {
       delete late[parseInt(r.getAttribute('data-remaining'), 10)]; render();
@@ -151,7 +178,7 @@ function tabClock(stage, text) {
     tabClock('mash', running ? clock.textContent : '');
     status.textContent =
       done ? 'Mash done. Time to sparge.' :
-      running ? 'Step ' + (step + 1) + ' · holding ' + steps[step].temp + ' °C' :
+      running ? 'Step ' + (step + 1) + ' · hold ' + steps[step].temp + ' °C until ' + clockTime(endAt) :
       !fresh ? 'Paused at step ' + (step + 1) + '.' :
       step > 0 ? 'Step ' + step + ' done. Raise the mash to ' + steps[step].temp + ' °C, then start.' :
       'Bring the mash to ' + steps[0].temp + ' °C, then start.';
@@ -168,7 +195,7 @@ function tabClock(stage, text) {
   function tick() {
     if (!running) return;
     left = Math.round((endAt - Date.now()) / 1000);
-    if (left <= 0) { sound.beep(); finishStep(); return; }
+    if (left <= 0) { sound.alarm(); finishStep(); return; }
     render();
   }
 
@@ -197,13 +224,13 @@ function tabClock(stage, text) {
     }
     save(); render();
   };
-  document.getElementById('mash-next').onclick = finishStep;
-  document.getElementById('mash-reset').onclick = function () {
+  confirmTap(document.getElementById('mash-next'), finishStep);
+  confirmTap(document.getElementById('mash-reset'), function () {
     clearInterval(timer); timer = null; running = false;
     step = 0; left = steps[0].min * 60;
     try { localStorage.removeItem(key); } catch (e) {}
     render();
-  };
+  });
   document.addEventListener('visibilitychange', function () { if (!document.hidden && running) tick(); });
 })();
 
@@ -222,6 +249,8 @@ function tabClock(stage, text) {
   var oStrike = document.getElementById('strike-water');
   var oTemp = document.getElementById('strike-temp');
   var oSparge = document.getElementById('sparge-water');
+  var page = document.getElementById('brewday');
+  var store = 'mash-water:' + (page ? page.getAttribute('data-key') : '');
 
   function show(el, v) { el.textContent = isFinite(v) ? v.toFixed(1) : '-'; }
   function update() {
@@ -233,7 +262,17 @@ function tabClock(stage, text) {
     show(oSparge, sparge);
     show(oTemp, r > 0 ? rest + (heat / r) * (rest - g) : NaN);
   }
-  [gt, ratio, ret].forEach(function (e) { e.addEventListener('input', update); });
+  // A save reloads the page, so the brewer's tweaks are kept per brew rather than reset to the defaults.
+  try {
+    var kept = JSON.parse(localStorage.getItem(store));
+    if (kept) { gt.value = kept.grain; ratio.value = kept.ratio; ret.value = kept.retention; }
+  } catch (e) {}
+  [gt, ratio, ret].forEach(function (e) {
+    e.addEventListener('input', function () {
+      update();
+      try { localStorage.setItem(store, JSON.stringify({ grain: gt.value, ratio: ratio.value, retention: ret.value })); } catch (e) {}
+    });
+  });
   update();
 })();
 
@@ -261,10 +300,12 @@ function tabClock(stage, text) {
   }
   function go(i) { show(i); window.scrollTo(0, 0); history.replaceState(null, '', '#' + keys[i]); }
 
-  // A stage named in the link wins, so the water form can send the brewer back to #water.
-  var wanted = location.hash.slice(1), saved = null;
+  // A stage named in the link wins, so the water form can send the brewer back to #water. Once the OG is in,
+  // the brew opens on Ferment rather than wherever brew day left off.
+  var wanted = location.hash.slice(1), saved = null, fallback = root.getAttribute('data-start');
   try { saved = localStorage.getItem(store); } catch (e) {}
-  var start = [wanted, saved, root.getAttribute('data-start')].map(function (k) { return keys.indexOf(k); }).filter(function (i) { return i >= 0; })[0];
+  var order = fallback === 'ferment' ? [wanted, fallback] : [wanted, saved, fallback];
+  var start = order.map(function (k) { return keys.indexOf(k); }).filter(function (i) { return i >= 0; })[0];
   root.classList.add('staged');
   show(start || 0);
 
@@ -277,21 +318,24 @@ function tabClock(stage, text) {
   var btn = document.getElementById('wake');
   if (!btn || !('wakeLock' in navigator)) return;
 
-  var store = 'wake', lock = null, want = true;
+  var store = 'wake', lock = null, asking = false, want = true;
   try { want = localStorage.getItem(store) !== 'off'; } catch (e) {}
 
   function render() {
     btn.hidden = false;
     btn.classList.toggle('on', !!lock);
-    btn.textContent = lock ? 'Screen on' : want ? 'Tap to keep screen on' : 'Screen may sleep';
+    btn.textContent = lock ? 'Screen on' : want ? 'Keep screen on' : 'Screen can sleep';
   }
   function acquire() {
-    if (!want || lock || document.hidden) return;
+    if (!want || lock || asking || document.hidden) return;
+    asking = true;
     navigator.wakeLock.request('screen').then(function (l) {
+      asking = false;
+      if (!want) { l.release(); return; }
       lock = l;
       l.addEventListener('release', function () { lock = null; render(); });
       render();
-    }).catch(render);
+    }).catch(function () { asking = false; render(); });
   }
 
   // Safari only grants the lock from a tap, and drops it whenever the page is hidden, so both re-arm it.

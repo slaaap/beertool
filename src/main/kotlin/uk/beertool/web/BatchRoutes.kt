@@ -42,6 +42,9 @@ class BatchDeleteRes(val recipeNo: Int, val no: Int)
 @Resource("/recipes/{recipeNo}/brew-day")
 class RecipeStartBrewRes(val recipeNo: Int)
 
+@Resource("/brew")
+class CurrentBrewRes
+
 fun Route.batchRoutes() {
     get<BatchesRes> { res ->
         withUser { call, user ->
@@ -87,6 +90,15 @@ fun Route.batchRoutes() {
             val target = BatchRepository.startBrewDay(recipe.id, user.id, LocalDate.now())
             if (target == null) call.respondRedirect("/recipes")
             else call.respondRedirect("/recipes/${recipe.no}/batches/${target.no}/brew")
+        }
+    }
+
+    // The home-screen app opens here, so on brew day it lands on the brew rather than the recipe list.
+    get<CurrentBrewRes> {
+        withUser { call, user ->
+            val current = BatchRepository.listByUser(user.id).firstOrNull { it.batch.isOnBrewDay }?.takeIf { user.canWrite }
+            if (current == null) call.respondRedirect("/recipes")
+            else call.respondRedirect("/recipes/${current.recipeNo}/batches/${current.batch.no}/brew")
         }
     }
 

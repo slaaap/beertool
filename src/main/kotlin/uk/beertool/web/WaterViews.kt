@@ -236,14 +236,14 @@ internal fun FlowContent.brewDayWater(recipe: Recipe, batch: Batch, prefs: Brewe
 }
 
 private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
-    val strike = report.strikeL ?: return
+    report.strikeL ?: return
     val sparge = report.spargeL ?: return
     table("mash-plan water-plan") {
         thead {
             tr {
                 th { +water.describe() }
-                th(classes = "num") { +"Strike"; br; span("vol") { +"${fmt(strike, 1)} L" } }
-                th(classes = "num") { +"Sparge"; br; span("vol") { +"${fmt(sparge, 1)} L" } }
+                th(classes = "num") { +"Strike" }
+                th(classes = "num") { +"Sparge" }
             }
         }
         tbody {

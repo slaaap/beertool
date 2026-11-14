@@ -1,8 +1,11 @@
 package uk.beertool.telegram
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
+import uk.beertool.batch.BrewDayStage
 import uk.beertool.batch.toDraft
 import uk.beertool.common.paginate
 import uk.beertool.recipe.Recipe
@@ -54,6 +57,9 @@ class TelegramBot(
 ) {
     private val log = LoggerFactory.getLogger(TelegramBot::class.java)
 
+    // The boil button ticks straight away while the background loop may be mid-tick on the same brew.
+    private val ticking = Mutex()
+
     private class Chatter(val telegramUserId: Long, val chatId: Long, val user: User?, val link: TelegramLink?)
 
     private fun chatter(telegramUserId: Long, chatId: Long): Chatter {
@@ -75,7 +81,7 @@ class TelegramBot(
         if (!message.chat.isPrivate || from.isBot) return
         val who = chatter(from.id, message.chat.id)
 
-        if (!text.startsWith("/")) return onReadings(who, text, message.replyToMessage?.messageId)
+        if (!text.startsWith("/")) return onReadings(who, text, message.messageId, message.replyToMessage?.messageId)
         if (who.link != null) ReadingPromptRepository.clear(who.telegramUserId)
         val command = text.substringBefore(' ').drop(1).substringBefore('@').lowercase()
         val arg = text.substringAfter(' ', "").trim()
@@ -198,7 +204,7 @@ class TelegramBot(
         }
     }
 
-    private suspend fun onReadings(who: Chatter, text: String, replyTo: Long?) {
+    private suspend fun onReadings(who: Chatter, text: String, messageId: Long, replyTo: Long?) {
         val user = who.user ?: return say(who, notLinked())
         val pending = who.link?.let { ReadingPromptRepository.pending(who.telegramUserId, replyTo) }
         val answer = pending?.let { parseAnswer(it.key, text) }
@@ -218,7 +224,12 @@ class TelegramBot(
         val saved = BatchRepository.update(batch.id, user.id, readings.applyTo(batch.toDraft()))
             ?: return say(who, "⚠️ That didn't save. Please send it again.")
         TelegramLinkRepository.setCurrentBatch(who.telegramUserId, saved.id)
-        prompted?.let { ReadingPromptRepository.answered(who.telegramUserId, it.messageId) }
+        // The panel repeats what was saved, so the question and its answer are cleared from the chat.
+        prompted?.let {
+            ReadingPromptRepository.answered(who.telegramUserId, it.messageId)
+            forget(who.chatId, it.messageId)
+            forget(who.chatId, messageId)
+        }
         val session = BrewSessionRepository.find(saved.id)
         if (session != null) showPanel(session, user, recipe, saved, flash = readingsSaved(readings))
         else say(who, readingsSaved(readings) + "\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, saved))
@@ -294,6 +305,11 @@ class TelegramBot(
                     notice = "Step ${session.mashStep + 1} started"
                     showBrewDay(who, user, recipe, batch, from = message.messageId)
                 }
+                "tq" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
+                    val session = BrewSessionRepository.find(batch.id) ?: return
+                    val confirm = timerConfirmation(recipe, batch, session, clock()) ?: return
+                    api.editMessageText(who.chatId, message.messageId, confirm.text, confirm.keyboard)
+                }
                 "mend" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
                     val session = BrewSessionRepository.find(batch.id) ?: return
                     val timer = session.timer?.takeIf { it.kind == TimerKind.MASH } ?: return
@@ -301,7 +317,11 @@ class TelegramBot(
                     showBrewDay(who, user, recipe, batch, from = message.messageId)
                 }
                 "boil" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    BrewSessionRepository.open(batch.id, user.id, who.chatId, BrewDayStage.BOIL)
+                    val session = BrewSessionRepository.open(batch.id, user.id, who.chatId, BrewDayStage.BOIL)
+                    if (session.timer?.kind == TimerKind.MASH) {
+                        notice = "Finish the mash step first"
+                        return
+                    }
                     BrewSessionRepository.startBoil(batch.id, recipe.boilTimeMin, clock())
                     TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
                     notice = "Boil timer started"
@@ -362,7 +382,7 @@ class TelegramBot(
         api.answerInlineQuery(query.id, results)
     }
 
-    suspend fun tickTimers() {
+    suspend fun tickTimers() = ticking.withLock {
         val now = clock()
         for (session in BrewSessionRepository.withTimers()) {
             try {
@@ -409,12 +429,15 @@ class TelegramBot(
         return boilAlertText(recipe, alert, timer.minutesLeft(now)).takeIf { claimed }
     }
 
-    // Edits raise no notification, so the countdown ticks over quietly; a panel the brewer deleted is let go.
+    // Edits raise no notification, so the countdown ticks over quietly. A panel the brewer deleted is let go,
+    // but a network blip or rate limit only skips this minute.
     private suspend fun refreshCountdown(session: BrewSession, user: User, recipe: Recipe, batch: Batch) {
+        val shown = session.panelMessageId ?: return
         try {
-            showPanel(session, user, recipe, batch, replacing = session.panelMessageId)
+            showPanel(session, user, recipe, batch, replacing = shown)
         } catch (e: TelegramException) {
-            BrewSessionRepository.setPanel(session.batchId, null, clock())
+            if (e.errorCode == 400 || e.errorCode == 403) BrewSessionRepository.dropPanel(session.batchId, shown)
+            else log.debug("Countdown edit for batch {} skipped: {}", session.batchId, e.message)
         }
     }
 
@@ -484,6 +507,6 @@ class TelegramBot(
     private fun String.short() = shortened(BUTTON_TEXT_MAX)
 
     private companion object {
-        val WRITE_ACTIONS = setOf("sb", "cur", "st", "mash", "mend", "boil", "stop", "ask", "cx", "cxy", "pkg")
+        val WRITE_ACTIONS = setOf("sb", "cur", "st", "mash", "tq", "mend", "boil", "stop", "ask", "cx", "cxy", "pkg")
     }
 }

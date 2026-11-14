@@ -162,7 +162,9 @@ internal fun TR.numInput(name: String, value: String?, step: String, max: String
         }
     }
 
+// iOS shows the full keyboard for a number field; inputmode brings up the number pad instead.
 internal fun INPUT.numAttrs(step: String, max: String? = null) {
+    attributes["inputmode"] = "decimal"
     attributes["step"] = step
     attributes["min"] = "0"
     max?.let { attributes["max"] = it }
