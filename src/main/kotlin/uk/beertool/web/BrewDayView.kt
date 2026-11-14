@@ -78,11 +78,13 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 hiddenInput(name = "brewDate") { value = batch.brewDate?.toString() ?: LocalDate.now().toString() }
                 hiddenInput(name = "packagedDate") { value = batch.packagedDate?.toString() ?: "" }
                 val readings = ReadingInputs(recipe, batch, estimate)
-                fieldGrid(columns = 2) {
+                fieldGrid(columns = 3) {
                     readingField(readings.preBoil)
                     readingField(readings.postBoil)
-                    readingField(readings.og)
                     readingField(readings.fermenter)
+                }
+                fieldGrid(columns = 2) {
+                    readingField(readings.og)
                     readingField(readings.fg)
                 }
                 fieldGrid(columns = 1) { field("Notes") { textArea { name = "notes"; +(batch.notes ?: "") } } }
@@ -112,12 +114,12 @@ private fun FlowContent.mashWaterGuide(recipe: Recipe, user: User) {
         attributes["data-rest"] = fmt(firstRest, 1)
         attributes["data-heat"] = Calculators.GRAIN_WATER_HEAT_RATIO.toString()
         div("stats trio") {
-            statTile("Strike water", fmt(water.strikeVolumeL, 1), "L", valueId = "strike-water")
+            statTile("Strike", fmt(water.strikeVolumeL, 1), "L", valueId = "strike-water")
             statTile("Strike temp", fmt(water.strikeTempC, 1), "°C", accent = true, valueId = "strike-temp")
-            statTile("Sparge water", fmt(water.spargeVolumeL, 1), "L", valueId = "sparge-water")
+            statTile("Sparge", fmt(water.spargeVolumeL, 1), "L", valueId = "sparge-water")
         }
         fieldGrid(columns = 3) {
-            field("Grain temp (°C)") {
+            field("Grain (°C)") {
                 numberInput { id = "mw-grain-temp"; value = fmt(DEFAULT_GRAIN_TEMP_C, 0); numAttrs("0.5") }
             }
             field("Ratio (L/kg)") {

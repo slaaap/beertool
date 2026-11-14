@@ -166,11 +166,9 @@ private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
     val inRange = report.mashPh?.let { it in MIN_MASH_PH..MAX_MASH_PH }
     val acidMl = report.acidForTargetMl
     div(if (canApply) "stats trio chem" else "stats duo chem") {
-        statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label) {
-            if (canApply) balanceLinks(report)
-        }
+        statTile("Cl : SO₄", fmt(report.profile.chlorideToSulphate, 2), report.balance?.label)
         statTile("Mash pH", fmt(report.mashPh, 2), "$MIN_MASH_PH-$MAX_MASH_PH", tone = if (inRange == false) "bad" else if (inRange == true) "good" else null)
-        if (canApply) statTile("${report.acid.shortLabel} for $TARGET_MASH_PH", fmt(acidMl, 1), "ml") {
+        if (canApply) statTile("To pH $TARGET_MASH_PH", fmt(acidMl, 1), "ml") {
             if (acidMl != null && acidMl >= 0.1 && acidMl.roundTo(1) != report.water.acidMl.roundTo(1)) {
                 button(type = ButtonType.button, classes = "tile-action") {
                     onClick = "waterUseAcid(this, '${fmt(acidMl, 1)}')"
@@ -179,11 +177,13 @@ private fun FlowContent.mashPhTiles(report: WaterReport, canApply: Boolean) {
             }
         }
     }
+    if (canApply) balanceLinks(report)
 }
 
 // Tapping a balance fills in its gypsum and calcium chloride; the one the salts match is marked, and a dot shows the one that suits the beer.
-private fun DIV.balanceLinks(report: WaterReport) {
+private fun FlowContent.balanceLinks(report: WaterReport) {
     div("balance-links") {
+        span("muted") { +"Salts for" }
         FlavourBalance.entries.forEach { balance ->
             val salts = report.saltsFor[balance] ?: return@forEach
             val gypsum = salts.gypsumG.roundTo(1)
@@ -244,13 +244,13 @@ private fun FlowContent.treatmentPlan(water: RecipeWater, report: WaterReport) {
         thead {
             tr {
                 th { +water.describe() }
-                th(classes = "num") { +"Strike ${fmt(strike, 1)} L" }
-                th(classes = "num") { +"Sparge ${fmt(sparge, 1)} L" }
+                th(classes = "num") { +"Strike"; br; span("vol") { +"${fmt(strike, 1)} L" } }
+                th(classes = "num") { +"Sparge"; br; span("vol") { +"${fmt(sparge, 1)} L" } }
             }
         }
         tbody {
             report.doses(water).forEach { dose ->
-                val unit = dose.addition.unit
+                val unit = dose.addition.shortUnit
                 tr {
                     td { +dose.addition.labelIn(water) }
                     td("num") { +"${fmt(dose.strike, 1)} $unit" }

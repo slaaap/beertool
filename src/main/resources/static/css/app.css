@@ -176,6 +176,7 @@ td .btn { padding:5px; }
 .brewday { max-width:560px; margin:0 auto; }
 .brewday input[type=number] { font-size:18px; padding:11px 12px; }
 .brewday .field label { font-size:13px; }
+.brewday .grid { align-items:end; }
 .boil-clock { font-family:var(--font-mono); font-size:52px; font-weight:600; text-align:center;
   font-variant-numeric:tabular-nums; letter-spacing:-0.02em; margin:6px 0; }
 .boil-controls { display:flex; gap:10px; justify-content:center; margin:0 0 16px; }
@@ -237,14 +238,15 @@ table.mash-plan td.step::before { counter-increment:step; content:counter(step) 
 .stat.bad .v { color:var(--danger); }
 .tile-action { display:block; text-align:left; margin-top:6px; padding:0; border:0; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
 .tile-action:hover { text-decoration:underline; }
-.balance-links { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 0 -8px; }
-.balance-links button { padding:3px 8px; border:0; border-radius:999px; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
+.balance-links { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:10px 0 0; font-size:13px; }
+.balance-links button { padding:4px 10px; border:1px solid var(--hairline); border-radius:999px; background:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; }
 .balance-links button:hover { background:var(--accent-soft); }
 .balance-links button.active { background:var(--accent-soft); cursor:default; }
 .balance-links button.recommended::after { content:"\2022"; display:inline-block; margin-left:4px; }
 table.water-plan { margin-top:14px; }
 table.water-plan .num { white-space:nowrap; }
 table.water-plan th:first-child { white-space:normal; }
+table.water-plan th .vol { text-transform:none; letter-spacing:0; }
 .mash-water .grid { margin-top:12px; }
 
 ul { padding-left:20px; }
@@ -297,6 +299,7 @@ li { margin:3px 0; }
   table.hops .c-amount, table.hops .c-time, table.hops .c-last { width:19%; }
 
   .brewday .g2 { grid-template-columns:repeat(2,1fr); }
+  .brewday .g3 { grid-template-columns:repeat(3,1fr); gap:15px 10px; }
   .mash-water .g3 { grid-template-columns:repeat(3,1fr); }
   .water-panel .field.acid { grid-column:auto; }
   .brew-water .g3 { grid-template-columns:repeat(2,1fr); }

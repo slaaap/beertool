@@ -47,6 +47,7 @@ enum class WaterAddition(
     val unit: String,
     val salt: Salt?,
     val amountIn: (RecipeWater) -> Double,
+    val shortUnit: String = unit,
 ) {
     GYPSUM("gypsumG", "Gypsum", "g", Salt.GYPSUM, RecipeWater::gypsumG),
     CALCIUM_CHLORIDE("calciumChlorideG", "Calcium chloride", "g", Salt.CALCIUM_CHLORIDE, RecipeWater::calciumChlorideG),
@@ -56,7 +57,7 @@ enum class WaterAddition(
     ACID("acidMl", "Acid", "ml", null, RecipeWater::acidMl),
 
     // Campden tablets clear chlorine and chloramine from all the water before it is heated; the minerals barely move.
-    CAMPDEN("campdenTablets", "Campden", "tablets", null, RecipeWater::campdenTablets);
+    CAMPDEN("campdenTablets", "Campden", "tablets", null, RecipeWater::campdenTablets, shortUnit = "tab");
 
     fun labelIn(water: RecipeWater?) = if (this == ACID && water != null) water.acid.label else label
 
