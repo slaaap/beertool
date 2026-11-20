@@ -32,7 +32,7 @@ including a phone-first **Brew Day** mode for using it at the kettle.
 
 ## Requirements
 
-- **JDK 21**
+- **JDK 25**
 - **Docker** - for a local Postgres, and for the tests (which spin up a throwaway Postgres via Testcontainers)
 
 ## Quick start
