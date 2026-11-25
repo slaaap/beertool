@@ -35,9 +35,9 @@ fun Application.configureErrorPages() {
     }
 }
 
-// MCP and OAuth clients read JSON or bare status codes, so they keep Ktor's own error handling.
+// MCP, OAuth and brewhouse clients read JSON or bare status codes, so they keep Ktor's own error handling.
 private fun ApplicationCall.isApi() = request.path().let {
-    it == MCP_PATH || it.startsWith("$MCP_PATH/") || it.startsWith("/oauth/") || it.startsWith("/.well-known/")
+    it == MCP_PATH || it.startsWith("$MCP_PATH/") || it.startsWith("/oauth/") || it.startsWith("/api/") || it.startsWith("/.well-known/")
 }
 
 private suspend fun ApplicationCall.respondErrorPage(status: HttpStatusCode, heading: String, message: String?) {

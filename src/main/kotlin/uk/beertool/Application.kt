@@ -7,6 +7,7 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.resources.Resources
 import uk.beertool.auth.configureSecurity
+import uk.beertool.brewhouse.configureBrewhouse
 import uk.beertool.common.systemEnv
 import uk.beertool.common.text
 import uk.beertool.db.DatabaseFactory
@@ -30,5 +31,6 @@ fun Application.module() {
     configureErrorPages()
     configureRouting()
     configureMcp()
+    configureBrewhouse()
     configureTelegram()
 }
