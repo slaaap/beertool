@@ -6,6 +6,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createRouteScopedPlugin
+import io.ktor.server.request.contentType
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.response.header
@@ -32,11 +33,13 @@ import uk.beertool.common.systemEnv
 import uk.beertool.common.text
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.user.User
+import uk.beertool.web.currentUser
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeParseException
 
 const val BREWHOUSE_PATH = "/api/brewhouse/v1"
+const val BREWHOUSE_WEB_PATH = "/api/brewhouse/web"
 const val MAX_BODY_BYTES = 16 * 1024
 
 data class BrewhouseConfig(
@@ -91,6 +94,7 @@ fun Application.configureBrewhouse(
                 tokenRoutes(service)
             }
         }
+        route(BREWHOUSE_WEB_PATH) { sessionRoutes(service) }
     }
     Brewhouse.service = service
     log.info("Brewhouse API enabled at {}, readings every {} s", BREWHOUSE_PATH, config.readingInterval.seconds)
@@ -124,6 +128,36 @@ private fun Route.tokenRoutes(service: BrewhouseService) {
             BrewhouseJson.encodeToString(ListSerializer(Reading.serializer()), readings)
         }
     }
+}
+
+// The Brew Day page's own routes: the signed-in brewer's session instead of a token, and nothing for showcase visitors.
+private fun Route.sessionRoutes(service: BrewhouseService) {
+    get("status") {
+        call.asBrewer { encode(service.status(it), Status.serializer()) }
+    }
+    post("commands") {
+        call.asBrewer(HttpStatusCode.Accepted) {
+            // A cross-site form cannot send JSON without a preflight, which on top of the SameSite cookie keeps this from being forged.
+            if (call.request.contentType().withoutParameters() != ContentType.Application.Json) {
+                throw BrewhouseProblem(415, "Send the command as application/json.")
+            }
+            encode(service.queue(it, decode(call.receiveLimited(), CommandRequest.serializer())), Command.serializer())
+        }
+    }
+    get("commands/{id}") {
+        call.asBrewer { encode(service.command(it, call.parameters["id"]!!), Command.serializer()) }
+    }
+    get("batches/{batchId}/schedule") {
+        call.asBrewer { encode(service.schedule(it, call.batchId()), Schedule.serializer()) }
+    }
+    get("batches/{batchId}/readings") {
+        call.asBrewer { BrewhouseJson.encodeToString(ListSerializer(Reading.serializer()), service.readings(it, call.batchId(), call.since())) }
+    }
+}
+
+private suspend fun ApplicationCall.asBrewer(success: HttpStatusCode = HttpStatusCode.OK, block: suspend (User) -> String) = api(success) {
+    val user = currentUser()?.takeIf { it.canWrite } ?: throw BrewhouseProblem(401, "Log in to use the brewhouse.")
+    block(user)
 }
 
 // A transparent node, so the token check covers the spec's routes but not the spec document beside them.

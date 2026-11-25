@@ -59,7 +59,8 @@ function tabClock(stage, text) {
   var btn = document.getElementById('boil-start');
   var status = document.getElementById('boil-status');
   var rows = [].slice.call(document.querySelectorAll('#boil-adds [data-remaining]'));
-  var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {};
+  var reset = document.getElementById('boil-reset');
+  var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {}, external = false;
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function save() {
@@ -71,7 +72,8 @@ function tabClock(stage, text) {
     if (left < 0) left = 0;
     clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('boil', running ? clock.textContent : '');
-    status.textContent = running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '';
+    status.textContent = (external && left > 0 ? 'Timed by the brewhouse. ' : '') +
+      (running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '');
     var m = Math.ceil(left / 60);
     rows.forEach(function (r) {
       var at = parseInt(r.getAttribute('data-remaining'), 10);
@@ -135,8 +137,34 @@ function tabClock(stage, text) {
   }
   render();
 
+  // While the brewhouse boils, its boil time drives the clock so additions sound on the controller's timing.
+  window.boilClock = {
+    follow: function (seconds, ticking) {
+      if (!external) {
+        external = true; btn.hidden = true; reset.hidden = true;
+        var m = Math.ceil(seconds / 60);
+        rows.forEach(function (r) {
+          var at = parseInt(r.getAttribute('data-remaining'), 10);
+          if (at > m) fired[at] = true;
+        });
+      }
+      left = Math.max(0, Math.round(seconds));
+      running = ticking && left > 0;
+      endAt = Date.now() + left * 1000;
+      if (running && !timer) { sound.unlock(); timer = setInterval(tick, 500); }
+      if (!running && timer) { clearInterval(timer); timer = null; }
+      fireDue(); render();
+    },
+    release: function () {
+      if (!external) return;
+      external = false; btn.hidden = false; reset.hidden = false;
+      clearInterval(timer); timer = null; running = false;
+      btn.textContent = 'Start'; save(); render();
+    }
+  };
+
   btn.onclick = function () { running ? pause() : start(); };
-  confirmTap(document.getElementById('boil-reset'), function () {
+  confirmTap(reset, function () {
     clearInterval(timer); timer = null; running = false;
     left = total; fired = {}; late = {}; clearSaved();
     btn.textContent = 'Start'; render();
@@ -291,6 +319,7 @@ function tabClock(stage, text) {
   function show(i) {
     at = i;
     stages.forEach(function (s, j) { s.hidden = j !== i; });
+    root.setAttribute('data-stage', keys[i]);
     tabs.forEach(function (t, j) { t.classList.toggle('active', j === i); });
     prev.hidden = i === 0;
     next.hidden = i === keys.length - 1;

@@ -1,0 +1,211 @@
+(function () {
+  var root = document.getElementById('bh');
+  if (!root) return;
+
+  var base = root.getAttribute('data-base');
+  var batchId = parseInt(root.getAttribute('data-batch'), 10);
+  var PHASES = {
+    idle: 'Idle', strike: 'Heating strike water', dough_in: 'Strike water ready: add the grain',
+    mash: 'Mashing', mashed: 'Mash done: lauter or lift the bag', boil_heat: 'Heating to the boil',
+    boil: 'Boiling', paused: 'Paused', manual: 'Hob panel in use', done: 'Done', fault: 'Stopped by a fault'
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function num(v, places) { return v == null ? '-' : v.toFixed(places); }
+  function show(el, on) { if (el) el.hidden = !on; }
+
+  var status = null, busy = false, lastReadingAt = null, readings = [], fetching = false;
+
+  function request(method, path, body) {
+    var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(base + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || 'beertool answered ' + r.status + '.');
+        return j;
+      });
+    });
+  }
+
+  function mySession() {
+    var s = status && status.report && status.report.session;
+    return s && s.batchId === batchId ? s : null;
+  }
+
+  function renderConnection() {
+    var state = $('bh-state'), report = status && status.report;
+    if (!status) { state.textContent = 'Brewhouse: can’t reach beertool'; return; }
+    if (status.online) {
+      state.textContent = 'Brewhouse online';
+    } else {
+      state.textContent = 'Brewhouse offline' + (status.lastSeenAt ? ', last seen ' + new Date(status.lastSeenAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '');
+    }
+    root.classList.toggle('online', !!status.online);
+    [].forEach.call(root.querySelectorAll('[data-device]'), function (dot) {
+      var dev = report && report.devices[dot.getAttribute('data-device')];
+      dot.classList.toggle('up', !!(status.online && dev && dev.online));
+    });
+  }
+
+  function renderStart() {
+    var other = status && status.report && status.report.session;
+    var runningElsewhere = other && other.batchId !== batchId && other.phase !== 'idle' && other.phase !== 'done';
+    var session = mySession();
+    var startable = !session || session.phase === 'idle' || session.phase === 'done';
+    show($('bh-start'), startable);
+    var btn = $('bh-start-btn');
+    if (!btn) return;
+    var ready = !!(status && status.online && status.report && status.report.ready);
+    btn.disabled = !ready || busy;
+    btn.textContent = ready ? 'Start on brewhouse' : runningElsewhere ? 'Brewhouse busy with another brew' : status && status.online ? 'Brewhouse not ready' : 'Start on brewhouse';
+    if (!ready) show($('bh-preview'), false);
+  }
+
+  function renderLive() {
+    var s = mySession(), live = !!s && s.phase !== 'idle';
+    show($('bh-live'), live);
+    if (!live) return;
+    var th = status.report.devices.thermometer;
+    $('bh-phase').textContent = (PHASES[s.phase] || s.phase) + (s.stage ? ' · ' + s.stage : '');
+    $('bh-temp').textContent = num(s.tempC, 1);
+    $('bh-target').textContent = s.targetC == null ? '' : '→ ' + num(s.targetC, 1) + ' °C';
+    tile('bh-top', num(th.topC, 1));
+    tile('bh-bottom', num(th.bottomC, 1));
+    tile('bh-power', s.powerW == null && s.hobW == null ? null : kw(s.powerW) + ' / ' + kw(s.hobW));
+    tile('bh-step-left', s.stepLeftMin == null ? null : num(s.stepLeftMin, 0));
+    tile('bh-eta', s.etaMin == null ? null : clockTime(Date.now() + s.etaMin * 60000));
+    tile('bh-boil-left', s.boilLeftMin == null ? null : num(s.boilLeftMin, 0));
+    [].forEach.call(root.querySelectorAll('[data-command]'), function (b) {
+      b.hidden = b.getAttribute('data-phases').split(' ').indexOf(s.phase) < 0;
+      b.disabled = busy || !status.online;
+    });
+  }
+
+  function kw(w) { return w == null ? '-' : (w / 1000).toFixed(1); }
+
+  // A figure that does not apply to the phase hides its tile rather than showing a dash.
+  function tile(id, value) {
+    var el = $(id);
+    el.textContent = value == null ? '-' : value;
+    el.closest('.stat').hidden = value == null;
+  }
+
+  function renderBanners() {
+    var s = mySession();
+    var fault = s && s.phase === 'fault';
+    show($('bh-fault'), fault);
+    if (fault) $('bh-fault').textContent = 'Heating stopped: ' + (s.fault || 'the brewhouse reported a fault') + '. Fix it, then press Stop.';
+    var manual = s && s.phase === 'manual';
+    show($('bh-manual'), manual);
+    if (manual) $('bh-note').textContent = (s.note || 'Someone is using the hob panel') + '. Timers keep running; press Resume to hand the heat back.';
+  }
+
+  function driveBoilClock() {
+    if (!window.boilClock) return;
+    var s = mySession();
+    if (s && s.boilLeftMin != null && (s.phase === 'boil' || s.phase === 'paused' || s.phase === 'manual')) {
+      window.boilClock.follow(s.boilLeftMin * 60, s.phase !== 'paused');
+    } else {
+      window.boilClock.release();
+    }
+  }
+
+  function render() {
+    renderConnection();
+    renderStart();
+    renderBanners();
+    renderLive();
+    driveBoilClock();
+  }
+
+  function error(text) {
+    var el = $('bh-error');
+    el.textContent = text || '';
+    show(el, !!text);
+  }
+
+  // A command is only queued here; the brewhouse decides, so its answer is fetched until it arrives or the command expires.
+  function send(command) {
+    busy = true; error(null); render();
+    request('POST', '/commands', command).then(function (c) {
+      var deadline = Date.now() + 70000;
+      (function check() {
+        request('GET', '/commands/' + encodeURIComponent(c.id)).then(function (now) {
+          if (now.status === 'pending' && Date.now() < deadline) { setTimeout(check, 1000); return; }
+          busy = false;
+          if (now.status === 'refused') error('The brewhouse refused: ' + (now.error || 'no reason given') + '.');
+          else if (now.status === 'expired' || now.status === 'pending') error('The brewhouse didn’t pick that up in time. Check its connection.');
+          poll();
+        }).catch(function (e) { busy = false; error(e.message); render(); });
+      })();
+    }).catch(function (e) { busy = false; error(e.message); render(); });
+  }
+
+  [].forEach.call(root.querySelectorAll('[data-command]'), function (b) {
+    var command = { type: b.getAttribute('data-command') };
+    if (command.type === 'stop') confirmTap(b, function () { send(command); });
+    else b.addEventListener('click', function () { sound.unlock(); send(command); });
+  });
+  if ($('bh-start-btn')) {
+    $('bh-start-btn').addEventListener('click', function () { show($('bh-preview'), true); $('bh-start-btn').hidden = true; });
+    $('bh-cancel').addEventListener('click', function () { show($('bh-preview'), false); $('bh-start-btn').hidden = false; });
+    $('bh-confirm').addEventListener('click', function () {
+      sound.unlock();
+      show($('bh-preview'), false); $('bh-start-btn').hidden = false;
+      send({ type: 'start', batchId: batchId });
+    });
+  }
+
+  function drawChart() {
+    var box = $('bh-chart');
+    if (readings.length < 2) { show(box, false); return; }
+    var t0 = Date.parse(readings[0].at), t1 = Date.parse(readings[readings.length - 1].at);
+    var temps = [];
+    readings.forEach(function (r) { if (r.tempC != null) temps.push(r.tempC); if (r.targetC != null) temps.push(r.targetC); });
+    if (!temps.length) { show(box, false); return; }
+    var lo = Math.floor(Math.min.apply(null, temps) - 1), hi = Math.ceil(Math.max.apply(null, temps) + 1);
+    var W = 300, H = 120;
+    function x(r) { return ((Date.parse(r.at) - t0) / Math.max(1, t1 - t0) * W).toFixed(1); }
+    function y(v) { return (H - (v - lo) / (hi - lo) * H).toFixed(1); }
+    function line(field) {
+      var d = '', pen = 'M';
+      readings.forEach(function (r) {
+        if (r[field] == null) { pen = 'M'; return; }
+        d += pen + x(r) + ' ' + y(r[field]) + ' '; pen = 'L';
+      });
+      return d;
+    }
+    box.innerHTML =
+      '<div class="bh-chart-head"><span class="bh-key temp">Temperature</span><span class="bh-key target">Target</span></div>' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Temperature against target over the session">' +
+      '<path class="target" d="' + line('targetC') + '"/><path class="temp" d="' + line('tempC') + '"/></svg>' +
+      '<div class="bh-chart-axis"><span>' + clockTime(t0) + '</span><span>' + lo + '–' + hi + ' °C</span><span>' + clockTime(t1) + '</span></div>';
+    show(box, true);
+  }
+
+  // One fetch at a time, so two overlapping requests never append the same readings twice.
+  function fetchReadings() {
+    if (fetching) return;
+    fetching = true;
+    var q = lastReadingAt ? '?since=' + encodeURIComponent(lastReadingAt) : '';
+    request('GET', '/batches/' + batchId + '/readings' + q).then(function (more) {
+      if (!more.length) return;
+      readings = readings.concat(more);
+      lastReadingAt = more[more.length - 1].at;
+      drawChart();
+    }).catch(function () {}).then(function () { fetching = false; });
+  }
+
+  var polls = 0;
+  function poll() {
+    return request('GET', '/status').then(function (s) { status = s; }).catch(function () { status = null; }).then(function () {
+      render();
+      if (mySession() && polls++ % 5 === 0) fetchReadings();
+    });
+  }
+
+  fetchReadings();
+  poll();
+  setInterval(function () { if (!document.hidden) poll(); }, 2000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+})();
