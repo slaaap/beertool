@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import uk.beertool.auth.PasswordHasher
 import uk.beertool.auth.configureSecurity
+import uk.beertool.brewhouse.Brewhouse
 import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.Mcp
@@ -48,6 +49,7 @@ class SettingsTokensTest {
         Mcp.tokensEnabled = true
         Mcp.oauthEnabled = true
         Telegram.botUsername = null
+        Brewhouse.service = null
     }
 
     @AfterEach

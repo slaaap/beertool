@@ -23,6 +23,7 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.builtins.ListSerializer
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import uk.beertool.batch.BatchRepository
@@ -47,6 +48,11 @@ class BrewhouseApiTest {
     @BeforeEach
     fun setUp() {
         TestDatabase.ensureReady()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        Brewhouse.service = null
     }
 
     @Test

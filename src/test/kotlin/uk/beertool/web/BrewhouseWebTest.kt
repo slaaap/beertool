@@ -1,5 +1,6 @@
 package uk.beertool.web
 
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -32,10 +33,12 @@ import uk.beertool.brewhouse.BrewhouseConfig
 import uk.beertool.brewhouse.configureBrewhouse
 import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.ApiTokenRepository
+import uk.beertool.mcp.Mcp
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.NewRecipe
 import uk.beertool.recipe.RecipeFermentable
 import uk.beertool.recipe.RecipeRepository
+import uk.beertool.telegram.Telegram
 import uk.beertool.user.SingleUser
 import uk.beertool.user.UserRepository
 import java.util.UUID
@@ -46,6 +49,10 @@ class BrewhouseWebTest {
     fun setUp() {
         TestDatabase.ensureReady()
         SingleUser.email = null
+        Mcp.enabled = false
+        Mcp.publicUrl = null
+        Mcp.tokensEnabled = false
+        Telegram.botUsername = null
     }
 
     @AfterEach
@@ -147,6 +154,55 @@ class BrewhouseWebTest {
         val page = client.get(brewer.brewDayUrl).bodyAsText()
 
         page shouldNotContain "id=\"bh\""
+    }
+
+    @Test
+    fun `should show on Connections that the brewhouse has not connected yet, with the URL to give it`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        val page = client.get("/settings/connections").bodyAsText()
+
+        page shouldContain "Brewhouse"
+        page shouldContain "Not connected yet"
+        page shouldContain "$BREWHOUSE_PATH</code>"
+        page shouldContain "Create token"
+    }
+
+    @Test
+    fun `should show on Connections that the brewhouse is online once it syncs`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+        client.post("$BREWHOUSE_PATH/sync") {
+            header(HttpHeaders.Authorization, "Bearer ${brewer.token}")
+            contentType(ContentType.Application.Json)
+            setBody(IDLE_REPORT)
+        }
+
+        val page = client.get("/settings/connections").bodyAsText()
+
+        page shouldContain "Online · beertool-brewhouse 1.0"
+    }
+
+    @Test
+    fun `should let the brewer make a token for the brewhouse while the AI assistant is off`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        val created = client.post("/settings/tokens") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("name=Brewhouse")
+        }.bodyAsText()
+
+        val token = Regex("bt_[A-Za-z0-9_-]+").find(created).shouldNotBeNull().value
+        ApiTokenRepository.userFor(token).shouldNotBeNull()
+        created shouldNotContain "claude mcp add"
+    }
+
+    @Test
+    fun `should leave the brewhouse off Connections while it is switched off`() = brewhouseWebApp(enabled = false) { brewer ->
+        val client = signedIn(brewer)
+
+        val response = client.get("/settings/connections")
+
+        response.headers[HttpHeaders.Location] shouldBe "/settings"
     }
 
     private data class Brewer(val email: String, val token: String, val batchId: Long, val brewDayUrl: String)

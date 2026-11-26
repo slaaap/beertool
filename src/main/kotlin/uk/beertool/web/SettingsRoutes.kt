@@ -12,6 +12,9 @@ import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.brewing.WaterProfile
+import uk.beertool.brewhouse.BREWHOUSE_PATH
+import uk.beertool.brewhouse.Brewhouse
+import uk.beertool.brewhouse.Status
 import uk.beertool.common.asPercent
 import uk.beertool.common.fmt
 import uk.beertool.common.shortDate
@@ -95,7 +98,7 @@ fun Route.settingsRoutes() {
     get<SettingsConnections> {
         withUser(write = true) { call, user ->
             if (!hasConnections()) return@withUser call.respondRedirect("/settings")
-            call.respondHtml { connectionsPage(user, call.mcpEndpoint()) }
+            call.respondHtml { connectionsPage(user, call.publicBase()) }
         }
     }
 
@@ -109,11 +112,11 @@ fun Route.settingsRoutes() {
 
     post<SettingsTokens> {
         withUser(write = true) { call, user ->
-            if (!Mcp.tokensEnabled) return@withUser call.respondRedirect(CONNECTIONS)
+            if (!tokensOn()) return@withUser call.respondRedirect(CONNECTIONS)
             val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
             val token = ApiTokenRepository.create(user.id, name)
             call.response.header(HttpHeaders.CacheControl, "no-store")
-            call.respondHtml { connectionsPage(user, call.mcpEndpoint(), NewToken(name, token)) }
+            call.respondHtml { connectionsPage(user, call.publicBase(), NewToken(name, token)) }
         }
     }
 
@@ -154,7 +157,10 @@ data class TokenForm(val name: String = "")
 
 private const val CONNECTIONS = "/settings/connections"
 
-private fun hasConnections() = Telegram.enabled || Mcp.enabled
+private fun hasConnections() = Telegram.enabled || Mcp.enabled || Brewhouse.enabled
+
+// The brewhouse only runs while personal tokens are on, as a controller has no other way to sign in.
+private fun tokensOn() = Mcp.tokensEnabled || Brewhouse.enabled
 
 private fun FlowContent.settingsHead(current: String) {
     h1 { +"Settings" }
@@ -166,11 +172,15 @@ private fun FlowContent.settingsHead(current: String) {
     }
 }
 
-fun HTML.connectionsPage(user: User, mcpEndpoint: String?, newToken: NewToken? = null) {
+fun HTML.connectionsPage(user: User, base: String, newToken: NewToken? = null) {
+    val mcpEndpoint = if (Mcp.enabled) base + MCP_PATH else null
     page("Connections", user) {
         settingsHead(CONNECTIONS)
         if (Telegram.enabled) telegramSection(user)
-        mcpEndpoint?.let { assistantSection(user, it, newToken) }
+        mcpEndpoint?.let { assistantSection(user, it) }
+        Brewhouse.service?.let { brewhouseSection(it.status(user), base + BREWHOUSE_PATH) }
+        val tokens = ApiTokenRepository.listByUser(user.id)
+        if (tokensOn() || tokens.isNotEmpty()) accessTokens(tokens, mcpEndpoint, newToken)
     }
 }
 
@@ -305,23 +315,39 @@ private fun usage(created: Instant, lastUsed: Instant?): String {
     return "connected ${day(created)} · " + (lastUsed?.let { "last used ${day(it)}" } ?: "not used yet")
 }
 
-private fun ApplicationCall.mcpEndpoint(): String? {
-    if (!Mcp.enabled) return null
-    val base = Mcp.publicUrl ?: request.origin.let { o ->
-        val port = if (o.serverPort == 80 || o.serverPort == 443) "" else ":${o.serverPort}"
-        "${o.scheme}://${o.serverHost}$port"
-    }
-    return base + MCP_PATH
+private fun ApplicationCall.publicBase() = Mcp.publicUrl ?: request.origin.let { o ->
+    val port = if (o.serverPort == 80 || o.serverPort == 443) "" else ":${o.serverPort}"
+    "${o.scheme}://${o.serverHost}$port"
 }
 
-private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
+private fun FlowContent.assistantSection(user: User, endpoint: String) {
     sectionHead("AI assistant")
     div("stack") {
         field("Server URL") { code("token") { +endpoint } }
         if (Mcp.oauthEnabled) connectedApps(user, endpoint)
     }
-    val tokens = ApiTokenRepository.listByUser(user.id)
-    if (Mcp.tokensEnabled || tokens.isNotEmpty()) accessTokens(tokens, endpoint, newToken)
+}
+
+private fun FlowContent.brewhouseSection(status: Status, apiUrl: String) {
+    sectionHead("Brewhouse")
+    div("stack") {
+        field("Status") {
+            p {
+                +when {
+                    status.online -> "Online" + (status.report?.software?.let { " · $it" } ?: "")
+                    status.lastSeenAt != null -> "Offline · last seen ${shortDateTime(status.lastSeenAt)}"
+                    else -> "Not connected yet"
+                }
+            }
+        }
+        field("API URL") { code("token") { +apiUrl } }
+        p("muted") { +"To connect your brewhouse controller, create a personal token below and enter it in the controller with this URL." }
+    }
+}
+
+private fun shortDateTime(at: Instant): String {
+    val time = at.atZone(ZoneId.systemDefault())
+    return "${shortDate(time.toLocalDate(), LocalDate.now())} ${"%02d:%02d".format(time.hour, time.minute)}"
 }
 
 private fun FlowContent.connectedApps(user: User, endpoint: String) {
@@ -341,15 +367,17 @@ private fun FlowContent.connectedApps(user: User, endpoint: String) {
 }
 
 // Tokens left over from before they were switched off would work again if switched back on, so they stay revocable.
-private fun FlowContent.accessTokens(tokens: List<ApiToken>, endpoint: String, newToken: NewToken?) {
+private fun FlowContent.accessTokens(tokens: List<ApiToken>, mcpEndpoint: String?, newToken: NewToken?) {
     sectionHead("Personal tokens")
-    if (!Mcp.tokensEnabled) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
+    if (!tokensOn()) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
     newToken?.let {
         div("token-box") {
             p { strong { +"Copy the token for “${it.name}” now." }; +" It won't be shown again." }
             code("token") { +it.token }
-            p("muted") { +"To connect Claude Code with it:" }
-            code("token") { +"claude mcp add --transport http beertool $endpoint --header \"Authorization: Bearer ${it.token}\"" }
+            if (mcpEndpoint != null) {
+                p("muted") { +"To connect Claude Code with it:" }
+                code("token") { +"claude mcp add --transport http beertool $mcpEndpoint --header \"Authorization: Bearer ${it.token}\"" }
+            }
         }
     }
     if (tokens.isNotEmpty()) {
@@ -361,7 +389,7 @@ private fun FlowContent.accessTokens(tokens: List<ApiToken>, endpoint: String, n
             }
         }
     }
-    if (!Mcp.tokensEnabled) return
+    if (!tokensOn()) return
     form(action = "/settings/tokens", method = FormMethod.post, classes = "inline-form") {
         field("New token name") { textInput(name = "name") { placeholder = "e.g. Claude Code on my laptop" } }
         submitInput(classes = "btn") { value = "Create token" }
