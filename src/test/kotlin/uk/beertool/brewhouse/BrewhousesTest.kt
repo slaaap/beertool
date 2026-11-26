@@ -145,7 +145,6 @@ internal fun report(
     results: List<CommandResult> = emptyList(),
 ) = Report(
     software = software,
-    devices = Devices(Hob(online = true, mode = HobMode.STANDBY), Thermometer(online = true, topC = 18.5, bottomC = 18.4), Pump(online = true, on = false)),
     ready = ready,
     session = session,
     commandResults = results,

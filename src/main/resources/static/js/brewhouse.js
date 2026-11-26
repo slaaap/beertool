@@ -7,7 +7,7 @@
   var PHASES = {
     idle: 'Idle', strike: 'Heating strike water', dough_in: 'Strike water ready: add the grain',
     mash: 'Mashing', mashed: 'Mash done: lauter or lift the bag', boil_heat: 'Heating to the boil',
-    boil: 'Boiling', paused: 'Paused', manual: 'Hob panel in use', done: 'Done', fault: 'Stopped by a fault'
+    boil: 'Boiling', paused: 'Paused', manual: 'Under manual control', done: 'Done', fault: 'Stopped by a fault'
   };
 
   function $(id) { return document.getElementById(id); }
@@ -35,6 +35,10 @@
 
   function renderConnection() {
     var state = $('bh-state'), report = status && status.report;
+    var busy = report && report.session && report.session.phase !== 'idle' && report.session.phase !== 'done';
+    var why = status && status.online && report && !report.ready && !busy && report.notReady;
+    $('bh-why').textContent = why || '';
+    show($('bh-why'), !!why);
     if (!status) { state.textContent = 'Brewhouse: can’t reach beertool'; return; }
     if (status.online) {
       state.textContent = 'Brewhouse online';
@@ -42,10 +46,6 @@
       state.textContent = 'Brewhouse offline' + (status.lastSeenAt ? ', last seen ' + new Date(status.lastSeenAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '');
     }
     root.classList.toggle('online', !!status.online);
-    [].forEach.call(root.querySelectorAll('[data-device]'), function (dot) {
-      var dev = report && report.devices[dot.getAttribute('data-device')];
-      dot.classList.toggle('up', !!(status.online && dev && dev.online));
-    });
   }
 
   function renderStart() {
@@ -66,13 +66,10 @@
     var s = mySession(), live = !!s && s.phase !== 'idle';
     show($('bh-live'), live);
     if (!live) return;
-    var th = status.report.devices.thermometer;
     $('bh-phase').textContent = (PHASES[s.phase] || s.phase) + (s.stage ? ' · ' + s.stage : '');
     $('bh-temp').textContent = num(s.tempC, 1);
     $('bh-target').textContent = s.targetC == null ? '' : '→ ' + num(s.targetC, 1) + ' °C';
-    tile('bh-top', num(th.topC, 1));
-    tile('bh-bottom', num(th.bottomC, 1));
-    tile('bh-power', s.powerW == null && s.hobW == null ? null : kw(s.powerW) + ' / ' + kw(s.hobW));
+    tile('bh-heat', s.heatPct == null ? null : String(s.heatPct));
     tile('bh-step-left', s.stepLeftMin == null ? null : num(s.stepLeftMin, 0));
     tile('bh-eta', s.etaMin == null ? null : clockTime(Date.now() + s.etaMin * 60000));
     tile('bh-boil-left', s.boilLeftMin == null ? null : num(s.boilLeftMin, 0));
@@ -81,8 +78,6 @@
       b.disabled = busy || !status.online;
     });
   }
-
-  function kw(w) { return w == null ? '-' : (w / 1000).toFixed(1); }
 
   // A figure that does not apply to the phase hides its tile rather than showing a dash.
   function tile(id, value) {
@@ -98,7 +93,7 @@
     if (fault) $('bh-fault').textContent = 'Heating stopped: ' + (s.fault || 'the brewhouse reported a fault') + '. Fix it, then press Stop.';
     var manual = s && s.phase === 'manual';
     show($('bh-manual'), manual);
-    if (manual) $('bh-note').textContent = (s.note || 'Someone is using the hob panel') + '. Timers keep running; press Resume to hand the heat back.';
+    if (manual) $('bh-note').textContent = (s.note || 'Someone took over the heat by hand') + '. Timers keep running; press Resume to hand the heat back.';
   }
 
   // Both clocks are on beertool's time, so neither the phone's clock nor the controller's skews the age.

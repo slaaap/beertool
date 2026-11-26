@@ -293,9 +293,40 @@ class BrewhouseApiTest {
     fun `should reject a report missing a required field`() = brewhouseApp {
         val brewer = newBrewer()
 
-        val response = client.post("$BREWHOUSE_PATH/sync") { bearer(brewer.token); json("""{"software":"x","ready":true,"session":null,"commandResults":[]}""") }
+        val response = client.post("$BREWHOUSE_PATH/sync") { bearer(brewer.token); json("""{"software":"x","session":null,"commandResults":[]}""") }
 
         response.status shouldBe HttpStatusCode.BadRequest
+    }
+
+    @Test
+    fun `should pass on why the brewhouse is not ready`() = brewhouseApp {
+        val brewer = newBrewer()
+        client.sync(brewer, report(ready = false).copy(notReady = "thermometer offline"))
+
+        val status = decode(client.get("$BREWHOUSE_PATH/status") { bearer(brewer.token) }.bodyAsText(), Status.serializer())
+
+        status.report!!.notReady shouldBe "thermometer offline"
+    }
+
+    @Test
+    fun `should reject a heat level outside 0 to 100 percent`() = brewhouseApp {
+        val brewer = newBrewer()
+
+        val response = client.sync(brewer, report(session = session(brewer.batchId).copy(heatPct = 140)))
+
+        response.status shouldBe HttpStatusCode.BadRequest
+    }
+
+    @Test
+    fun `should accept a report that still carries fields the API has dropped, such as devices`() = brewhouseApp {
+        val brewer = newBrewer()
+
+        val response = client.post("$BREWHOUSE_PATH/sync") {
+            bearer(brewer.token)
+            json("""{"software":"x","ready":true,"session":null,"commandResults":[],"devices":{"hob":{"online":true}}}""")
+        }
+
+        response.status shouldBe HttpStatusCode.OK
     }
 
     @Test
@@ -312,7 +343,7 @@ class BrewhouseApiTest {
         readings.map { it.tempC } shouldBe listOf(64.0, 65.5)
         readings.first().phase shouldBe Phase.MASH
         readings.first().targetC shouldBe 66.0
-        readings.first().powerW shouldBe 1800
+        readings.first().heatPct shouldBe 75
     }
 
     @Test
@@ -425,8 +456,7 @@ class BrewhouseApiTest {
         step = 0,
         targetC = 66.0,
         tempC = tempC,
-        powerW = 1800,
-        hobW = 1800,
+        heatPct = 75,
         updatedAt = clock,
     )
 

@@ -4,10 +4,10 @@ info:
   version: 1.0.0
   summary: Lets a home brewery controller report its state to beertool and take commands from it.
   description: |
-    A brewhouse is a local controller (for example the beertool-brewhouse mash server) that drives a
-    kettle's heater, thermometer and pump. It never accepts inbound connections: it calls
-    `POST /sync` about every 2 seconds, reporting its devices and the running session, and receives
-    any commands queued for it in the response.
+    A brewhouse is a local controller (for example the beertool-brewhouse mash server) that heats a
+    kettle and runs a mash and boil to a schedule, whatever hardware it uses. It never accepts inbound
+    connections: it calls `POST /sync` about every 2 seconds, reporting whether it is ready and the
+    running session, and receives any commands queued for it in the response.
 
     Each user has at most one brewhouse, identified by its brewhouse key. beertool
     treats the brewhouse as online while its last sync is under 15 seconds old.
@@ -249,17 +249,19 @@ components:
 
     Report:
       type: object
-      required: [software, devices, ready, session, commandResults]
+      required: [software, ready, session, commandResults]
       properties:
         software:
           type: string
           description: The controller and its version.
           examples: ["beertool-brewhouse 1.0"]
-        devices:
-          $ref: "#/components/schemas/Devices"
         ready:
           type: boolean
-          description: Every device is online and no session is running, so a `start` would be accepted.
+          description: The controller could take a `start` now; how it decides is up to it.
+        notReady:
+          type: [string, "null"]
+          description: Why it is not ready, in words for people; beertool shows it beside the start button.
+          examples: ["thermometer offline"]
         session:
           oneOf:
             - $ref: "#/components/schemas/Session"
@@ -269,46 +271,6 @@ components:
           description: Outcomes of commands executed since the previous sync; beertool stops delivering them.
           items:
             $ref: "#/components/schemas/CommandResult"
-
-    Devices:
-      type: object
-      required: [hob, thermometer, pump]
-      properties:
-        hob:
-          type: object
-          required: [online]
-          properties:
-            online:
-              type: boolean
-            mode:
-              type: [string, "null"]
-              description: What the hob shows.
-              enum: [standby, "on", power, error, unknown, no_bus, null]
-            powerW:
-              type: [integer, "null"]
-              description: The power setting the hob shows, while heating.
-        thermometer:
-          type: object
-          required: [online]
-          properties:
-            online:
-              type: boolean
-            topC:
-              type: [number, "null"]
-            bottomC:
-              type: [number, "null"]
-            batteryPct:
-              type: [integer, "null"]
-        pump:
-          type: object
-          required: [online]
-          properties:
-            online:
-              type: boolean
-            "on":
-              type: [boolean, "null"]
-            powerW:
-              type: [number, "null"]
 
     Session:
       type: object
@@ -337,13 +299,12 @@ components:
           description: The temperature being heated to or held; null while boiling or when nothing is driven.
         tempC:
           type: [number, "null"]
-          description: The temperature the controller uses (both probes averaged, or the bottom probe during the boil).
-        powerW:
-          type: integer
-          description: The power the controller asks of the hob.
-        hobW:
-          type: integer
-          description: The power the hob actually delivers.
+          description: The temperature the controller regulates on.
+        heatPct:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 100
+          description: How hard it is heating, from 0 (off) to 100 (full power).
         stepLeftMin:
           type: [number, "null"]
           description: Minutes left in the current mash step, once its temperature is reached.
@@ -362,7 +323,7 @@ components:
           examples: ["pump not running"]
         note:
           type: [string, "null"]
-          description: Why someone else is driving the hob, while `phase` is `manual`.
+          description: Why someone else is driving the heat, while `phase` is `manual`.
         startedAt:
           type: [string, "null"]
           format: date-time
@@ -380,10 +341,10 @@ components:
         - `mashed`: last step done; holding it until `start_boil` (lauter or lift the bag now).
         - `boil_heat`: heating to the boil.
         - `boil`: boiling, `boilLeftMin` counting down.
-        - `paused`: heat and pump off until `resume`; timers stopped.
-        - `manual`: someone used the hob panel; timers run, no heating until `resume`.
-        - `done`: finished, hob and pump off.
-        - `fault`: safety stop, hob and pump off until `stop`.
+        - `paused`: heating (and any pump) off until `resume`; timers stopped.
+        - `manual`: someone took over the heat by hand; timers run, no heating until `resume`.
+        - `done`: finished, heating off.
+        - `fault`: safety stop, heating off until `stop`.
       enum: [idle, strike, dough_in, mash, mashed, boil_heat, boil, paused, manual, done, fault]
 
     Reading:
@@ -400,7 +361,7 @@ components:
           type: [number, "null"]
         targetC:
           type: [number, "null"]
-        powerW:
+        heatPct:
           type: [integer, "null"]
 
     CommandType:

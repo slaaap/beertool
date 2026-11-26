@@ -19,6 +19,7 @@ class BrewhouseService(
     private val lastReadingAt = ConcurrentHashMap<Pair<Long, Long>, Instant>()
 
     fun sync(user: User, report: Report): SyncResponse {
+        if (report.session?.heatPct?.let { it !in 0..100 } == true) throw BrewhouseProblem(400, "heatPct must be between 0 and 100.")
         val commands = brewhouses.sync(user.id, report)
         report.session?.let { record(user, it) }
         return SyncResponse(commands)
@@ -65,7 +66,7 @@ class BrewhouseService(
         }
         if (!due) return
         if (BatchRepository.findById(batchId, user.id) == null) return
-        BrewhouseReadingRepository.add(batchId, Reading(at, session.phase, session.tempC, session.targetC, session.powerW))
+        BrewhouseReadingRepository.add(batchId, Reading(at, session.phase, session.tempC, session.targetC, session.heatPct))
         lastReadingAt.values.removeIf { Duration.between(it, at) > STALE_THROTTLE }
     }
 

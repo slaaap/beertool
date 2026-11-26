@@ -37,11 +37,7 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
         attributes["data-base"] = BREWHOUSE_WEB_PATH
         div("bh-conn") {
             span("bh-state") { id = "bh-state"; +"Brewhouse: checking…" }
-            span("bh-dots") {
-                listOf("hob" to "Hob", "thermometer" to "Thermometer", "pump" to "Pump").forEach { (key, label) ->
-                    span("bh-dot") { attributes["data-device"] = key; +label }
-                }
-            }
+            span("bh-why") { id = "bh-why"; hidden = true }
         }
         p("alert") { id = "bh-fault"; hidden = true }
         div("notice bh-manual") {
@@ -73,9 +69,7 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
                 span("bh-target") { id = "bh-target" }
             }
             div("stats auto bh-stats") {
-                statTile("Top", "-", "°C", valueId = "bh-top")
-                statTile("Bottom", "-", "°C", valueId = "bh-bottom")
-                statTile("Power asked / given", "-", "kW", valueId = "bh-power")
+                statTile("Heat", "-", "%", valueId = "bh-heat")
                 statTile("Step left", "-", "min", valueId = "bh-step-left")
                 statTile("ETA", "-", null, valueId = "bh-eta")
                 statTile("Boil left", "-", "min", valueId = "bh-boil-left")

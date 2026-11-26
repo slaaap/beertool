@@ -284,8 +284,7 @@ class BrewhouseWebTest {
 
     private companion object {
         val IDLE_REPORT = """
-            {"software":"beertool-brewhouse 1.0","ready":true,"session":null,"commandResults":[],
-             "devices":{"hob":{"online":true},"thermometer":{"online":true},"pump":{"online":true}}}
+            {"software":"beertool-brewhouse 1.0","ready":true,"session":null,"commandResults":[]}
         """.trimIndent()
     }
 }

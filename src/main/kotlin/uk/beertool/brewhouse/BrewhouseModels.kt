@@ -52,45 +52,6 @@ enum class Phase {
 }
 
 @Serializable
-enum class HobMode {
-    @SerialName("standby") STANDBY,
-    @SerialName("on") ON,
-    @SerialName("power") POWER,
-    @SerialName("error") ERROR,
-    @SerialName("unknown") UNKNOWN,
-    @SerialName("no_bus") NO_BUS,
-}
-
-@Serializable
-data class Hob(
-    val online: Boolean,
-    val mode: HobMode? = null,
-    val powerW: Int? = null,
-)
-
-@Serializable
-data class Thermometer(
-    val online: Boolean,
-    val topC: Double? = null,
-    val bottomC: Double? = null,
-    val batteryPct: Int? = null,
-)
-
-@Serializable
-data class Pump(
-    val online: Boolean,
-    val on: Boolean? = null,
-    val powerW: Double? = null,
-)
-
-@Serializable
-data class Devices(
-    val hob: Hob,
-    val thermometer: Thermometer,
-    val pump: Pump,
-)
-
-@Serializable
 data class Session(
     val batchId: Long? = null,
     val phase: Phase,
@@ -98,8 +59,7 @@ data class Session(
     val step: Int? = null,
     val targetC: Double? = null,
     val tempC: Double? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER) val powerW: Int? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER) val hobW: Int? = null,
+    val heatPct: Int? = null,
     val stepLeftMin: Double? = null,
     val etaMin: Double? = null,
     val boilMinutes: Int? = null,
@@ -120,8 +80,8 @@ data class CommandResult(
 @Serializable
 data class Report(
     val software: String,
-    val devices: Devices,
     val ready: Boolean,
+    val notReady: String? = null,
     val session: Session?,
     val commandResults: List<CommandResult>,
 )
@@ -214,5 +174,5 @@ data class Reading(
     val phase: Phase,
     val tempC: Double? = null,
     val targetC: Double? = null,
-    val powerW: Int? = null,
+    val heatPct: Int? = null,
 )

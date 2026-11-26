@@ -18,7 +18,7 @@ object BrewhouseReadings : LongIdTable("brewhouse_readings") {
     val phase = text("phase")
     val tempC = double("temp_c").nullable()
     val targetC = double("target_c").nullable()
-    val powerW = integer("power_w").nullable()
+    val heatPct = integer("heat_pct").nullable()
 }
 
 object BrewhouseReadingRepository {
@@ -30,7 +30,7 @@ object BrewhouseReadingRepository {
             it[phase] = reading.phase.name
             it[tempC] = reading.tempC
             it[targetC] = reading.targetC
-            it[powerW] = reading.powerW
+            it[heatPct] = reading.heatPct
         }
     }
 
@@ -44,7 +44,7 @@ object BrewhouseReadingRepository {
                     phase = Phase.valueOf(it[BrewhouseReadings.phase]),
                     tempC = it[BrewhouseReadings.tempC],
                     targetC = it[BrewhouseReadings.targetC],
-                    powerW = it[BrewhouseReadings.powerW],
+                    heatPct = it[BrewhouseReadings.heatPct],
                 )
             }
     }
