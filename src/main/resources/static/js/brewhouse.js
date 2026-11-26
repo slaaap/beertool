@@ -59,7 +59,7 @@
     var ready = !!(status && status.online && status.report && status.report.ready);
     btn.disabled = !ready || busy;
     btn.textContent = ready ? 'Start on brewhouse' : runningElsewhere ? 'Brewhouse busy with another brew' : status && status.online ? 'Brewhouse not ready' : 'Start on brewhouse';
-    if (!ready) show($('bh-preview'), false);
+    if (!ready) { show($('bh-preview'), false); btn.hidden = false; }
   }
 
   function renderLive() {
@@ -118,7 +118,7 @@
     function seconds(min) { return min == null ? null : min * 60 - (ticking ? reportAgeS() : 0); }
     if (window.boilClock) {
       if (stage === 'boil' && s.boilLeftMin != null) window.boilClock.follow(seconds(s.boilLeftMin), ticking);
-      else window.boilClock.release();
+      else window.boilClock.release(stage === 'done');
     }
     if (window.mashClock) {
       if (stage === 'mash' && s.step != null) window.mashClock.follow(s.step, seconds(s.stepLeftMin), ticking);
@@ -216,7 +216,7 @@
       '<div class="bh-chart-head"><span class="bh-key temp">Temperature</span><span class="bh-key target">Target</span></div>' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Temperature against target over the session">' +
       '<path class="target" d="' + line('targetC') + '"/><path class="temp" d="' + line('tempC') + '"/></svg>' +
-      '<div class="bh-chart-axis"><span>' + clockTime(t0) + '</span><span>' + lo + '–' + hi + ' °C</span><span>' + clockTime(t1) + '</span></div>';
+      '<div class="bh-chart-axis"><span>' + clockTime(t0) + '</span><span>' + lo + '-' + hi + ' °C</span><span>' + clockTime(t1) + '</span></div>';
     show(box, true);
   }
 

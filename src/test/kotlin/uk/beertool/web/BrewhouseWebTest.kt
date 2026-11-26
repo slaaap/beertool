@@ -30,9 +30,9 @@ import uk.beertool.brewhouse.BREWHOUSE_PATH
 import uk.beertool.brewhouse.BREWHOUSE_WEB_PATH
 import uk.beertool.brewhouse.Brewhouse
 import uk.beertool.brewhouse.BrewhouseConfig
+import uk.beertool.brewhouse.BrewhouseKeyRepository
 import uk.beertool.brewhouse.configureBrewhouse
 import uk.beertool.db.TestDatabase
-import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.Mcp
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.NewRecipe
@@ -200,7 +200,8 @@ class BrewhouseWebTest {
         page shouldContain "Brewhouse"
         page shouldContain "Not connected yet"
         page shouldContain "$BREWHOUSE_PATH</code>"
-        page shouldContain "Create token"
+        page shouldContain "Make a new key"
+        page shouldNotContain "Personal tokens"
     }
 
     @Test
@@ -218,17 +219,29 @@ class BrewhouseWebTest {
     }
 
     @Test
-    fun `should let the brewer make a token for the brewhouse while the AI assistant is off`() = brewhouseWebApp { brewer ->
+    fun `should show a new brewhouse key once, and only that key opens the API`() = brewhouseWebApp { brewer ->
         val client = signedIn(brewer)
 
-        val created = client.post("/settings/tokens") {
-            contentType(ContentType.Application.FormUrlEncoded)
-            setBody("name=Brewhouse")
-        }.bodyAsText()
+        val created = client.post("/settings/brewhouse/key").bodyAsText()
+        val later = client.get("/settings/connections").bodyAsText()
 
-        val token = Regex("bt_[A-Za-z0-9_-]+").find(created).shouldNotBeNull().value
-        ApiTokenRepository.userFor(token).shouldNotBeNull()
-        created shouldNotContain "claude mcp add"
+        val key = Regex("bh_[A-Za-z0-9_-]+").find(created).shouldNotBeNull().value
+        client.get("$BREWHOUSE_PATH/status") { header(HttpHeaders.Authorization, "Bearer $key") }.status shouldBe HttpStatusCode.OK
+        client.get("$BREWHOUSE_PATH/status") { header(HttpHeaders.Authorization, "Bearer ${brewer.token}") }.status shouldBe HttpStatusCode.Unauthorized
+        later shouldContain "Brewhouse key"
+        later shouldNotContain key
+    }
+
+    @Test
+    fun `should disconnect the brewhouse from Connections`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        client.post("/settings/brewhouse/key/revoke")
+        val page = client.get("/settings/connections").bodyAsText()
+
+        client.get("$BREWHOUSE_PATH/status") { header(HttpHeaders.Authorization, "Bearer ${brewer.token}") }.status shouldBe HttpStatusCode.Unauthorized
+        page shouldContain "Connect a brewhouse"
+        page shouldNotContain "Brewhouse key"
     }
 
     @Test
@@ -256,7 +269,7 @@ class BrewhouseWebTest {
         val user = UserRepository.create(email, PasswordHasher.hash("secret123"), "Brewer")
         val recipe = RecipeRepository.create(user.id, NewRecipe(name = "Pale", fermentables = listOf(RecipeFermentable("Maris Otter", 4.5, FermentableType.MALT))))
         val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id))!!
-        return Brewer(email, ApiTokenRepository.create(user.id, "brewhouse"), batch.id, "/recipes/${recipe.no}/batches/${batch.no}/brew")
+        return Brewer(email, BrewhouseKeyRepository.issue(user.id), batch.id, "/recipes/${recipe.no}/batches/${batch.no}/brew")
     }
 
     private fun brewhouseWebApp(enabled: Boolean = true, block: suspend ApplicationTestBuilder.(Brewer) -> Unit) = testApplication {

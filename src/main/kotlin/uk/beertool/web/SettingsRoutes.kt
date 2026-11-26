@@ -14,10 +14,13 @@ import kotlinx.serialization.Serializable
 import uk.beertool.brewing.WaterProfile
 import uk.beertool.brewhouse.BREWHOUSE_PATH
 import uk.beertool.brewhouse.Brewhouse
+import uk.beertool.brewhouse.BrewhouseKeyRepository
 import uk.beertool.brewhouse.Status
 import uk.beertool.common.asPercent
 import uk.beertool.common.fmt
+import uk.beertool.common.publicUrl
 import uk.beertool.common.shortDate
+import uk.beertool.common.systemEnv
 import uk.beertool.mcp.ApiToken
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
@@ -112,11 +115,27 @@ fun Route.settingsRoutes() {
 
     post<SettingsTokens> {
         withUser(write = true) { call, user ->
-            if (!tokensOn()) return@withUser call.respondRedirect(CONNECTIONS)
+            if (!Mcp.tokensEnabled) return@withUser call.respondRedirect(CONNECTIONS)
             val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
             val token = ApiTokenRepository.create(user.id, name)
             call.response.header(HttpHeaders.CacheControl, "no-store")
             call.respondHtml { connectionsPage(user, call.publicBase(), NewToken(name, token)) }
+        }
+    }
+
+    post<SettingsBrewhouseKey> {
+        withUser(write = true) { call, user ->
+            if (!Brewhouse.enabled) return@withUser call.respondRedirect(CONNECTIONS)
+            val key = BrewhouseKeyRepository.issue(user.id)
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.respondHtml { connectionsPage(user, call.publicBase(), newBrewhouseKey = key) }
+        }
+    }
+
+    post<SettingsBrewhouseKeyRevoke> {
+        withUser(write = true) { call, user ->
+            BrewhouseKeyRepository.revoke(user.id)
+            call.respondRedirect(CONNECTIONS)
         }
     }
 
@@ -159,9 +178,6 @@ private const val CONNECTIONS = "/settings/connections"
 
 private fun hasConnections() = Telegram.enabled || Mcp.enabled || Brewhouse.enabled
 
-// The brewhouse only runs while personal tokens are on, as a controller has no other way to sign in.
-private fun tokensOn() = Mcp.tokensEnabled || Brewhouse.enabled
-
 private fun FlowContent.settingsHead(current: String) {
     h1 { +"Settings" }
     if (!hasConnections()) return
@@ -172,15 +188,13 @@ private fun FlowContent.settingsHead(current: String) {
     }
 }
 
-fun HTML.connectionsPage(user: User, base: String, newToken: NewToken? = null) {
-    val mcpEndpoint = if (Mcp.enabled) base + MCP_PATH else null
+fun HTML.connectionsPage(user: User, base: String, newToken: NewToken? = null, newBrewhouseKey: String? = null) {
     page("Connections", user) {
         settingsHead(CONNECTIONS)
         if (Telegram.enabled) telegramSection(user)
-        mcpEndpoint?.let { assistantSection(user, it) }
-        Brewhouse.service?.let { brewhouseSection(it.status(user), base + BREWHOUSE_PATH) }
-        val tokens = ApiTokenRepository.listByUser(user.id)
-        if (tokensOn() || tokens.isNotEmpty()) accessTokens(tokens, mcpEndpoint, newToken)
+        if (Mcp.enabled) assistantSection(user, base + MCP_PATH, newToken)
+        Brewhouse.service?.let { brewhouseSection(user, it.status(user), base + BREWHOUSE_PATH, newBrewhouseKey) }
+        js("settings.js")
     }
 }
 
@@ -315,39 +329,63 @@ private fun usage(created: Instant, lastUsed: Instant?): String {
     return "connected ${day(created)} · " + (lastUsed?.let { "last used ${day(it)}" } ?: "not used yet")
 }
 
-private fun ApplicationCall.publicBase() = Mcp.publicUrl ?: request.origin.let { o ->
+// PUBLIC_URL is read directly too, as the brewhouse can be on while MCP, which otherwise holds it, is off.
+private fun ApplicationCall.publicBase() = Mcp.publicUrl ?: systemEnv.publicUrl() ?: request.origin.let { o ->
     val port = if (o.serverPort == 80 || o.serverPort == 443) "" else ":${o.serverPort}"
     "${o.scheme}://${o.serverHost}$port"
 }
 
-private fun FlowContent.assistantSection(user: User, endpoint: String) {
+private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
     sectionHead("AI assistant")
     div("stack") {
         field("Server URL") { code("token") { +endpoint } }
         if (Mcp.oauthEnabled) connectedApps(user, endpoint)
     }
+    val tokens = ApiTokenRepository.listByUser(user.id)
+    if (Mcp.tokensEnabled || tokens.isNotEmpty()) accessTokens(tokens, endpoint, newToken)
 }
 
-private fun FlowContent.brewhouseSection(status: Status, apiUrl: String) {
+private fun FlowContent.brewhouseSection(user: User, status: Status, apiUrl: String, newKey: String?) {
     sectionHead("Brewhouse")
     div("stack") {
         field("Status") {
             p {
-                +when {
-                    status.online -> "Online" + (status.report?.software?.let { " · $it" } ?: "")
-                    status.lastSeenAt != null -> "Offline · last seen ${shortDateTime(status.lastSeenAt)}"
-                    else -> "Not connected yet"
+                when {
+                    status.online -> +("Online" + (status.report?.software?.let { " · $it" } ?: ""))
+                    status.lastSeenAt != null -> { +"Offline · last seen "; localTime(status.lastSeenAt) }
+                    else -> +"Not connected yet"
                 }
             }
         }
         field("API URL") { code("token") { +apiUrl } }
-        p("muted") { +"To connect your brewhouse controller, create a personal token below and enter it in the controller with this URL." }
+    }
+    newKey?.let {
+        div("token-box") {
+            p { strong { +"Copy the brewhouse key now." }; +" It won't be shown again. Enter it in the controller with the API URL above." }
+            code("token") { +it }
+        }
+    }
+    val key = BrewhouseKeyRepository.find(user.id)
+    if (key != null) {
+        ul("conn-list") {
+            connRow("Brewhouse key", usage(key.createdAt, key.lastUsedAt)) {
+                deleteButton("/settings/brewhouse/key/revoke", "Disconnect the brewhouse? Its key stops working at once.")
+            }
+        }
+    }
+    form(action = "/settings/brewhouse/key", method = FormMethod.post, classes = "inline-form") {
+        if (key != null) attributes["onsubmit"] = "return confirm('Make a new key? The brewhouse stops syncing until you enter it there.')"
+        submitInput(classes = "btn") { value = if (key == null) "Connect a brewhouse" else "Make a new key" }
     }
 }
 
-private fun shortDateTime(at: Instant): String {
-    val time = at.atZone(ZoneId.systemDefault())
-    return "${shortDate(time.toLocalDate(), LocalDate.now())} ${"%02d:%02d".format(time.hour, time.minute)}"
+// Shown in the brewer's own timezone by settings.js; the server's rendering is only the fallback.
+private fun FlowContent.localTime(at: Instant) {
+    time {
+        attributes["datetime"] = at.toString()
+        attributes["data-local"] = ""
+        +at.atZone(ZoneId.systemDefault()).let { "${shortDate(it.toLocalDate(), LocalDate.now())} ${"%02d:%02d".format(it.hour, it.minute)}" }
+    }
 }
 
 private fun FlowContent.connectedApps(user: User, endpoint: String) {
@@ -367,17 +405,15 @@ private fun FlowContent.connectedApps(user: User, endpoint: String) {
 }
 
 // Tokens left over from before they were switched off would work again if switched back on, so they stay revocable.
-private fun FlowContent.accessTokens(tokens: List<ApiToken>, mcpEndpoint: String?, newToken: NewToken?) {
+private fun FlowContent.accessTokens(tokens: List<ApiToken>, endpoint: String, newToken: NewToken?) {
     sectionHead("Personal tokens")
-    if (!tokensOn()) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
+    if (!Mcp.tokensEnabled) p("muted") { +"Personal tokens are switched off on this server, so these don't work." }
     newToken?.let {
         div("token-box") {
             p { strong { +"Copy the token for “${it.name}” now." }; +" It won't be shown again." }
             code("token") { +it.token }
-            if (mcpEndpoint != null) {
-                p("muted") { +"To connect Claude Code with it:" }
-                code("token") { +"claude mcp add --transport http beertool $mcpEndpoint --header \"Authorization: Bearer ${it.token}\"" }
-            }
+            p("muted") { +"To connect Claude Code with it:" }
+            code("token") { +"claude mcp add --transport http beertool $endpoint --header \"Authorization: Bearer ${it.token}\"" }
         }
     }
     if (tokens.isNotEmpty()) {
@@ -389,7 +425,7 @@ private fun FlowContent.accessTokens(tokens: List<ApiToken>, mcpEndpoint: String
             }
         }
     }
-    if (!tokensOn()) return
+    if (!Mcp.tokensEnabled) return
     form(action = "/settings/tokens", method = FormMethod.post, classes = "inline-form") {
         field("New token name") { textInput(name = "name") { placeholder = "e.g. Claude Code on my laptop" } }
         submitInput(classes = "btn") { value = "Create token" }

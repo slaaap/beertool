@@ -199,9 +199,10 @@ commands queued for it; beertool keeps no state about it beyond the latest repor
 the temperature readings of each brew. The OpenAPI 3.1 spec is served at
 [`/api/brewhouse/v1/openapi.yaml`](src/main/resources/brewhouse/openapi.yaml).
 
-To connect a controller, create a personal token under **Settings → Connections** and give it the token and
-the API URL shown there. The controller signs in with that token, so the Brewhouse API stays off when
-`MCP_TOKENS_ENABLED=false`; it does not need `MCP_ENABLED`.
+To connect a controller, press **Connect a brewhouse** under **Settings → Connections** and enter the key
+it shows, with the API URL shown there, in the controller. A brewhouse key opens the Brewhouse API and nothing
+else, so the controller never holds access to your recipes; personal tokens for the AI assistant are not
+accepted here. Making a new key retires the old one.
 
 Once the controller has synced, the Brew Day page's Water, Mash and Boil stages show whether it is online,
 start the brew on it after showing the schedule it will send (strike water and temperature, mash steps,

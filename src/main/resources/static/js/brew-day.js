@@ -161,10 +161,12 @@ function tabClock(stage, text) {
       if (!running && timer) { clearInterval(timer); timer = null; }
       fireDue(); render();
     },
-    release: function () {
+    // finished: the controller ended the boil, so a clock a second or two behind still reaches flame-out and its addition.
+    release: function (finished) {
       if (!external) return;
       external = false; btn.hidden = false; reset.hidden = false;
       clearInterval(timer); timer = null; running = false;
+      if (finished) { left = 0; fireDue(); }
       btn.textContent = 'Start'; save(); render();
     }
   };

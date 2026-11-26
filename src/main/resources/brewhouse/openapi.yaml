@@ -9,10 +9,10 @@ info:
     `POST /sync` about every 2 seconds, reporting its devices and the running session, and receives
     any commands queued for it in the response.
 
-    Each user has at most one brewhouse, identified by the personal access token it uses. beertool
+    Each user has at most one brewhouse, identified by its brewhouse key. beertool
     treats the brewhouse as online while its last sync is under 15 seconds old.
 
-    Commands are queued by the beertool UI, or by any client holding a token, via `POST /commands`.
+    Commands are queued by the beertool UI, or by any client holding the key, via `POST /commands`.
     A command is delivered in every sync response until the brewhouse acknowledges it in
     `commandResults`, or until it expires 60 seconds after it was queued, so a stale command never
     fires later. The brewhouse executes each command id at most once.
@@ -22,9 +22,10 @@ info:
   license:
     name: MIT
 servers:
-  - url: https://beertool.uk/api/brewhouse/v1
+  - url: /api/brewhouse/v1
+    description: Relative to the beertool instance serving this document.
 security:
-  - token: []
+  - brewhouseKey: []
 
 paths:
   /sync:
@@ -33,7 +34,7 @@ paths:
       summary: Report the brewhouse state and collect pending commands.
       description: |
         Called by the brewhouse about every 2 seconds, whether or not a session is running. beertool
-        stores the report as the latest state for the token's user, records the time it was received,
+        stores the report as the latest state for the key's user, records the time it was received,
         drops the commands acknowledged in `commandResults`, and returns the commands still pending.
         While a session is linked to a batch, beertool also keeps a reading series for that batch
         (see `Session`).
@@ -201,10 +202,12 @@ paths:
 
 components:
   securitySchemes:
-    token:
+    brewhouseKey:
       type: http
       scheme: bearer
-      description: A beertool personal access token (`bt_...`), created on the settings page.
+      description: |
+        A brewhouse key (`bh_...`), made under Settings → Connections. It opens this API only, and making
+        a new one retires the old.
 
   responses:
     BadRequest:
@@ -214,7 +217,7 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     Unauthorized:
-      description: Missing, unknown or revoked token.
+      description: Missing, unknown or retired brewhouse key.
       content:
         application/json:
           schema:
@@ -311,8 +314,9 @@ components:
       type: object
       description: |
         The running or last session. beertool appends a `Reading` to the batch's series from each report
-        whose session has a `batchId`, at most one per reading interval (10 seconds unless the server is
-        configured otherwise), and keeps the series with the batch.
+        whose session has a `batchId` and is in progress (not `idle`, `done` or `fault`), at most one per
+        reading interval (10 seconds unless the server is configured otherwise), and keeps the series with
+        the batch.
       required: [phase, updatedAt]
       properties:
         batchId:

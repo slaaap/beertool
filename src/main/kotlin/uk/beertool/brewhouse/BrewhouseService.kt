@@ -56,6 +56,7 @@ class BrewhouseService(
     // Keyed by user too, so a controller reporting someone else's batch id cannot hold back that brewer's own readings.
     private fun record(user: User, session: Session) {
         val batchId = session.batchId ?: return
+        if (session.phase !in RECORDED) return
         val at = now()
         val key = user.id to batchId
         var due = false
@@ -70,5 +71,8 @@ class BrewhouseService(
 
     private companion object {
         val STALE_THROTTLE: Duration = Duration.ofHours(1)
+
+        // A finished or faulted session stays in every report until the next one starts, so only a brew in progress is charted.
+        val RECORDED = setOf(Phase.STRIKE, Phase.DOUGH_IN, Phase.MASH, Phase.MASHED, Phase.BOIL_HEAT, Phase.BOIL, Phase.PAUSED, Phase.MANUAL)
     }
 }

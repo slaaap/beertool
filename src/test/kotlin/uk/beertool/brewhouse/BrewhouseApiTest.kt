@@ -61,21 +61,42 @@ class BrewhouseApiTest {
 
         response.status shouldBe HttpStatusCode.Unauthorized
         response.headers[HttpHeaders.WWWAuthenticate]!! shouldStartWith "Bearer"
-        decode(response.bodyAsText(), ApiError.serializer()).error shouldContain "token"
+        decode(response.bodyAsText(), ApiError.serializer()).error shouldContain "brewhouse key"
     }
 
     @Test
-    fun `should turn away an unknown token`() = brewhouseApp {
-        val response = client.get("$BREWHOUSE_PATH/status") { bearer("bt_not-a-token") }
+    fun `should turn away an unknown key`() = brewhouseApp {
+        val response = client.get("$BREWHOUSE_PATH/status") { bearer("bh_not-a-key") }
 
         response.status shouldBe HttpStatusCode.Unauthorized
     }
 
     @Test
-    fun `should turn away a token once it is revoked`() = brewhouseApp {
+    fun `should turn away a personal access token, which only opens the AI assistant`() = brewhouseApp {
         val brewer = newBrewer()
-        val tokenId = ApiTokenRepository.listByUser(brewer.userId).single().id
-        ApiTokenRepository.revoke(tokenId, brewer.userId)
+        val personal = ApiTokenRepository.create(brewer.userId, "Claude Code")
+
+        val response = client.get("$BREWHOUSE_PATH/status") { bearer(personal) }
+
+        response.status shouldBe HttpStatusCode.Unauthorized
+    }
+
+    @Test
+    fun `should retire the old key when the brewer makes a new one`() = brewhouseApp {
+        val brewer = newBrewer()
+        val fresh = BrewhouseKeyRepository.issue(brewer.userId)
+
+        val old = client.get("$BREWHOUSE_PATH/status") { bearer(brewer.token) }
+        val new = client.get("$BREWHOUSE_PATH/status") { bearer(fresh) }
+
+        old.status shouldBe HttpStatusCode.Unauthorized
+        new.status shouldBe HttpStatusCode.OK
+    }
+
+    @Test
+    fun `should turn away the brewhouse once disconnected`() = brewhouseApp {
+        val brewer = newBrewer()
+        BrewhouseKeyRepository.revoke(brewer.userId)
 
         val response = client.post("$BREWHOUSE_PATH/sync") { bearer(brewer.token); json(encode(report(), Report.serializer())) }
 
@@ -295,6 +316,19 @@ class BrewhouseApiTest {
     }
 
     @Test
+    fun `should stop charting once the session is over, though the controller still reports it`() = brewhouseApp {
+        val brewer = newBrewer()
+
+        client.sync(brewer, report(session = session(brewer.batchId, tempC = 99.0)))
+        listOf(Phase.DONE, Phase.FAULT, Phase.IDLE).forEach {
+            later(Duration.ofSeconds(10))
+            client.sync(brewer, report(session = session(brewer.batchId).copy(phase = it)))
+        }
+
+        client.readings(brewer).map { it.tempC } shouldBe listOf(99.0)
+    }
+
+    @Test
     fun `should return only the readings after the given instant`() = brewhouseApp {
         val brewer = newBrewer()
         client.sync(brewer, report(session = session(brewer.batchId, tempC = 64.0)))
@@ -350,21 +384,12 @@ class BrewhouseApiTest {
     }
 
     @Test
-    fun `should stay off when personal tokens are switched off`() = brewhouseApp(BrewhouseConfig(tokensEnabled = false)) {
-        val brewer = newBrewer()
-
-        val response = client.get("$BREWHOUSE_PATH/status") { bearer(brewer.token) }
-
-        response.status shouldBe HttpStatusCode.NotFound
-    }
-
-    @Test
-    fun `should read the reading interval and the token switch from the environment`() {
-        val env = mapOf("BREWHOUSE_ENABLED" to "true", "BREWHOUSE_READING_INTERVAL_SECONDS" to "30", "MCP_TOKENS_ENABLED" to "false")
+    fun `should read the reading interval from the environment`() {
+        val env = mapOf("BREWHOUSE_ENABLED" to "true", "BREWHOUSE_READING_INTERVAL_SECONDS" to "30")
 
         val config = BrewhouseConfig.fromEnv(env::get)
 
-        config shouldBe BrewhouseConfig(readingInterval = Duration.ofSeconds(30), tokensEnabled = false)
+        config shouldBe BrewhouseConfig(readingInterval = Duration.ofSeconds(30))
     }
 
     @Test
@@ -390,7 +415,7 @@ class BrewhouseApiTest {
             ),
         )
         val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id))!!
-        return Brewer(user.id, ApiTokenRepository.create(user.id, "brewhouse"), batch.id)
+        return Brewer(user.id, BrewhouseKeyRepository.issue(user.id), batch.id)
     }
 
     private fun session(batchId: Long?, tempC: Double = 64.0) = Session(

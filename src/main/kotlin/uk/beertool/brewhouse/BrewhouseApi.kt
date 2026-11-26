@@ -31,7 +31,6 @@ import uk.beertool.common.flag
 import uk.beertool.common.io
 import uk.beertool.common.systemEnv
 import uk.beertool.common.text
-import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.user.User
 import uk.beertool.web.currentUser
 import java.time.Duration
@@ -44,7 +43,6 @@ const val MAX_BODY_BYTES = 16 * 1024
 
 data class BrewhouseConfig(
     val readingInterval: Duration = DEFAULT_READING_INTERVAL,
-    val tokensEnabled: Boolean = true,
 ) {
     companion object {
         fun fromEnv(env: Env = systemEnv): BrewhouseConfig? {
@@ -52,10 +50,7 @@ data class BrewhouseConfig(
             val seconds = env.text("BREWHOUSE_READING_INTERVAL_SECONDS")?.let {
                 it.toLongOrNull()?.takeIf { s -> s > 0 } ?: error("BREWHOUSE_READING_INTERVAL_SECONDS must be a whole number of seconds above 0, not '$it'")
             }
-            return BrewhouseConfig(
-                readingInterval = seconds?.let { Duration.ofSeconds(it) } ?: DEFAULT_READING_INTERVAL,
-                tokensEnabled = env.flag("MCP_TOKENS_ENABLED", default = true),
-            )
+            return BrewhouseConfig(readingInterval = seconds?.let { Duration.ofSeconds(it) } ?: DEFAULT_READING_INTERVAL)
         }
     }
 }
@@ -80,18 +75,14 @@ fun Application.configureBrewhouse(
         log.info("BREWHOUSE_ENABLED not set - brewhouse API disabled")
         return
     }
-    if (!config.tokensEnabled) {
-        log.warn("Brewhouse API disabled: MCP_TOKENS_ENABLED is false, and a controller can only connect with a personal access token")
-        return
-    }
     val service = BrewhouseService(Brewhouses(now), config.readingInterval, now)
     val spec = Brewhouse::class.java.getResource("/brewhouse/openapi.yaml")!!.readText()
     routing {
         get("$BREWHOUSE_PATH/openapi.yaml") { call.respondText(spec, ContentType.parse("application/yaml")) }
         route(BREWHOUSE_PATH) {
-            createChild(TokenProtected).apply {
-                install(TokenAuth)
-                tokenRoutes(service)
+            createChild(KeyProtected).apply {
+                install(KeyAuth)
+                keyRoutes(service)
             }
         }
         route(BREWHOUSE_WEB_PATH) { sessionRoutes(service) }
@@ -100,7 +91,7 @@ fun Application.configureBrewhouse(
     log.info("Brewhouse API enabled at {}, readings every {} s", BREWHOUSE_PATH, config.readingInterval.seconds)
 }
 
-private fun Route.tokenRoutes(service: BrewhouseService) {
+private fun Route.keyRoutes(service: BrewhouseService) {
     post("sync") {
         call.api {
             val report = decode(call.receiveLimited(), Report.serializer())
@@ -130,7 +121,7 @@ private fun Route.tokenRoutes(service: BrewhouseService) {
     }
 }
 
-// The Brew Day page's own routes: the signed-in brewer's session instead of a token, and nothing for showcase visitors.
+// The Brew Day page's own routes: the signed-in brewer's session instead of a key, and nothing for showcase visitors.
 private fun Route.sessionRoutes(service: BrewhouseService) {
     get("status") {
         call.asBrewer { encode(service.pageStatus(it), PageStatus.serializer()) }
@@ -161,23 +152,23 @@ private suspend fun ApplicationCall.asBrewer(success: HttpStatusCode = HttpStatu
     block(user)
 }
 
-// A transparent node, so the token check covers the spec's routes but not the spec document beside them.
-private object TokenProtected : RouteSelector() {
+// A transparent node, so the key check covers the spec's routes but not the spec document beside them.
+private object KeyProtected : RouteSelector() {
     override suspend fun evaluate(context: RoutingResolveContext, segmentIndex: Int) = RouteSelectorEvaluation.Transparent
-    override fun toString() = "(brewhouse token)"
+    override fun toString() = "(brewhouse key)"
 }
 
-// Scoped to the routed API node, so no spelling of the URL reaches a handler without a token.
-private val TokenAuth = createRouteScopedPlugin("BrewhouseTokenAuth") {
+// Scoped to the routed API node, so no spelling of the URL reaches a handler without a key.
+private val KeyAuth = createRouteScopedPlugin("BrewhouseKeyAuth") {
     onCall { call ->
         val token = call.request.header(HttpHeaders.Authorization)
             ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
             ?.substring("Bearer ".length)?.trim()
             ?.ifEmpty { null }
-        val user = token?.let { io { ApiTokenRepository.userFor(it) } }
+        val user = token?.let { io { BrewhouseKeyRepository.userFor(it) } }
         if (user == null) {
             call.response.header(HttpHeaders.WWWAuthenticate, "Bearer realm=\"beertool\"")
-            call.respondError(HttpStatusCode.Unauthorized, "A valid beertool access token is required.")
+            call.respondError(HttpStatusCode.Unauthorized, "A valid brewhouse key is required.")
         } else {
             call.attributes.put(BrewhouseUser, user)
         }
