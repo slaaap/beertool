@@ -27,12 +27,14 @@ including a phone-first **Brew Day** mode for using it at the kettle.
   brew day plan, a boil timer that messages you at each addition, and log readings by just typing `og 1.052`.
 - **AI assistant access** (optional) - an MCP endpoint, so an assistant such as Claude or ChatGPT can read your
   recipes and brew log, estimate drafts with beertool's own maths, and save recipes you agree on.
+- **Brewhouse control** (optional) - an HTTP API for a home brewery controller (induction hob, thermometer,
+  pump): Brew Day shows its live temperatures and can start a mash and boil on it.
 - **Two modes** - multi-user with accounts, or a **single-user public-showcase mode** where visitors browse
   one brewer's recipes read-only.
 
 ## Requirements
 
-- **JDK 21**
+- **JDK 25**
 - **Docker** - for a local Postgres, and for the tests (which spin up a throwaway Postgres via Testcontainers)
 
 ## Quick start
@@ -63,6 +65,8 @@ All configuration is via environment variables:
 | `MCP_ENABLED`       | *(unset → off)*                                   | `true` turns on the MCP endpoint at `/mcp` (see below)        |
 | `MCP_OAUTH_ENABLED` | `true`                                            | `false` turns off connecting by OAuth (Claude, ChatGPT)       |
 | `MCP_TOKENS_ENABLED`| `true`                                            | `false` turns off personal access tokens                      |
+| `BREWHOUSE_ENABLED` | *(unset → off)*                                   | `true` turns on the Brewhouse API (see below)                 |
+| `BREWHOUSE_READING_INTERVAL_SECONDS` | `10`                             | How often a running session's temperature is kept for the brew-day chart |
 | `MCP_OAUTH_CLIENT_HOSTS` | `claude.ai,chatgpt.com`                      | Comma-separated hosts whose apps may connect through OAuth (see below) |
 | `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site, and the MCP endpoint accepts requests for this host |
 
@@ -186,6 +190,26 @@ still be revoked.
 
 Disconnect an app or revoke a token in Settings and it loses access at once. Set `PUBLIC_URL` in production:
 requests addressed to any other host are refused, which protects the endpoint against DNS rebinding.
+
+## Brewhouse (optional)
+
+With `BREWHOUSE_ENABLED=true`, beertool serves an API at `/api/brewhouse/v1` for a home brewery controller
+that runs the hob, thermometer and pump. The controller posts a report every few seconds and collects the
+commands queued for it; beertool keeps no state about it beyond the latest report, the pending commands and
+the temperature readings of each brew. The OpenAPI 3.1 spec is served at
+[`/api/brewhouse/v1/openapi.yaml`](src/main/resources/brewhouse/openapi.yaml).
+
+To connect a controller, press **Connect a brewhouse** under **Settings → Connections** and enter the key
+it shows, with the API URL shown there, in the controller. A brewhouse key opens the Brewhouse API and nothing
+else, so the controller never holds access to your recipes; personal tokens for the AI assistant are not
+accepted here. Making a new key retires the old one.
+
+Once the controller has synced, the Brew Day page's Water, Mash and Boil stages show whether it is online,
+start the brew on it after showing the schedule it will send (strike water and temperature, mash steps,
+boil), and then follow it live: temperature against target, the phase with buttons to move it on, pause or
+stop, a chart of the session, and the mash and boil timers following the controller's clock. The start uses
+the grain temperature and mash thickness adjusted in the page's mash-water guide. While a session runs,
+one reading is kept per `BREWHOUSE_READING_INTERVAL_SECONDS` and deleted with its batch.
 
 ## Build a standalone jar
 

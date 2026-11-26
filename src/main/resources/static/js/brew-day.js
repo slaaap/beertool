@@ -59,7 +59,8 @@ function tabClock(stage, text) {
   var btn = document.getElementById('boil-start');
   var status = document.getElementById('boil-status');
   var rows = [].slice.call(document.querySelectorAll('#boil-adds [data-remaining]'));
-  var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {};
+  var reset = document.getElementById('boil-reset');
+  var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {}, external = false;
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function save() {
@@ -71,7 +72,8 @@ function tabClock(stage, text) {
     if (left < 0) left = 0;
     clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('boil', running ? clock.textContent : '');
-    status.textContent = running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '';
+    status.textContent = (external && left > 0 ? 'Timed by the brewhouse. ' : '') +
+      (running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '');
     var m = Math.ceil(left / 60);
     rows.forEach(function (r) {
       var at = parseInt(r.getAttribute('data-remaining'), 10);
@@ -135,8 +137,42 @@ function tabClock(stage, text) {
   }
   render();
 
+  // While the brewhouse boils, its boil time drives the clock so additions sound on the controller's timing.
+  window.boilClock = {
+    follow: function (seconds, ticking) {
+      var fresh = !external;
+      if (fresh) {
+        external = true; btn.hidden = true; reset.hidden = true;
+        var m = Math.ceil(seconds / 60);
+        rows.forEach(function (r) {
+          var at = parseInt(r.getAttribute('data-remaining'), 10);
+          if (at > m) fired[at] = true;
+        });
+      }
+      var want = Math.max(0, Math.round(seconds));
+      var shown = running ? Math.round((endAt - Date.now()) / 1000) : left;
+      // A report is a second or two old by the time it lands, so only a real gap moves the clock.
+      if (fresh || running !== (ticking && want > 0) || Math.abs(want - shown) > 2) {
+        left = want;
+        running = ticking && left > 0;
+        endAt = Date.now() + left * 1000;
+      }
+      if (running && !timer) { sound.unlock(); timer = setInterval(tick, 500); }
+      if (!running && timer) { clearInterval(timer); timer = null; }
+      fireDue(); render();
+    },
+    // finished: the controller ended the boil, so a clock a second or two behind still reaches flame-out and its addition.
+    release: function (finished) {
+      if (!external) return;
+      external = false; btn.hidden = false; reset.hidden = false;
+      clearInterval(timer); timer = null; running = false;
+      if (finished) { left = 0; fireDue(); }
+      btn.textContent = 'Start'; save(); render();
+    }
+  };
+
   btn.onclick = function () { running ? pause() : start(); };
-  confirmTap(document.getElementById('boil-reset'), function () {
+  confirmTap(reset, function () {
     clearInterval(timer); timer = null; running = false;
     left = total; fired = {}; late = {}; clearSaved();
     btn.textContent = 'Start'; render();
@@ -156,12 +192,15 @@ function tabClock(stage, text) {
   var key = 'mash:' + clock.getAttribute('data-key');
   var status = document.getElementById('mash-status');
   var btn = document.getElementById('mash-start');
+  var next = document.getElementById('mash-next');
+  var reset = document.getElementById('mash-reset');
   var rows = [].slice.call(document.querySelectorAll('table.mash-plan tr[data-min]'));
   var steps = rows.map(function (r) { return { temp: r.getAttribute('data-temp'), min: parseInt(r.getAttribute('data-min'), 10) }; });
-  var step = 0, left = steps[0].min * 60, running = false, endAt = 0, timer = null;
+  var step = 0, left = steps[0].min * 60, running = false, endAt = 0, timer = null, external = false, heating = false;
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function save() {
+    if (external) return;
     try { localStorage.setItem(key, JSON.stringify({ step: step, running: running, endAt: endAt, remaining: left })); } catch (e) {}
   }
 
@@ -172,51 +211,89 @@ function tabClock(stage, text) {
       r.classList.toggle('done', i < step);
     });
     btn.disabled = done;
-    document.getElementById('mash-next').disabled = done;
+    next.disabled = done;
     btn.textContent = running ? 'Pause' : fresh || done ? 'Start' : 'Resume';
     clock.textContent = done ? 'Done' : Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('mash', running ? clock.textContent : '');
     status.textContent =
       done ? 'Mash done. Time to sparge.' :
+      external ? (heating ? 'Step ' + (step + 1) + ' · heating to ' + steps[step].temp + ' °C' :
+        running ? 'Step ' + (step + 1) + ' · hold ' + steps[step].temp + ' °C until ' + clockTime(endAt) :
+        'Paused at step ' + (step + 1)) + '. Timed by the brewhouse.' :
       running ? 'Step ' + (step + 1) + ' · hold ' + steps[step].temp + ' °C until ' + clockTime(endAt) :
       !fresh ? 'Paused at step ' + (step + 1) + '.' :
       step > 0 ? 'Step ' + step + ' done. Raise the mash to ' + steps[step].temp + ' °C, then start.' :
       'Bring the mash to ' + steps[0].temp + ' °C, then start.';
   }
 
+  function stopTicking() { clearInterval(timer); timer = null; }
+
   // Each rest waits for the brewer to reach its temperature, so a finished step never starts the next one.
   function finishStep() {
-    clearInterval(timer); timer = null; running = false;
+    stopTicking(); running = false;
     step++;
     left = step < steps.length ? steps[step].min * 60 : 0;
     save(); render();
   }
 
+  // Under the brewhouse a step ends when the controller says so, so the clock only runs down to zero.
   function tick() {
     if (!running) return;
     left = Math.round((endAt - Date.now()) / 1000);
+    if (left <= 0 && external) { left = 0; stopTicking(); running = false; render(); return; }
     if (left <= 0) { sound.alarm(); finishStep(); return; }
     render();
   }
 
-  try {
-    var s = JSON.parse(localStorage.getItem(key));
-    if (s && s.step != null) {
-      step = Math.min(s.step, steps.length);
-      if (s.running) { endAt = s.endAt; running = true; }
-      else if (s.remaining != null) left = s.remaining;
+  function restore() {
+    step = 0; left = steps[0].min * 60; running = false;
+    try {
+      var s = JSON.parse(localStorage.getItem(key));
+      if (s && s.step != null) {
+        step = Math.min(s.step, steps.length);
+        left = step < steps.length ? steps[step].min * 60 : 0;
+        if (s.running) { endAt = s.endAt; running = true; }
+        else if (s.remaining != null) left = s.remaining;
+      }
+    } catch (e) {}
+    if (running) {
+      left = Math.round((endAt - Date.now()) / 1000);
+      if (left <= 0) finishStep();
+      else timer = setInterval(tick, 500);
     }
-  } catch (e) {}
-  if (running) {
-    left = Math.round((endAt - Date.now()) / 1000);
-    if (left <= 0) finishStep();
-    else timer = setInterval(tick, 500);
+    render();
   }
-  render();
+  restore();
+
+  // While the brewhouse mashes, its step and time left drive the clock; seconds is null while it heats to the step.
+  window.mashClock = {
+    follow: function (index, seconds, ticking) {
+      var fresh = !external;
+      if (fresh) { external = true; stopTicking(); running = false; btn.hidden = next.hidden = reset.hidden = true; }
+      var moved = index !== step;
+      step = Math.min(index, steps.length);
+      heating = seconds == null && step < steps.length;
+      var want = step >= steps.length ? 0 : heating ? steps[step].min * 60 : Math.max(0, Math.round(seconds));
+      var go = ticking && !heating && want > 0;
+      var shown = running ? Math.round((endAt - Date.now()) / 1000) : left;
+      if (fresh || moved || running !== go || Math.abs(want - shown) > 2) {
+        left = want; running = go; endAt = Date.now() + left * 1000;
+      }
+      if (running && !timer) timer = setInterval(tick, 500);
+      if (!running) stopTicking();
+      render();
+    },
+    release: function () {
+      if (!external) return;
+      external = false; heating = false; stopTicking();
+      btn.hidden = next.hidden = reset.hidden = false;
+      restore();
+    }
+  };
 
   btn.onclick = function () {
     if (running) {
-      clearInterval(timer); timer = null; running = false;
+      stopTicking(); running = false;
     } else {
       sound.unlock();
       endAt = Date.now() + left * 1000; running = true;
@@ -224,9 +301,9 @@ function tabClock(stage, text) {
     }
     save(); render();
   };
-  confirmTap(document.getElementById('mash-next'), finishStep);
-  confirmTap(document.getElementById('mash-reset'), function () {
-    clearInterval(timer); timer = null; running = false;
+  confirmTap(next, finishStep);
+  confirmTap(reset, function () {
+    stopTicking(); running = false;
     step = 0; left = steps[0].min * 60;
     try { localStorage.removeItem(key); } catch (e) {}
     render();
@@ -291,6 +368,7 @@ function tabClock(stage, text) {
   function show(i) {
     at = i;
     stages.forEach(function (s, j) { s.hidden = j !== i; });
+    root.setAttribute('data-stage', keys[i]);
     tabs.forEach(function (t, j) { t.classList.toggle('active', j === i); });
     prev.hidden = i === 0;
     next.hidden = i === keys.length - 1;

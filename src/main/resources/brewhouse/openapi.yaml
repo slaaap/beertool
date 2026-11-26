@@ -1,0 +1,481 @@
+openapi: 3.1.0
+info:
+  title: Beertool Brewhouse API
+  version: 1.0.0
+  summary: Lets a home brewery controller report its state to beertool and take commands from it.
+  description: |
+    A brewhouse is a local controller (for example the beertool-brewhouse mash server) that heats a
+    kettle and runs a mash and boil to a schedule, whatever hardware it uses. It never accepts inbound
+    connections: it calls `POST /sync` about every 2 seconds, reporting whether it is ready and the
+    running session, and receives any commands queued for it in the response.
+
+    Each user has at most one brewhouse, identified by its brewhouse key. beertool
+    treats the brewhouse as online while its last sync is under 15 seconds old.
+
+    Commands are queued by the beertool UI, or by any client holding the key, via `POST /commands`.
+    A command is delivered in every sync response until the brewhouse acknowledges it in
+    `commandResults`, or until it expires 60 seconds after it was queued, so a stale command never
+    fires later. The brewhouse executes each command id at most once.
+
+    The brewhouse stays the authority on safety: it validates every command against its own state
+    and may refuse it, reporting why in `commandResults`.
+  license:
+    name: MIT
+servers:
+  - url: /api/brewhouse/v1
+    description: Relative to the beertool instance serving this document.
+security:
+  - brewhouseKey: []
+
+paths:
+  /sync:
+    post:
+      operationId: sync
+      summary: Report the brewhouse state and collect pending commands.
+      description: |
+        Called by the brewhouse about every 2 seconds, whether or not a session is running. beertool
+        stores the report as the latest state for the key's user, records the time it was received,
+        drops the commands acknowledged in `commandResults`, and returns the commands still pending.
+        While a session is linked to a batch, beertool also keeps a reading series for that batch
+        (see `Session`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Report"
+      responses:
+        "200":
+          description: Report stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Report larger than 16 KiB.
+
+  /status:
+    get:
+      operationId: getStatus
+      summary: The brewhouse's latest report, for dashboards and other clients.
+      responses:
+        "200":
+          description: Latest known state. `report` is null if the brewhouse has never synced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /commands:
+    post:
+      operationId: queueCommand
+      summary: Queue a command for the brewhouse.
+      description: |
+        For `start`, beertool builds the schedule from the batch (see `Schedule`) and delivers it with
+        the command. beertool rejects the command with 409 when the brewhouse is offline, and rejects
+        `start` when the last report is not `ready`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandRequest"
+      responses:
+        "202":
+          description: Queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The batch does not exist or belongs to another user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The brewhouse is offline, or not ready for `start`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: A `start` whose batch has no runnable schedule (see `getSchedule`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /commands/{id}:
+    get:
+      operationId: getCommand
+      summary: Whether a queued command was delivered and what the brewhouse said.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The command and its outcome. Kept for at least 10 minutes after it was queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Unknown or forgotten command.
+
+  /batches/{batchId}/schedule:
+    get:
+      operationId: getSchedule
+      summary: The schedule a `start` for this batch would send, to preview or check it.
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: The schedule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The batch does not exist or belongs to another user.
+        "422":
+          description: |
+            The recipe has no mash steps, a step is outside 20-80 °C or under a minute, or the recipe lacks
+            the mash grain or pre-boil volume needed to work out the strike water.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /batches/{batchId}/readings:
+    get:
+      operationId: getReadings
+      summary: The reading series a brewhouse session recorded for this batch, for charts.
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: since
+          in: query
+          description: Only readings after this instant, so a live chart can fetch just what is new.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Readings in time order; empty if the batch was never brewed on a brewhouse.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reading"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The batch does not exist or belongs to another user.
+
+components:
+  securitySchemes:
+    brewhouseKey:
+      type: http
+      scheme: bearer
+      description: |
+        A brewhouse key (`bh_...`), made under Settings → Connections. It opens this API only, and making
+        a new one retires the old.
+
+  responses:
+    BadRequest:
+      description: Malformed or invalid body.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing, unknown or retired brewhouse key.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: A sentence a person can read.
+
+    Status:
+      type: object
+      required: [online, lastSeenAt, report]
+      properties:
+        online:
+          type: boolean
+          description: The last sync arrived under 15 seconds ago.
+        lastSeenAt:
+          type: [string, "null"]
+          format: date-time
+        report:
+          oneOf:
+            - $ref: "#/components/schemas/Report"
+            - type: "null"
+
+    Report:
+      type: object
+      required: [software, ready, session, commandResults]
+      properties:
+        software:
+          type: string
+          description: The controller and its version.
+          examples: ["beertool-brewhouse 1.0"]
+        ready:
+          type: boolean
+          description: The controller could take a `start` now; how it decides is up to it.
+        notReady:
+          type: [string, "null"]
+          description: Why it is not ready, in words for people; beertool shows it beside the start button.
+          examples: ["thermometer offline"]
+        session:
+          oneOf:
+            - $ref: "#/components/schemas/Session"
+            - type: "null"
+        commandResults:
+          type: array
+          description: Outcomes of commands executed since the previous sync; beertool stops delivering them.
+          items:
+            $ref: "#/components/schemas/CommandResult"
+
+    Session:
+      type: object
+      description: |
+        The running or last session. beertool appends a `Reading` to the batch's series from each report
+        whose session has a `batchId` and is in progress (not `idle`, `done` or `fault`), at most one per
+        reading interval (10 seconds unless the server is configured otherwise), and keeps the series with
+        the batch.
+      required: [phase, updatedAt]
+      properties:
+        batchId:
+          type: [integer, "null"]
+          format: int64
+          description: The batch it was started for; null when started locally without beertool.
+        phase:
+          $ref: "#/components/schemas/Phase"
+        stage:
+          type: [string, "null"]
+          description: A label for people, such as "Strike water", "Step 2 of 3" or "Boil".
+          examples: ["Step 2 of 3"]
+        step:
+          type: [integer, "null"]
+          description: Zero-based index of the current mash step.
+        targetC:
+          type: [number, "null"]
+          description: The temperature being heated to or held; null while boiling or when nothing is driven.
+        tempC:
+          type: [number, "null"]
+          description: The temperature the controller regulates on.
+        heatPct:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 100
+          description: How hard it is heating, from 0 (off) to 100 (full power).
+        stepLeftMin:
+          type: [number, "null"]
+          description: Minutes left in the current mash step, once its temperature is reached.
+        etaMin:
+          type: [number, "null"]
+          description: Predicted minutes until the target temperature, or until boiling.
+        boilMinutes:
+          type: [integer, "null"]
+          description: Length of the boil.
+        boilLeftMin:
+          type: [number, "null"]
+          description: Minutes left in the boil, once boiling. beertool times its hop additions from this.
+        fault:
+          type: [string, "null"]
+          description: Why the controller stopped heating, in words for people.
+          examples: ["pump not running"]
+        note:
+          type: [string, "null"]
+          description: Why someone else is driving the heat, while `phase` is `manual`.
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Phase:
+      type: string
+      description: |
+        - `idle`: nothing running.
+        - `strike`: heating the strike water.
+        - `dough_in`: strike water ready; waiting for `dough_in`.
+        - `mash`: heating to or holding a mash step.
+        - `mashed`: last step done; holding it until `start_boil` (lauter or lift the bag now).
+        - `boil_heat`: heating to the boil.
+        - `boil`: boiling, `boilLeftMin` counting down.
+        - `paused`: heating (and any pump) off until `resume`; timers stopped.
+        - `manual`: someone took over the heat by hand; timers run, no heating until `resume`.
+        - `done`: finished, heating off.
+        - `fault`: safety stop, heating off until `stop`.
+      enum: [idle, strike, dough_in, mash, mashed, boil_heat, boil, paused, manual, done, fault]
+
+    Reading:
+      type: object
+      required: [at, phase]
+      properties:
+        at:
+          type: string
+          format: date-time
+          description: When beertool received it.
+        phase:
+          $ref: "#/components/schemas/Phase"
+        tempC:
+          type: [number, "null"]
+        targetC:
+          type: [number, "null"]
+        heatPct:
+          type: [integer, "null"]
+
+    CommandType:
+      type: string
+      description: |
+        - `start`: run a batch's schedule (needs `batchId`).
+        - `dough_in`: the grain is in.
+        - `start_boil`: the wort is ready; heat to the boil.
+        - `boiling`: it is boiling now; start the boil timer without waiting for detection.
+        - `pause`, `resume`, `stop`.
+      enum: [start, dough_in, start_boil, boiling, pause, resume, stop]
+
+    CommandRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: "#/components/schemas/CommandType"
+        batchId:
+          type: integer
+          format: int64
+          description: Required for `start`, ignored otherwise.
+
+    Command:
+      type: object
+      required: [id, type, createdAt, status]
+      properties:
+        id:
+          type: string
+          description: Unique per command, generated by beertool.
+        type:
+          $ref: "#/components/schemas/CommandType"
+        schedule:
+          description: Present on `start` only.
+          $ref: "#/components/schemas/Schedule"
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          description: "`pending` until acknowledged, then `done` or `refused`; `expired` if never acknowledged within 60 s."
+          enum: [pending, done, refused, expired]
+        error:
+          type: [string, "null"]
+          description: Why the brewhouse refused it.
+
+    CommandResult:
+      type: object
+      required: [id, ok]
+      properties:
+        id:
+          type: string
+        ok:
+          type: boolean
+        error:
+          type: [string, "null"]
+
+    SyncResponse:
+      type: object
+      required: [commands]
+      properties:
+        commands:
+          type: array
+          description: Pending commands, oldest first.
+          items:
+            $ref: "#/components/schemas/Command"
+
+    Schedule:
+      type: object
+      description: |
+        Built by beertool from the batch's recipe and the brewer's settings, using the same figures as the
+        Brew Day mash-water guide.
+      required: [batchId, recipeName, waterL, grainKg, strikeC, steps, boil]
+      properties:
+        batchId:
+          type: integer
+          format: int64
+        recipeName:
+          type: string
+        waterL:
+          type: number
+          exclusiveMinimum: 0
+          description: Strike water volume in the kettle at dough-in.
+        grainKg:
+          type: number
+          minimum: 0
+          description: Fermentables that go into the mash (not boil or later additions).
+        strikeC:
+          type: [number, "null"]
+          description: Strike water temperature; null to start with the grain already in.
+        steps:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [tempC, minutes]
+            properties:
+              tempC:
+                type: number
+                minimum: 20
+                maximum: 80
+              minutes:
+                type: integer
+                exclusiveMinimum: 0
+        boil:
+          oneOf:
+            - type: object
+              required: [minutes, volumeL]
+              properties:
+                minutes:
+                  type: integer
+                  exclusiveMinimum: 0
+                volumeL:
+                  type: number
+                  exclusiveMinimum: 0
+                  description: Pre-boil volume.
+            - type: "null"

@@ -24,3 +24,9 @@
     renumberRows(body.rows);
   };
 })();
+
+(function () {
+  [].forEach.call(document.querySelectorAll('time[data-local]'), function (t) {
+    t.textContent = new Date(t.getAttribute('datetime')).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  });
+})();

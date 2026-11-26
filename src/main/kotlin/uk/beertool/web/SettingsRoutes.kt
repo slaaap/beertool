@@ -12,9 +12,15 @@ import io.ktor.server.routing.Route
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import uk.beertool.brewing.WaterProfile
+import uk.beertool.brewhouse.BREWHOUSE_PATH
+import uk.beertool.brewhouse.Brewhouse
+import uk.beertool.brewhouse.BrewhouseKeyRepository
+import uk.beertool.brewhouse.Status
 import uk.beertool.common.asPercent
 import uk.beertool.common.fmt
+import uk.beertool.common.publicUrl
 import uk.beertool.common.shortDate
+import uk.beertool.common.systemEnv
 import uk.beertool.mcp.ApiToken
 import uk.beertool.mcp.ApiTokenRepository
 import uk.beertool.mcp.MCP_PATH
@@ -95,7 +101,7 @@ fun Route.settingsRoutes() {
     get<SettingsConnections> {
         withUser(write = true) { call, user ->
             if (!hasConnections()) return@withUser call.respondRedirect("/settings")
-            call.respondHtml { connectionsPage(user, call.mcpEndpoint()) }
+            call.respondHtml { connectionsPage(user, call.publicBase()) }
         }
     }
 
@@ -113,7 +119,23 @@ fun Route.settingsRoutes() {
             val name = call.receiveForm<TokenForm>().name.trim().ifBlank { "Access token" }.take(80)
             val token = ApiTokenRepository.create(user.id, name)
             call.response.header(HttpHeaders.CacheControl, "no-store")
-            call.respondHtml { connectionsPage(user, call.mcpEndpoint(), NewToken(name, token)) }
+            call.respondHtml { connectionsPage(user, call.publicBase(), NewToken(name, token)) }
+        }
+    }
+
+    post<SettingsBrewhouseKey> {
+        withUser(write = true) { call, user ->
+            if (!Brewhouse.enabled) return@withUser call.respondRedirect(CONNECTIONS)
+            val key = BrewhouseKeyRepository.issue(user.id)
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.respondHtml { connectionsPage(user, call.publicBase(), newBrewhouseKey = key) }
+        }
+    }
+
+    post<SettingsBrewhouseKeyRevoke> {
+        withUser(write = true) { call, user ->
+            BrewhouseKeyRepository.revoke(user.id)
+            call.respondRedirect(CONNECTIONS)
         }
     }
 
@@ -154,7 +176,7 @@ data class TokenForm(val name: String = "")
 
 private const val CONNECTIONS = "/settings/connections"
 
-private fun hasConnections() = Telegram.enabled || Mcp.enabled
+private fun hasConnections() = Telegram.enabled || Mcp.enabled || Brewhouse.enabled
 
 private fun FlowContent.settingsHead(current: String) {
     h1 { +"Settings" }
@@ -166,11 +188,13 @@ private fun FlowContent.settingsHead(current: String) {
     }
 }
 
-fun HTML.connectionsPage(user: User, mcpEndpoint: String?, newToken: NewToken? = null) {
+fun HTML.connectionsPage(user: User, base: String, newToken: NewToken? = null, newBrewhouseKey: String? = null) {
     page("Connections", user) {
         settingsHead(CONNECTIONS)
         if (Telegram.enabled) telegramSection(user)
-        mcpEndpoint?.let { assistantSection(user, it, newToken) }
+        if (Mcp.enabled) assistantSection(user, base + MCP_PATH, newToken)
+        Brewhouse.service?.let { brewhouseSection(user, it.status(user), base + BREWHOUSE_PATH, newBrewhouseKey) }
+        js("settings.js")
     }
 }
 
@@ -305,13 +329,10 @@ private fun usage(created: Instant, lastUsed: Instant?): String {
     return "connected ${day(created)} · " + (lastUsed?.let { "last used ${day(it)}" } ?: "not used yet")
 }
 
-private fun ApplicationCall.mcpEndpoint(): String? {
-    if (!Mcp.enabled) return null
-    val base = Mcp.publicUrl ?: request.origin.let { o ->
-        val port = if (o.serverPort == 80 || o.serverPort == 443) "" else ":${o.serverPort}"
-        "${o.scheme}://${o.serverHost}$port"
-    }
-    return base + MCP_PATH
+// PUBLIC_URL is read directly too, as the brewhouse can be on while MCP, which otherwise holds it, is off.
+private fun ApplicationCall.publicBase() = Mcp.publicUrl ?: systemEnv.publicUrl() ?: request.origin.let { o ->
+    val port = if (o.serverPort == 80 || o.serverPort == 443) "" else ":${o.serverPort}"
+    "${o.scheme}://${o.serverHost}$port"
 }
 
 private fun FlowContent.assistantSection(user: User, endpoint: String, newToken: NewToken?) {
@@ -322,6 +343,49 @@ private fun FlowContent.assistantSection(user: User, endpoint: String, newToken:
     }
     val tokens = ApiTokenRepository.listByUser(user.id)
     if (Mcp.tokensEnabled || tokens.isNotEmpty()) accessTokens(tokens, endpoint, newToken)
+}
+
+private fun FlowContent.brewhouseSection(user: User, status: Status, apiUrl: String, newKey: String?) {
+    sectionHead("Brewhouse")
+    div("stack") {
+        field("Status") {
+            p {
+                when {
+                    status.online -> +("Online" + (status.report?.software?.let { " · $it" } ?: ""))
+                    status.lastSeenAt != null -> { +"Offline · last seen "; localTime(status.lastSeenAt) }
+                    else -> +"Not connected yet"
+                }
+            }
+        }
+        field("API URL") { code("token") { +apiUrl } }
+    }
+    newKey?.let {
+        div("token-box") {
+            p { strong { +"Copy the brewhouse key now." }; +" It won't be shown again. Enter it in the controller with the API URL above." }
+            code("token") { +it }
+        }
+    }
+    val key = BrewhouseKeyRepository.find(user.id)
+    if (key != null) {
+        ul("conn-list") {
+            connRow("Brewhouse key", usage(key.createdAt, key.lastUsedAt)) {
+                deleteButton("/settings/brewhouse/key/revoke", "Disconnect the brewhouse? Its key stops working at once.")
+            }
+        }
+    }
+    form(action = "/settings/brewhouse/key", method = FormMethod.post, classes = "inline-form") {
+        if (key != null) attributes["onsubmit"] = "return confirm('Make a new key? The brewhouse stops syncing until you enter it there.')"
+        submitInput(classes = "btn") { value = if (key == null) "Connect a brewhouse" else "Make a new key" }
+    }
+}
+
+// Shown in the brewer's own timezone by settings.js; the server's rendering is only the fallback.
+private fun FlowContent.localTime(at: Instant) {
+    time {
+        attributes["datetime"] = at.toString()
+        attributes["data-local"] = ""
+        +at.atZone(ZoneId.systemDefault()).let { "${shortDate(it.toLocalDate(), LocalDate.now())} ${"%02d:%02d".format(it.hour, it.minute)}" }
+    }
 }
 
 private fun FlowContent.connectedApps(user: User, endpoint: String) {

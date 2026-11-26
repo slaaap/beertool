@@ -26,6 +26,12 @@ class SettingsTokens
 @Resource("/settings/tokens/{id}/revoke")
 class SettingsTokenRevoke(val id: Long)
 
+@Resource("/settings/brewhouse/key")
+class SettingsBrewhouseKey
+
+@Resource("/settings/brewhouse/key/revoke")
+class SettingsBrewhouseKeyRevoke
+
 @Resource("/settings/apps/{id}/revoke")
 class SettingsAppRevoke(val id: Long)
 

@@ -3,6 +3,7 @@ package uk.beertool.web
 import kotlinx.html.*
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BrewDayStage
+import uk.beertool.brewhouse.Brewhouse
 import uk.beertool.brewing.Calculators
 import uk.beertool.common.fmt
 import uk.beertool.recipe.DEFAULT_GRAIN_TEMP_C
@@ -46,6 +47,7 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 }
                 if (saved) span("saved-note") { id = "saved-note"; +"Saved ✓" }
             }
+            if (Brewhouse.enabled && user.canWrite && batch.isOnBrewDay) brewhousePanel(recipe, batch, user)
 
             val readings = ReadingInputs(recipe, batch, estimate)
             stage(BrewDayStage.WATER) {
@@ -92,6 +94,7 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
         }
 
         js("brew-day.js")
+        if (Brewhouse.enabled && user.canWrite && batch.isOnBrewDay) js("brewhouse.js")
         js("water.js")
         js("ui.js")
     }

@@ -231,6 +231,36 @@ table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .boil-adds li.late .at { color:var(--danger); }
 .boil-adds li.late::after { content:"late - add now"; margin-left:auto; color:var(--danger); font-size:13px; font-weight:600; }
 .timer-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
+.timer-controls .btn[hidden] { display:none; }
+.btn:disabled { opacity:0.45; cursor:default; filter:none; }
+
+.bh-panel { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px; margin-top:14px; }
+#brewday.staged:not([data-stage=water]):not([data-stage=mash]):not([data-stage=boil]) .bh-panel { display:none; }
+.bh-panel [hidden] { display:none !important; }
+.bh-conn { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.bh-state { font-weight:600; color:var(--muted); }
+.bh-panel.online .bh-state { color:var(--good); }
+.bh-why { font-size:13px; color:var(--muted); }
+.bh-wide { width:100%; justify-content:center; padding:13px; font-size:16px; }
+.bh-preview { margin-top:12px; }
+.bh-preview .stats { margin-bottom:10px; }
+.bh-phase { font-weight:600; margin:4px 0 0; }
+.bh-temp { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; margin:2px 0 12px; }
+.bh-now { font-family:var(--font-mono); font-size:56px; font-weight:600; line-height:1.1; color:var(--accent);
+  font-variant-numeric:tabular-nums; }
+.bh-unit { font-size:20px; color:var(--muted); }
+.bh-target { font-family:var(--font-mono); font-size:20px; color:var(--muted); margin-left:8px; }
+.bh-stats { margin-bottom:14px; }
+.bh-actions { flex-wrap:wrap; }
+.bh-chart { margin-top:12px; }
+.bh-chart svg { display:block; width:100%; height:140px; border-bottom:1px solid var(--hairline); }
+.bh-chart path { fill:none; stroke-width:2; vector-effect:non-scaling-stroke; }
+.bh-chart path.temp { stroke:var(--accent); }
+.bh-chart path.target { stroke:var(--muted); stroke-dasharray:4 3; }
+.bh-chart-head, .bh-chart-axis { display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--muted); }
+.bh-chart-head { justify-content:flex-start; margin-bottom:4px; }
+.bh-key::before { content:""; display:inline-block; width:14px; height:0; border-top:2px solid var(--accent); margin-right:5px; vertical-align:3px; }
+.bh-key.target::before { border-top:2px dashed var(--muted); }
 .water-change { margin:12px 0 4px; }
 .water-change > summary { list-style:none; display:inline-flex; }
 .water-change > summary::-webkit-details-marker { display:none; }
