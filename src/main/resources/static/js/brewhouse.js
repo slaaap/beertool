@@ -14,7 +14,8 @@
   function num(v, places) { return v == null ? '-' : v.toFixed(places); }
   function show(el, on) { if (el) el.hidden = !on; }
 
-  var status = null, busy = false, lastReadingAt = null, readings = [], fetching = false;
+  var status = null, busy = false, lastReadingAt = null, readings = [], fetching = false, lastPhase = null, lastActive = null;
+  var CALLS_FOR_YOU = { dough_in: true, mashed: true, fault: true };
 
   function request(method, path, body) {
     var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
@@ -100,14 +101,37 @@
     if (manual) $('bh-note').textContent = (s.note || 'Someone is using the hob panel') + '. Timers keep running; press Resume to hand the heat back.';
   }
 
-  function driveBoilClock() {
-    if (!window.boilClock) return;
-    var s = mySession();
-    if (s && s.boilLeftMin != null && (s.phase === 'boil' || s.phase === 'paused' || s.phase === 'manual')) {
-      window.boilClock.follow(s.boilLeftMin * 60, s.phase !== 'paused');
-    } else {
-      window.boilClock.release();
+  // Both clocks are on beertool's time, so neither the phone's clock nor the controller's skews the age.
+  function reportAgeS() {
+    if (!status || !status.serverNow || !status.lastSeenAt) return 0;
+    return Math.max(0, (Date.parse(status.serverNow) - Date.parse(status.lastSeenAt)) / 1000);
+  }
+
+  // Paused and manual interrupt a stage, so the clocks stay on the stage that was running.
+  function stageOf(s) {
+    if (s.phase !== 'paused' && s.phase !== 'manual') return s.phase;
+    return lastActive || (s.boilLeftMin != null ? 'boil' : s.step != null ? 'mash' : null);
+  }
+
+  function driveClocks() {
+    var s = mySession(), stage = s && stageOf(s), ticking = !!s && s.phase !== 'paused';
+    function seconds(min) { return min == null ? null : min * 60 - (ticking ? reportAgeS() : 0); }
+    if (window.boilClock) {
+      if (stage === 'boil' && s.boilLeftMin != null) window.boilClock.follow(seconds(s.boilLeftMin), ticking);
+      else window.boilClock.release();
     }
+    if (window.mashClock) {
+      if (stage === 'mash' && s.step != null) window.mashClock.follow(s.step, seconds(s.stepLeftMin), ticking);
+      else if (stage === 'mashed' || stage === 'boil_heat' || stage === 'boil' || stage === 'done') window.mashClock.follow(Infinity, 0, false);
+      else window.mashClock.release();
+    }
+  }
+
+  function notice() {
+    var s = mySession(), phase = s ? s.phase : null;
+    if (lastPhase && phase !== lastPhase && CALLS_FOR_YOU[phase]) sound.alarm();
+    if (phase && phase !== 'paused' && phase !== 'manual') lastActive = phase;
+    lastPhase = phase;
   }
 
   function render() {
@@ -115,7 +139,7 @@
     renderStart();
     renderBanners();
     renderLive();
-    driveBoilClock();
+    driveClocks();
   }
 
   function error(text) {
@@ -147,13 +171,26 @@
     else b.addEventListener('click', function () { sound.unlock(); send(command); });
   });
   if ($('bh-start-btn')) {
-    $('bh-start-btn').addEventListener('click', function () { show($('bh-preview'), true); $('bh-start-btn').hidden = true; });
+    $('bh-start-btn').addEventListener('click', function () {
+      copy('strike-water', 'bh-pv-water'); copy('strike-temp', 'bh-pv-strike');
+      show($('bh-preview'), true); $('bh-start-btn').hidden = true;
+    });
     $('bh-cancel').addEventListener('click', function () { show($('bh-preview'), false); $('bh-start-btn').hidden = false; });
     $('bh-confirm').addEventListener('click', function () {
       sound.unlock();
       show($('bh-preview'), false); $('bh-start-btn').hidden = false;
-      send({ type: 'start', batchId: batchId });
+      send({ type: 'start', batchId: batchId, grainTempC: input('mw-grain-temp'), mashThicknessLPerKg: input('mw-ratio') });
     });
+  }
+
+  // The preview and the start follow what the brewer adjusted in the mash-water guide, as the schedule is worked out from the same inputs.
+  function copy(from, to) {
+    var a = $(from), b = $(to);
+    if (a && b && a.textContent !== '-') b.textContent = a.textContent;
+  }
+  function input(id) {
+    var v = $(id) ? parseFloat($(id).value) : NaN;
+    return isFinite(v) ? v : null;
   }
 
   function drawChart() {
@@ -199,6 +236,7 @@
   var polls = 0;
   function poll() {
     return request('GET', '/status').then(function (s) { status = s; }).catch(function () { status = null; }).then(function () {
+      notice();
       render();
       if (mySession() && polls++ % 5 === 0) fetchReadings();
     });

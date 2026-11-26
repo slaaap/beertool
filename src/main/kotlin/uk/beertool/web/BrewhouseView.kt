@@ -98,8 +98,8 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
 
 private fun FlowContent.schedulePreview(schedule: Schedule) {
     div("stats trio") {
-        statTile("Strike", fmt(schedule.waterL, 1), "L")
-        statTile("Strike temp", fmt(schedule.strikeC, 1), "°C", accent = true)
+        statTile("Strike", fmt(schedule.waterL, 1), "L", valueId = "bh-pv-water")
+        statTile("Strike temp", fmt(schedule.strikeC, 1), "°C", accent = true, valueId = "bh-pv-strike")
         statTile("Boil", schedule.boil?.let { "${it.minutes}" } ?: "none", schedule.boil?.let { "min" })
     }
     table("mash-plan") {

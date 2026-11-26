@@ -26,9 +26,11 @@ class BrewhouseService(
 
     fun status(user: User): Status = brewhouses.status(user.id)
 
-    fun queue(user: User, request: CommandRequest): Command {
+    fun pageStatus(user: User): PageStatus = status(user).let { PageStatus(it.online, it.lastSeenAt, it.report, now()) }
+
+    fun queue(user: User, request: CommandRequest, strike: StrikeInputs = StrikeInputs()): Command {
         val schedule = if (request.type == CommandType.START) {
-            schedule(user, request.batchId ?: throw BrewhouseProblem(400, "A start command needs a batchId."))
+            schedule(user, request.batchId ?: throw BrewhouseProblem(400, "A start command needs a batchId."), strike)
         } else {
             null
         }
@@ -38,10 +40,10 @@ class BrewhouseService(
     fun command(user: User, id: String): Command =
         brewhouses.command(user.id, id) ?: throw BrewhouseProblem(404, "No such command, or it was queued too long ago.")
 
-    fun schedule(user: User, batchId: Long): Schedule {
+    fun schedule(user: User, batchId: Long, strike: StrikeInputs = StrikeInputs()): Schedule {
         val batch = ownBatch(user, batchId)
         val recipe = RecipeRepository.findById(batch.recipeId, user.id) ?: throw noBatch()
-        return brewhouseSchedule(batch.id, recipe, user.preferences)
+        return brewhouseSchedule(batch.id, recipe, user.preferences, strike)
     }
 
     fun readings(user: User, batchId: Long, since: Instant?): List<Reading> =

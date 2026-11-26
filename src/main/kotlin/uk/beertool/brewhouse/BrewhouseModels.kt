@@ -150,6 +150,26 @@ data class CommandRequest(
     val batchId: Long? = null,
 )
 
+// The Brew Day page's own command and status shapes, not part of the spec.
+@Serializable
+data class PageCommandRequest(
+    val type: CommandType,
+    val batchId: Long? = null,
+    val grainTempC: Double? = null,
+    val mashThicknessLPerKg: Double? = null,
+) {
+    fun toCommand() = CommandRequest(type, batchId)
+}
+
+// serverNow lets the page age the report on beertool's clock rather than trusting its own or the controller's.
+@Serializable
+data class PageStatus(
+    val online: Boolean,
+    @Serializable(with = InstantIso::class) val lastSeenAt: Instant?,
+    val report: Report?,
+    @Serializable(with = InstantIso::class) val serverNow: Instant,
+)
+
 @Serializable
 enum class CommandStatus {
     @SerialName("pending") PENDING,

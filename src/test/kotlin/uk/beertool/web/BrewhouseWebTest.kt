@@ -69,6 +69,7 @@ class BrewhouseWebTest {
 
         response.status shouldBe HttpStatusCode.OK
         response.bodyAsText() shouldContain "\"online\":false"
+        response.bodyAsText() shouldContain "\"serverNow\":"
     }
 
     @Test
@@ -112,6 +113,40 @@ class BrewhouseWebTest {
         queued.status shouldBe HttpStatusCode.Accepted
         collected shouldContain "\"type\":\"start\""
         collected shouldContain "\"batchId\":${brewer.batchId}"
+    }
+
+    @Test
+    fun `should start the brewhouse with the strike water the brewer adjusted on the page`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+        client.post("$BREWHOUSE_PATH/sync") {
+            header(HttpHeaders.Authorization, "Bearer ${brewer.token}")
+            contentType(ContentType.Application.Json)
+            setBody(IDLE_REPORT)
+        }
+
+        client.post("$BREWHOUSE_WEB_PATH/commands") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"type":"start","batchId":${brewer.batchId},"grainTempC":20,"mashThicknessLPerKg":2.0}""")
+        }
+        val collected = client.post("$BREWHOUSE_PATH/sync") {
+            header(HttpHeaders.Authorization, "Bearer ${brewer.token}")
+            contentType(ContentType.Application.Json)
+            setBody(IDLE_REPORT)
+        }.bodyAsText()
+
+        collected shouldContain "\"waterL\":9.0"
+    }
+
+    @Test
+    fun `should refuse a start with a grain temperature no brewer could mean`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        val response = client.post("$BREWHOUSE_WEB_PATH/commands") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"type":"start","batchId":${brewer.batchId},"grainTempC":95}""")
+        }
+
+        response.status shouldBe HttpStatusCode.BadRequest
     }
 
     @Test

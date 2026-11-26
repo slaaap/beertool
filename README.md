@@ -206,7 +206,8 @@ the API URL shown there. The controller signs in with that token, so the Brewhou
 Once the controller has synced, the Brew Day page's Water, Mash and Boil stages show whether it is online,
 start the brew on it after showing the schedule it will send (strike water and temperature, mash steps,
 boil), and then follow it live: temperature against target, the phase with buttons to move it on, pause or
-stop, a chart of the session, and the boil timer counting down with the controller. While a session runs,
+stop, a chart of the session, and the mash and boil timers following the controller's clock. The start uses
+the grain temperature and mash thickness adjusted in the page's mash-water guide. While a session runs,
 one reading is kept per `BREWHOUSE_READING_INTERVAL_SECONDS` and deleted with its batch.
 
 ## Build a standalone jar

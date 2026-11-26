@@ -133,7 +133,7 @@ private fun Route.tokenRoutes(service: BrewhouseService) {
 // The Brew Day page's own routes: the signed-in brewer's session instead of a token, and nothing for showcase visitors.
 private fun Route.sessionRoutes(service: BrewhouseService) {
     get("status") {
-        call.asBrewer { encode(service.status(it), Status.serializer()) }
+        call.asBrewer { encode(service.pageStatus(it), PageStatus.serializer()) }
     }
     post("commands") {
         call.asBrewer(HttpStatusCode.Accepted) {
@@ -141,7 +141,8 @@ private fun Route.sessionRoutes(service: BrewhouseService) {
             if (call.request.contentType().withoutParameters() != ContentType.Application.Json) {
                 throw BrewhouseProblem(415, "Send the command as application/json.")
             }
-            encode(service.queue(it, decode(call.receiveLimited(), CommandRequest.serializer())), Command.serializer())
+            val request = decode(call.receiveLimited(), PageCommandRequest.serializer())
+            encode(service.queue(it, request.toCommand(), StrikeInputs(request.grainTempC, request.mashThicknessLPerKg)), Command.serializer())
         }
     }
     get("commands/{id}") {

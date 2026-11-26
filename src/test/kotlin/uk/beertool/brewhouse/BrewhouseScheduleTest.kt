@@ -1,6 +1,7 @@
 package uk.beertool.brewhouse
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.doubles.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -27,6 +28,27 @@ class BrewhouseScheduleTest {
         val guide = recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg)!!
         fmt(schedule.waterL, 1) shouldBe fmt(guide.strikeVolumeL, 1)
         fmt(schedule.strikeC, 1) shouldBe fmt(guide.strikeTempC, 1)
+    }
+
+    @Test
+    fun `should heat the strike water for the grain temperature and thickness the brewer adjusted on the page`() {
+        val recipe = recipe()
+
+        val schedule = brewhouseSchedule(7, recipe, prefs, StrikeInputs(grainTempC = 8.0, mashThicknessLPerKg = 2.5))
+
+        val guide = recipe.mashWater(2.5, prefs.grainAbsorptionLPerKg, grainTempC = 8.0)!!
+        fmt(schedule.waterL, 1) shouldBe fmt(guide.strikeVolumeL, 1)
+        fmt(schedule.strikeC, 1) shouldBe fmt(guide.strikeTempC, 1)
+        schedule.strikeC!! shouldBeGreaterThan brewhouseSchedule(7, recipe, prefs).strikeC!!
+    }
+
+    @Test
+    fun `should refuse a grain temperature or thickness no brewer could mean`() {
+        val tooHot = shouldThrow<BrewhouseProblem> { StrikeInputs(grainTempC = 90.0) }
+        val tooThin = shouldThrow<BrewhouseProblem> { StrikeInputs(mashThicknessLPerKg = 40.0) }
+
+        tooHot.status shouldBe 400
+        tooThin.status shouldBe 400
     }
 
     @Test
