@@ -6,7 +6,7 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath(platform("com.fasterxml.jackson:jackson-bom:2.22.4"))
+        classpath(platform("com.fasterxml.jackson:jackson-bom:2.23.0"))
         classpath(platform("org.apache.logging.log4j:log4j-bom:2.26.1"))
         constraints {
             classpath("org.codehaus.plexus:plexus-utils:4.1.0")
