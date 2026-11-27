@@ -344,7 +344,7 @@ components:
         - `paused`: heating (and any pump) off until `resume`; timers stopped.
         - `manual`: someone took over the heat by hand; timers run, no heating until `resume`.
         - `done`: finished, heating off.
-        - `fault`: safety stop, heating off until `stop`.
+        - `fault`: safety stop, heating off until `resume` (carry on) or `stop`.
       enum: [idle, strike, dough_in, mash, mashed, boil_heat, boil, paused, manual, done, fault]
 
     Reading:

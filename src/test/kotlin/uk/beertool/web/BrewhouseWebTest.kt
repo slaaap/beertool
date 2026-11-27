@@ -1,5 +1,6 @@
 package uk.beertool.web
 
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -180,6 +181,17 @@ class BrewhouseWebTest {
         page shouldContain "id=\"bh\""
         page shouldContain "Start on brewhouse"
         page shouldContain "brewhouse.js"
+    }
+
+    @Test
+    fun `should offer Resume as well as Stop after a fault, as the brewhouse can carry on`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        val page = client.get(brewer.brewDayUrl).bodyAsText()
+
+        val phases = { command: String -> Regex("""data-command="$command" data-phases="([^"]*)"""").find(page)!!.groupValues[1].split(" ") }
+        phases("resume") shouldContain "fault"
+        phases("stop") shouldContain "fault"
     }
 
     @Test

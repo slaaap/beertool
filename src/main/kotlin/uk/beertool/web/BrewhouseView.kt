@@ -20,7 +20,7 @@ private val PHASE_BUTTONS = listOf(
     PhaseButton("start_boil", "Start boil", setOf(Phase.MASHED), primary = true),
     PhaseButton("boiling", "It's boiling", setOf(Phase.BOIL_HEAT), primary = true),
     PhaseButton("pause", "Pause", RUNNING),
-    PhaseButton("resume", "Resume", setOf(Phase.PAUSED, Phase.MANUAL), primary = true),
+    PhaseButton("resume", "Resume", setOf(Phase.PAUSED, Phase.MANUAL, Phase.FAULT), primary = true),
     PhaseButton("stop", "Stop", RUNNING + Phase.PAUSED + Phase.MANUAL + Phase.FAULT),
 )
 

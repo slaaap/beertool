@@ -16,6 +16,7 @@
 
   var status = null, busy = false, lastReadingAt = null, readings = [], fetching = false, lastPhase = null, lastActive = null;
   var CALLS_FOR_YOU = { dough_in: true, mashed: true, fault: true };
+  var INTERRUPTS = { paused: true, manual: true, fault: true };
 
   function request(method, path, body) {
     var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
@@ -90,7 +91,7 @@
     var s = mySession();
     var fault = s && s.phase === 'fault';
     show($('bh-fault'), fault);
-    if (fault) $('bh-fault').textContent = 'Heating stopped: ' + (s.fault || 'the brewhouse reported a fault') + '. Fix it, then press Stop.';
+    if (fault) $('bh-fault').textContent = 'Heating stopped: ' + (s.fault || 'the brewhouse reported a fault') + '. Fix it, then press Resume to carry on or Stop to end the brew.';
     var manual = s && s.phase === 'manual';
     show($('bh-manual'), manual);
     if (manual) $('bh-note').textContent = (s.note || 'Someone took over the heat by hand') + '. Timers keep running; press Resume to hand the heat back.';
@@ -102,14 +103,14 @@
     return Math.max(0, (Date.parse(status.serverNow) - Date.parse(status.lastSeenAt)) / 1000);
   }
 
-  // Paused and manual interrupt a stage, so the clocks stay on the stage that was running.
+  // Paused, manual and a fault interrupt a stage that can be resumed, so the clocks stay on the stage that was running.
   function stageOf(s) {
-    if (s.phase !== 'paused' && s.phase !== 'manual') return s.phase;
+    if (!INTERRUPTS[s.phase]) return s.phase;
     return lastActive || (s.boilLeftMin != null ? 'boil' : s.step != null ? 'mash' : null);
   }
 
   function driveClocks() {
-    var s = mySession(), stage = s && stageOf(s), ticking = !!s && s.phase !== 'paused';
+    var s = mySession(), stage = s && stageOf(s), ticking = !!s && s.phase !== 'paused' && s.phase !== 'fault';
     function seconds(min) { return min == null ? null : min * 60 - (ticking ? reportAgeS() : 0); }
     if (window.boilClock) {
       if (stage === 'boil' && s.boilLeftMin != null) window.boilClock.follow(seconds(s.boilLeftMin), ticking);
@@ -125,7 +126,7 @@
   function notice() {
     var s = mySession(), phase = s ? s.phase : null;
     if (lastPhase && phase !== lastPhase && CALLS_FOR_YOU[phase]) sound.alarm();
-    if (phase && phase !== 'paused' && phase !== 'manual') lastActive = phase;
+    if (phase && !INTERRUPTS[phase]) lastActive = phase;
     lastPhase = phase;
   }
 
