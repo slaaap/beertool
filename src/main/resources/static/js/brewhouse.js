@@ -14,9 +14,20 @@
   function num(v, places) { return v == null ? '-' : v.toFixed(places); }
   function show(el, on) { if (el) el.hidden = !on; }
 
-  var status = null, busy = false, lastReadingAt = null, readings = [], fetching = false, lastPhase = null, lastActive = null;
-  var CALLS_FOR_YOU = { dough_in: true, mashed: true, fault: true };
+  var status = null, unreachable = false, firstNotice = true, busy = false, lastReadingAt = null, readings = [], fetching = false, lastPhase = null, lastActive = null;
   var INTERRUPTS = { paused: true, manual: true, fault: true };
+  var STAGE_TAB = { strike: 'water', dough_in: 'mash', mash: 'mash', mashed: 'mash', boil_heat: 'boil', boil: 'boil' };
+  var BEFORE_MASH = { strike: true, dough_in: true };
+  var BEFORE_BOIL = { strike: true, dough_in: true, mash: true, mashed: true, boil_heat: true };
+  var AFTER_MASH = { mashed: true, boil_heat: true, boil: true, done: true };
+  var boiledKey = 'bh-boiled:' + batchId;
+
+  function callsForYou(s) {
+    if (s.phase === 'dough_in') return { title: 'Strike water is ready', lines: ['Add the grain, then press Grain is in.'] };
+    if (s.phase === 'mashed') return { title: 'Mash done', lines: ['Lauter or lift the bag, then press Start boil.'] };
+    if (s.phase === 'fault') return { title: 'Heating stopped', lines: [(s.fault || 'The brewhouse reported a fault') + '.', 'Fix it, then press Resume or Stop.'] };
+    return null;
+  }
 
   function request(method, path, body) {
     var opts = { method: method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
@@ -40,7 +51,7 @@
     var why = status && status.online && report && !report.ready && !busy && report.notReady;
     $('bh-why').textContent = why || '';
     show($('bh-why'), !!why);
-    if (!status) { state.textContent = 'Brewhouse: can’t reach beertool'; return; }
+    if (!status || unreachable) { state.textContent = 'Brewhouse: can’t reach beertool'; return; }
     if (status.online) {
       state.textContent = 'Brewhouse online';
     } else {
@@ -53,7 +64,7 @@
     var other = status && status.report && status.report.session;
     var runningElsewhere = other && other.batchId !== batchId && other.phase !== 'idle' && other.phase !== 'done';
     var session = mySession();
-    var startable = !session || session.phase === 'idle' || session.phase === 'done';
+    var startable = !session || session.phase === 'idle';
     show($('bh-start'), startable);
     var btn = $('bh-start-btn');
     if (!btn) return;
@@ -76,7 +87,7 @@
     tile('bh-boil-left', s.boilLeftMin == null ? null : num(s.boilLeftMin, 0));
     [].forEach.call(root.querySelectorAll('[data-command]'), function (b) {
       b.hidden = b.getAttribute('data-phases').split(' ').indexOf(s.phase) < 0;
-      b.disabled = busy || !status.online;
+      b.disabled = busy || unreachable || !status.online;
     });
   }
 
@@ -109,25 +120,47 @@
     return lastActive || (s.boilLeftMin != null ? 'boil' : s.step != null ? 'mash' : null);
   }
 
+  function boiled() { try { return localStorage.getItem(boiledKey) === '1'; } catch (e) { return false; } }
+
+  // From the start until it is done, the brewhouse owns both clocks, so their own buttons are hidden rather than out of step.
   function driveClocks() {
     var s = mySession(), stage = s && stageOf(s), ticking = !!s && s.phase !== 'paused' && s.phase !== 'fault';
     function seconds(min) { return min == null ? null : min * 60 - (ticking ? reportAgeS() : 0); }
+    if (stage === 'boil') { try { localStorage.setItem(boiledKey, '1'); } catch (e) {} }
     if (window.boilClock) {
       if (stage === 'boil' && s.boilLeftMin != null) window.boilClock.follow(seconds(s.boilLeftMin), ticking);
-      else window.boilClock.release(stage === 'done');
+      else if (BEFORE_BOIL[stage]) window.boilClock.wait();
+      else if (stage === 'done' && boiled()) window.boilClock.finish();
+      else window.boilClock.release();
     }
     if (window.mashClock) {
       if (stage === 'mash' && s.step != null) window.mashClock.follow(s.step, seconds(s.stepLeftMin), ticking);
-      else if (stage === 'mashed' || stage === 'boil_heat' || stage === 'boil' || stage === 'done') window.mashClock.follow(Infinity, 0, false);
+      else if (BEFORE_MASH[stage]) window.mashClock.wait();
+      else if (AFTER_MASH[stage]) window.mashClock.follow(Infinity, 0, false);
       else window.mashClock.release();
     }
   }
 
+  // A page opened while the brewhouse waits on the brewer asks too; only a real move to another stage changes the tab, not a pause and resume.
   function notice() {
     var s = mySession(), phase = s ? s.phase : null;
-    if (lastPhase && phase !== lastPhase && CALLS_FOR_YOU[phase]) sound.alarm();
+    if (phase !== lastPhase || firstNotice) {
+      if (lastPhase) alerts.dismiss('bh-' + lastPhase);
+      var call = s && callsForYou(s);
+      if (call) { call.id = 'bh-' + phase; alerts.show(call); }
+      if (lastPhase && STAGE_TAB[phase] && STAGE_TAB[phase] !== STAGE_TAB[lastActive] && window.brewStage) window.brewStage(STAGE_TAB[phase]);
+      if (phase === 'strike') {
+        try { localStorage.removeItem(boiledKey); } catch (e) {}
+        if (window.boilClock) window.boilClock.newRun();
+      }
+    }
     if (phase && !INTERRUPTS[phase]) lastActive = phase;
-    lastPhase = phase;
+    lastPhase = phase; firstNotice = false;
+  }
+
+  function renderSound() {
+    var s = mySession();
+    show($('bh-sound'), !!s && s.phase !== 'idle' && s.phase !== 'done' && !sound.ready());
   }
 
   // The widget is the controller's own drawing of its devices; beertool only frames it and hands it the report.
@@ -177,6 +210,7 @@
     renderStart();
     renderBanners();
     renderLive();
+    renderSound();
     driveClocks();
   }
 
@@ -208,6 +242,7 @@
     if (command.type === 'stop') confirmTap(b, function () { send(command); });
     else b.addEventListener('click', function () { sound.unlock(); send(command); });
   });
+  $('bh-sound').addEventListener('click', function () { sound.unlock(); setTimeout(renderSound, 300); });
   if ($('bh-start-btn')) {
     $('bh-start-btn').addEventListener('click', function () {
       copy('strike-water', 'bh-pv-water'); copy('strike-temp', 'bh-pv-strike');
@@ -272,8 +307,10 @@
   }
 
   var polls = 0;
+  // A failed poll keeps the last report, so the clocks run on by themselves instead of being handed back over a network blip.
   function poll() {
-    return request('GET', '/status').then(function (s) { status = s; }).catch(function () { status = null; }).then(function () {
+    return request('GET', '/status').then(function (s) { status = s; unreachable = false; }).catch(function () { unreachable = true; }).then(function () {
+      if (unreachable && status) { renderConnection(); renderLive(); return; }
       notice();
       render();
       if (mySession() && polls++ % 5 === 0) fetchReadings();

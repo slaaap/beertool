@@ -175,14 +175,19 @@ fun HTML.batchFormPage(user: User, recipe: Recipe, batch: Batch?, estimate: Reci
 
 internal class ReadingInput(val name: String, val label: String, val value: Double?, val placeholder: String, val step: String, val max: String)
 
-// The plan shows as placeholder text, so a blank field reads as "not measured" rather than zero.
+// The plan shows as placeholder text marked as such, so a blank field reads as "not measured" rather than a value already saved.
 internal class ReadingInputs(recipe: Recipe, batch: Batch?, estimate: RecipeStats) {
-    val og = ReadingInput("measuredOg", "OG", batch?.measuredOg, fmt(estimate.og, 3), "0.001", GRAVITY_MAX)
-    val fg = ReadingInput("measuredFg", "FG", batch?.measuredFg, fmt(estimate.fg, 3), "0.001", GRAVITY_MAX)
-    val preBoil = ReadingInput("measuredPreBoilVolumeL", "Pre-boil (L)", batch?.measuredPreBoilVolumeL, recipe.preBoilVolumeL?.let { fmt(it, 1) }.orEmpty(), "0.5", VOLUME_MAX)
-    val postBoil = ReadingInput("measuredPostBoilVolumeL", "Post-boil (L)", batch?.measuredPostBoilVolumeL, fmt(recipe.postBoilVolumeL, 1), "0.5", VOLUME_MAX)
-    val fermenter = ReadingInput("measuredFermenterVolumeL", "Fermenter (L)", batch?.measuredFermenterVolumeL, fmt(recipe.fermenterVolumeL, 1), "0.5", VOLUME_MAX)
+    val og = ReadingInput("measuredOg", "OG", batch?.measuredOg, plan(estimate.og, 3), "0.001", GRAVITY_MAX)
+    val fg = ReadingInput("measuredFg", "FG", batch?.measuredFg, plan(estimate.fg, 3), "0.001", GRAVITY_MAX)
+    val preBoil = ReadingInput("measuredPreBoilVolumeL", "Pre-boil (L)", batch?.measuredPreBoilVolumeL, plan(recipe.preBoilVolumeL, 1), VOLUME_STEP, VOLUME_MAX)
+    val postBoil = ReadingInput("measuredPostBoilVolumeL", "Post-boil (L)", batch?.measuredPostBoilVolumeL, plan(recipe.postBoilVolumeL, 1), VOLUME_STEP, VOLUME_MAX)
+    val fermenter = ReadingInput("measuredFermenterVolumeL", "Fermenter (L)", batch?.measuredFermenterVolumeL, plan(recipe.fermenterVolumeL, 1), VOLUME_STEP, VOLUME_MAX)
 }
+
+private fun plan(value: Double?, places: Int) = value?.let { "plan ${fmt(it, places)}" }.orEmpty()
+
+// A small test pot or a jug's markings call for tenths of a litre.
+private const val VOLUME_STEP = "0.1"
 
 // Gravity may be typed as points, so the cap is the points form of the highest gravity.
 private val GRAVITY_MAX = formatAmount(MAX_GRAVITY * 1000)

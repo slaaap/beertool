@@ -45,6 +45,7 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
             attributes["sandbox"] = "allow-scripts"
             attributes["referrerpolicy"] = "no-referrer"
         }
+        button(type = ButtonType.button, classes = "notice bh-sound") { id = "bh-sound"; hidden = true; +"Tap here to turn on alarm sounds" }
         p("alert") { id = "bh-fault"; hidden = true }
         div("notice bh-manual") {
             id = "bh-manual"; hidden = true

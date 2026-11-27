@@ -195,6 +195,7 @@ td .btn { padding:5px; }
 .stage-title { margin:28px 0 12px; }
 .staged .stage-title { display:none; }
 .stage-readings { margin-top:22px; }
+.readings-hint p { margin:0 0 8px; }
 .stage-readings .actions, .stage > input[type=submit] { margin-top:4px; }
 .stage input[type=submit].btn.primary { width:100%; justify-content:center; padding:13px; font-size:16px; margin-top:14px; }
 .stage .field textarea { min-height:110px; }
@@ -230,6 +231,19 @@ table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .boil-adds li.late { opacity:1; text-decoration:none; border-color:var(--danger); background:var(--danger-soft); cursor:pointer; }
 .boil-adds li.late .at { color:var(--danger); }
 .boil-adds li.late::after { content:"late - add now"; margin-left:auto; color:var(--danger); font-size:13px; font-weight:600; }
+.boil-adds li.added { opacity:0.55; cursor:pointer; }
+.boil-adds li.added::after { content:"added ✓"; margin-left:auto; color:var(--good); font-size:13px; font-weight:600; }
+.bd-alert { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:20px;
+  background:rgba(20,14,8,0.55); }
+.bd-alert[hidden] { display:none; }
+.bd-alert-card { width:100%; max-width:420px; max-height:100%; overflow:auto; background:var(--surface); color:var(--ink); border:2px solid var(--accent);
+  border-radius:14px; padding:20px; box-shadow:0 12px 40px rgba(0,0,0,0.35); }
+.bd-alert-card h2 { margin:0 0 10px; font-family:var(--font-display); font-size:24px; color:var(--accent); }
+.bd-alert-card p { margin:0 0 8px; font-size:18px; }
+.bd-alert-card p.muted { font-size:13px; margin:10px 0 0; text-align:center; }
+.bd-alert-ok { width:100%; justify-content:center; padding:14px; font-size:18px; margin-top:12px; }
+.bh-sound, .sound-prompt { display:block; width:100%; text-align:left; cursor:pointer; border:0; font:inherit; }
+.sound-prompt[hidden] { display:none; }
 .timer-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
 .timer-controls .btn[hidden] { display:none; }
 .btn:disabled { opacity:0.45; cursor:default; filter:none; }
