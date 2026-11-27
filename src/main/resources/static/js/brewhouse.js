@@ -130,7 +130,49 @@
     lastPhase = phase;
   }
 
+  // The widget is the controller's own drawing of its devices; beertool only frames it and hands it the report.
+  var frame = $('bh-widget'), widgetAt = null, frameReady = false;
+  var TOKENS = ['--ground', '--surface', '--ink', '--muted', '--hairline', '--accent', '--accent-soft', '--danger', '--danger-soft', '--good',
+    '--font-display', '--font-body', '--font-mono'];
+
+  function theme() {
+    var html = document.documentElement, css = getComputedStyle(html), tokens = {}, set = html.getAttribute('data-theme');
+    TOKENS.forEach(function (t) { tokens[t] = css.getPropertyValue(t).trim(); });
+    return { dark: set ? set === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches, tokens: tokens };
+  }
+
+  function renderWidget() {
+    var at = status && status.widgetAt;
+    if (!at) { if (!status) postWidget(); else { show(frame, false); widgetAt = null; frame.removeAttribute('src'); } return; }
+    if (at !== widgetAt) {
+      widgetAt = at; frameReady = false;
+      frame.style.height = ''; frame.style.aspectRatio = '4 / 3';
+      frame.src = base + '/widget?v=' + encodeURIComponent(at);
+      show(frame, true);
+    }
+    postWidget();
+  }
+
+  // Its origin is opaque, so '*' is the only target that reaches it; nothing in the message is secret from the brewhouse that sent it.
+  function postWidget() {
+    if (!frameReady || !frame.contentWindow) return;
+    var report = status && status.report;
+    frame.contentWindow.postMessage({
+      type: 'brewhouse', data: (report && report.widget) || null, session: (report && report.session) || null,
+      online: !!(status && status.online), theme: theme()
+    }, '*');
+  }
+
+  frame.addEventListener('load', function () { if (frame.getAttribute('src')) { frameReady = true; postWidget(); } });
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (e.source !== frame.contentWindow || !d || d.type !== 'brewhouse-size' || typeof d.height !== 'number' || !isFinite(d.height)) return;
+    frame.style.aspectRatio = '';
+    frame.style.height = Math.min(1200, Math.max(120, Math.round(d.height))) + 'px';
+  });
+
   function render() {
+    renderWidget();
     renderConnection();
     renderStart();
     renderBanners();

@@ -39,6 +39,12 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
             span("bh-state") { id = "bh-state"; +"Brewhouse: checking…" }
             span("bh-why") { id = "bh-why"; hidden = true }
         }
+        iframe(classes = "bh-widget") {
+            id = "bh-widget"; hidden = true
+            title = "Brewhouse devices"
+            attributes["sandbox"] = "allow-scripts"
+            attributes["referrerpolicy"] = "no-referrer"
+        }
         p("alert") { id = "bh-fault"; hidden = true }
         div("notice bh-manual") {
             id = "bh-manual"; hidden = true

@@ -10,9 +10,11 @@ import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
 import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -23,6 +25,9 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -330,6 +335,65 @@ class BrewhouseApiTest {
     }
 
     @Test
+    fun `should pass the widget's state on as the brewhouse sent it`() = brewhouseApp {
+        val brewer = newBrewer()
+        val state = buildJsonObject { putJsonObject("hob") { put("display", "2100"); put("powerW", 2100) } }
+        client.sync(brewer, report().copy(widget = state))
+
+        val status = decode(client.get("$BREWHOUSE_PATH/status") { bearer(brewer.token) }.bodyAsText(), Status.serializer())
+
+        status.report!!.widget shouldBe state
+    }
+
+    @Test
+    fun `should keep the widget the brewhouse uploads, replacing the one before`() = brewhouseApp {
+        val brewer = newBrewer()
+        client.putWidget(brewer, "<p>old</p>")
+
+        val response = client.putWidget(brewer, "<svg id=\"rig\"></svg>")
+
+        response.status shouldBe HttpStatusCode.NoContent
+        BrewhouseWidgetRepository.find(brewer.userId)!!.html shouldBe "<svg id=\"rig\"></svg>"
+    }
+
+    @Test
+    fun `should drop the widget when the brewhouse deletes it`() = brewhouseApp {
+        val brewer = newBrewer()
+        client.putWidget(brewer, "<p>rig</p>")
+
+        val response = client.delete("$BREWHOUSE_PATH/widget") { bearer(brewer.token) }
+
+        response.status shouldBe HttpStatusCode.NoContent
+        BrewhouseWidgetRepository.find(brewer.userId).shouldBeNull()
+    }
+
+    @Test
+    fun `should only take a widget sent as HTML`() = brewhouseApp {
+        val brewer = newBrewer()
+
+        val response = client.put("$BREWHOUSE_PATH/widget") { bearer(brewer.token); json("""{"html":"<p>rig</p>"}""") }
+
+        response.status shouldBe HttpStatusCode.UnsupportedMediaType
+        BrewhouseWidgetRepository.find(brewer.userId).shouldBeNull()
+    }
+
+    @Test
+    fun `should turn away a widget larger than 256 KiB`() = brewhouseApp {
+        val brewer = newBrewer()
+
+        val response = client.putWidget(brewer, "<p>" + "x".repeat(MAX_WIDGET_BYTES) + "</p>")
+
+        response.status shouldBe HttpStatusCode.PayloadTooLarge
+    }
+
+    @Test
+    fun `should demand a key to upload a widget`() = brewhouseApp {
+        val response = client.put("$BREWHOUSE_PATH/widget") { contentType(ContentType.Text.Html); setBody("<p>rig</p>") }
+
+        response.status shouldBe HttpStatusCode.Unauthorized
+    }
+
+    @Test
     fun `should keep at most one reading per interval for the session's batch`() = brewhouseApp {
         val brewer = newBrewer()
 
@@ -479,6 +543,9 @@ class BrewhouseApiTest {
 
     private suspend fun HttpClient.sync(brewer: Brewer, report: Report): HttpResponse =
         post("$BREWHOUSE_PATH/sync") { bearer(brewer.token); json(encode(report, Report.serializer())) }
+
+    private suspend fun HttpClient.putWidget(brewer: Brewer, html: String): HttpResponse =
+        put("$BREWHOUSE_PATH/widget") { bearer(brewer.token); contentType(ContentType.Text.Html); setBody(html) }
 
     private suspend fun HttpClient.readings(brewer: Brewer, since: Instant? = null): List<Reading> {
         val query = since?.let { "?since=$it" }.orEmpty()

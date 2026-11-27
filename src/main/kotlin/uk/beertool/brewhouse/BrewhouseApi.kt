@@ -3,6 +3,7 @@ package uk.beertool.brewhouse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.withCharset
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createRouteScopedPlugin
@@ -10,13 +11,16 @@ import io.ktor.server.request.contentType
 import io.ktor.server.request.header
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.response.header
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.RouteSelector
 import io.ktor.server.routing.RouteSelectorEvaluation
 import io.ktor.server.routing.RoutingResolveContext
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.util.AttributeKey
@@ -40,6 +44,11 @@ import java.time.format.DateTimeParseException
 const val BREWHOUSE_PATH = "/api/brewhouse/v1"
 const val BREWHOUSE_WEB_PATH = "/api/brewhouse/web"
 const val MAX_BODY_BYTES = 16 * 1024
+const val MAX_WIDGET_BYTES = 256 * 1024
+
+// The widget is the controller's code, so its frame gets an opaque origin, no network and only its own inline code.
+const val WIDGET_POLICY = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
+    "img-src data:; font-src data:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'"
 
 data class BrewhouseConfig(
     val readingInterval: Duration = DEFAULT_READING_INTERVAL,
@@ -110,6 +119,16 @@ private fun Route.keyRoutes(service: BrewhouseService) {
     get("commands/{id}") {
         call.api { encode(service.command(call.attributes[BrewhouseUser], call.parameters["id"]!!), Command.serializer()) }
     }
+    put("widget") {
+        call.api(HttpStatusCode.NoContent) {
+            if (call.request.contentType().withoutParameters() != ContentType.Text.Html) throw BrewhouseProblem(415, "Send the widget as text/html.")
+            service.putWidget(call.attributes[BrewhouseUser], call.receiveLimited(MAX_WIDGET_BYTES))
+            ""
+        }
+    }
+    delete("widget") {
+        call.api(HttpStatusCode.NoContent) { service.deleteWidget(call.attributes[BrewhouseUser]); "" }
+    }
     get("batches/{batchId}/schedule") {
         call.api { encode(service.schedule(call.attributes[BrewhouseUser], call.batchId()), Schedule.serializer()) }
     }
@@ -135,6 +154,16 @@ private fun Route.sessionRoutes(service: BrewhouseService) {
             val request = decode(call.receiveLimited(), PageCommandRequest.serializer())
             encode(service.queue(it, request.toCommand(), StrikeInputs(request.grainTempC, request.mashThicknessLPerKg)), Command.serializer())
         }
+    }
+    get("widget") {
+        val user = call.currentUser()?.takeIf { it.canWrite }
+            ?: return@get call.respondError(HttpStatusCode.Unauthorized, "Log in to use the brewhouse.")
+        val html = io { BrewhouseWidgetRepository.find(user.id)?.html }
+            ?: return@get call.respondError(HttpStatusCode.NotFound, "The brewhouse hasn't uploaded a widget.")
+        call.response.header("Content-Security-Policy", WIDGET_POLICY)
+        call.response.header("X-Frame-Options", "SAMEORIGIN")
+        call.response.header(HttpHeaders.CacheControl, "private, no-cache")
+        call.respondText(html, ContentType.Text.Html.withCharset(Charsets.UTF_8))
     }
     get("commands/{id}") {
         call.asBrewer { encode(service.command(it, call.parameters["id"]!!), Command.serializer()) }
@@ -185,14 +214,14 @@ internal fun <T> decode(body: String, serializer: KSerializer<T>): T = try {
 
 internal fun <T> encode(value: T, serializer: KSerializer<T>): String = BrewhouseJson.encodeToString(serializer, value)
 
-internal suspend fun ApplicationCall.receiveLimited(): String {
-    request.header(HttpHeaders.ContentLength)?.toLongOrNull()?.let { if (it > MAX_BODY_BYTES) throw tooLarge() }
-    val bytes = receiveChannel().readRemaining(MAX_BODY_BYTES + 1L).readByteArray()
-    if (bytes.size > MAX_BODY_BYTES) throw tooLarge()
+internal suspend fun ApplicationCall.receiveLimited(limit: Int = MAX_BODY_BYTES): String {
+    request.header(HttpHeaders.ContentLength)?.toLongOrNull()?.let { if (it > limit) throw tooLarge(limit) }
+    val bytes = receiveChannel().readRemaining(limit + 1L).readByteArray()
+    if (bytes.size > limit) throw tooLarge(limit)
     return bytes.decodeToString()
 }
 
-private fun tooLarge() = BrewhouseProblem(413, "The body is larger than 16 KiB.")
+private fun tooLarge(limit: Int) = BrewhouseProblem(413, "The body is larger than ${limit / 1024} KiB.")
 
 internal fun ApplicationCall.batchId(): Long =
     parameters["batchId"]?.toLongOrNull() ?: throw BrewhouseProblem(404, "No such batch.")
@@ -211,7 +240,7 @@ internal suspend fun ApplicationCall.api(success: HttpStatusCode = HttpStatusCod
     } catch (e: BrewhouseProblem) {
         return respondError(HttpStatusCode.fromValue(e.status), e.message.orEmpty())
     }
-    respondText(body, ContentType.Application.Json, success)
+    if (success == HttpStatusCode.NoContent) respond(success) else respondText(body, ContentType.Application.Json, success)
 }
 
 internal suspend fun ApplicationCall.respondError(status: HttpStatusCode, message: String) =

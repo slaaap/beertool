@@ -10,6 +10,7 @@ import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -32,6 +33,7 @@ import uk.beertool.brewhouse.BREWHOUSE_WEB_PATH
 import uk.beertool.brewhouse.Brewhouse
 import uk.beertool.brewhouse.BrewhouseConfig
 import uk.beertool.brewhouse.BrewhouseKeyRepository
+import uk.beertool.brewhouse.WIDGET_POLICY
 import uk.beertool.brewhouse.configureBrewhouse
 import uk.beertool.db.TestDatabase
 import uk.beertool.mcp.Mcp
@@ -195,6 +197,62 @@ class BrewhouseWebTest {
     }
 
     @Test
+    fun `should frame the brewhouse's widget on the Brew Day page with scripts only`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        val page = client.get(brewer.brewDayUrl).bodyAsText()
+
+        page shouldContain """id="bh-widget""""
+        page shouldContain """sandbox="allow-scripts""""
+    }
+
+    @Test
+    fun `should tell the page when the brewhouse uploaded its widget`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+        val before = client.get("$BREWHOUSE_WEB_PATH/status").bodyAsText()
+
+        putWidget(brewer, "<p>rig</p>")
+        val after = client.get("$BREWHOUSE_WEB_PATH/status").bodyAsText()
+
+        before shouldContain "\"widgetAt\":null"
+        after shouldContain Regex("\"widgetAt\":\"[^\"]+\"")
+    }
+
+    @Test
+    fun `should serve the widget sealed off from beertool, framable only by beertool's own page`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+        putWidget(brewer, "<svg id=\"rig\"></svg>")
+
+        val response = client.get("$BREWHOUSE_WEB_PATH/widget")
+
+        response.status shouldBe HttpStatusCode.OK
+        response.bodyAsText() shouldBe "<svg id=\"rig\"></svg>"
+        response.headers.getAll("Content-Security-Policy") shouldBe listOf(WIDGET_POLICY)
+        response.headers["X-Frame-Options"] shouldBe "SAMEORIGIN"
+    }
+
+    @Test
+    fun `should keep every other page out of frames`() = brewhouseWebApp { brewer ->
+        val client = signedIn(brewer)
+
+        val page = client.get(brewer.brewDayUrl)
+        val noWidget = client.get("$BREWHOUSE_WEB_PATH/widget")
+
+        page.headers["X-Frame-Options"] shouldBe "DENY"
+        noWidget.status shouldBe HttpStatusCode.NotFound
+        noWidget.headers["Content-Security-Policy"] shouldBe "frame-ancestors 'none'"
+    }
+
+    @Test
+    fun `should not serve the widget to a visitor who is not signed in`() = brewhouseWebApp { brewer ->
+        putWidget(brewer, "<p>rig</p>")
+
+        val response = client.get("$BREWHOUSE_WEB_PATH/widget")
+
+        response.status shouldBe HttpStatusCode.Unauthorized
+    }
+
+    @Test
     fun `should leave the panel off the Brew Day page while the brewhouse is switched off`() = brewhouseWebApp(enabled = false) { brewer ->
         val client = signedIn(brewer)
 
@@ -274,6 +332,14 @@ class BrewhouseWebTest {
             setBody("email=${brewer.email}&password=secret123")
         }
         return client
+    }
+
+    private suspend fun ApplicationTestBuilder.putWidget(brewer: Brewer, html: String) {
+        client.put("$BREWHOUSE_PATH/widget") {
+            header(HttpHeaders.Authorization, "Bearer ${brewer.token}")
+            contentType(ContentType.Text.Html)
+            setBody(html)
+        }.status shouldBe HttpStatusCode.NoContent
     }
 
     private fun newBrewer(): Brewer {

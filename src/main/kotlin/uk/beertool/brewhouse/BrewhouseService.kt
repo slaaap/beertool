@@ -27,7 +27,17 @@ class BrewhouseService(
 
     fun status(user: User): Status = brewhouses.status(user.id)
 
-    fun pageStatus(user: User): PageStatus = status(user).let { PageStatus(it.online, it.lastSeenAt, it.report, now()) }
+    fun pageStatus(user: User): PageStatus =
+        status(user).let { PageStatus(it.online, it.lastSeenAt, it.report, now(), BrewhouseWidgetRepository.updatedAt(user.id)) }
+
+    fun putWidget(user: User, html: String) {
+        if (html.isBlank()) throw BrewhouseProblem(400, "The widget is empty.")
+        BrewhouseWidgetRepository.put(user.id, html, now())
+    }
+
+    fun deleteWidget(user: User) {
+        BrewhouseWidgetRepository.delete(user.id)
+    }
 
     fun queue(user: User, request: CommandRequest, strike: StrikeInputs = StrikeInputs()): Command {
         val schedule = if (request.type == CommandType.START) {

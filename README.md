@@ -211,6 +211,11 @@ stop, a chart of the session, and the mash and boil timers following the control
 the grain temperature and mash thickness adjusted in the page's mash-water guide. While a session runs,
 one reading is kept per `BREWHOUSE_READING_INTERVAL_SECONDS` and deleted with its batch.
 
+beertool knows nothing about the controller's devices. A controller that wants them on the page uploads its
+own widget (one HTML document) and sends the widget's state in each sync; beertool shows it in a sandboxed
+frame with no network, cookies or access to the page, and passes it the state and the page's colours. The
+spec's Widget section describes the contract.
+
 ## Build a standalone jar
 
 ```bash

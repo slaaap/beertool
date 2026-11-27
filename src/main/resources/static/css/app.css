@@ -241,6 +241,7 @@ table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .bh-state { font-weight:600; color:var(--muted); }
 .bh-panel.online .bh-state { color:var(--good); }
 .bh-why { font-size:13px; color:var(--muted); }
+.bh-widget { display:block; width:100%; aspect-ratio:4 / 3; border:0; margin:8px 0; background:transparent; }
 .bh-wide { width:100%; justify-content:center; padding:13px; font-size:16px; }
 .bh-preview { margin-top:12px; }
 .bh-preview .stats { margin-bottom:10px; }

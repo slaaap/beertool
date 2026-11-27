@@ -39,10 +39,13 @@ fun Application.configureSecurity(env: Env = systemEnv) {
 }
 
 // No page is meant to be shown inside another site's frame, which keeps the OAuth consent page safe from clickjacking.
+// A response that sets its own policy, like the brewhouse widget framed by beertool's own page, keeps it.
 private val FramingForbidden = createApplicationPlugin("FramingForbidden") {
-    onCall { call ->
-        call.response.header("X-Frame-Options", "DENY")
-        call.response.header("Content-Security-Policy", "frame-ancestors 'none'")
+    onCallRespond { call, _ ->
+        if (call.response.headers["Content-Security-Policy"] == null) {
+            call.response.header("X-Frame-Options", "DENY")
+            call.response.header("Content-Security-Policy", "frame-ancestors 'none'")
+        }
     }
 }
 

@@ -19,6 +19,38 @@ info:
 
     The brewhouse stays the authority on safety: it validates every command against its own state
     and may refuse it, reporting why in `commandResults`.
+
+    ## Widget
+
+    beertool knows nothing about the brewhouse's devices. A brewhouse that wants its devices shown on
+    the Brew Day page uploads a widget with `PUT /widget`, its own drawing, and puts whatever state the
+    widget needs in each report's `widget` field. beertool frames the widget and hands it that state.
+
+    The widget is one self-contained HTML document. beertool serves it in a frame under this policy, so
+    only inline code runs and nothing reaches the network:
+    `sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline';
+    img-src data:; font-src data:; form-action 'none'; base-uri 'none'`.
+    Its origin is opaque, so it has no cookies or storage and no access to beertool's page.
+
+    beertool posts this message to the frame once it loads and after every status poll (about every 2 seconds):
+
+    ```
+    { type: "brewhouse",
+      data: <the latest report's widget, or null>,
+      session: <the latest report's session, or null>,
+      online: <false when no sync arrived in the last 15 seconds, or beertool is unreachable>,
+      theme: { dark: <boolean>, tokens: { "--ground": "#FBF8F2", ... } } }
+    ```
+
+    `tokens` holds beertool's colours and fonts: `--ground`, `--surface`, `--ink`, `--muted`,
+    `--hairline`, `--accent`, `--accent-soft`, `--danger`, `--danger-soft`, `--good`, `--font-display`,
+    `--font-body` and `--font-mono`. The frame shows through to the page, so leave the document's
+    background and `color-scheme` unset. When `online` is false, show the devices as out of touch rather
+    than the last values as if they were live.
+
+    The frame spans the panel's width and starts at 4:3. The widget sets its height by posting
+    `{ type: "brewhouse-size", height: <px> }` to `window.parent`, again whenever it changes;
+    beertool keeps it between 120 and 1200 pixels.
   license:
     name: MIT
 servers:
@@ -69,6 +101,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Status"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /widget:
+    put:
+      operationId: putWidget
+      summary: Upload the widget that draws the brewhouse's devices on the Brew Day page.
+      description: |
+        Replaces any earlier widget. Upload it when the brewhouse starts and whenever the document changes;
+        beertool keeps it until it is replaced or deleted. See the Widget section above for how it is shown.
+      requestBody:
+        required: true
+        content:
+          text/html:
+            schema:
+              type: string
+              maxLength: 262144
+      responses:
+        "204":
+          description: Widget stored.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Widget larger than 256 KiB.
+        "415":
+          description: Not sent as text/html.
+    delete:
+      operationId: deleteWidget
+      summary: Remove the widget, so the Brew Day page shows no devices pane.
+      responses:
+        "204":
+          description: Widget removed, or there was none.
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -271,6 +337,14 @@ components:
           description: Outcomes of commands executed since the previous sync; beertool stops delivering them.
           items:
             $ref: "#/components/schemas/CommandResult"
+        widget:
+          type: [object, "null"]
+          description: |
+            Whatever state the brewhouse's widget draws, passed to it as `data` without beertool reading it.
+            Send it in every report, so a page opened mid-brew draws straight away. It counts towards the
+            report's 16 KiB.
+          additionalProperties: true
+          examples: [{ "kettle": { "online": true, "display": "2100" } }]
 
     Session:
       type: object

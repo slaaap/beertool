@@ -12,6 +12,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.time.Instant
 import java.time.format.DateTimeParseException
 
@@ -84,6 +85,7 @@ data class Report(
     val notReady: String? = null,
     val session: Session?,
     val commandResults: List<CommandResult>,
+    val widget: JsonObject? = null,
 )
 
 @Serializable
@@ -128,6 +130,7 @@ data class PageStatus(
     @Serializable(with = InstantIso::class) val lastSeenAt: Instant?,
     val report: Report?,
     @Serializable(with = InstantIso::class) val serverNow: Instant,
+    @Serializable(with = InstantIso::class) val widgetAt: Instant? = null,
 )
 
 @Serializable
