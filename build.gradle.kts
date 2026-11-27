@@ -69,6 +69,7 @@ dependencies {
     testImplementation(libs.kotest.assertions)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.json.schema.validator)
     testRuntimeOnly(libs.junit.launcher)
 }
 

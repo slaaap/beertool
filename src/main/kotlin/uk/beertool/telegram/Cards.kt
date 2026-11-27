@@ -9,7 +9,6 @@ import uk.beertool.common.formatAmount
 import uk.beertool.common.prettify
 import uk.beertool.common.roundTo
 import uk.beertool.common.shortDate
-import uk.beertool.recipe.BoilAddition
 import uk.beertool.recipe.BrewStage
 import uk.beertool.recipe.FermentableUsage
 import uk.beertool.recipe.HopUsage
@@ -131,9 +130,6 @@ internal fun batchProgress(batch: Batch, today: LocalDate): String {
 
 internal class Reading(
     val label: String,
-    val key: String,
-    val example: String,
-    val question: String,
     val actual: Double?,
     val plan: Double?,
     val unit: String,
@@ -145,11 +141,11 @@ private fun gravity(v: Double) = fmt(v, 3)
 private fun volume(v: Double) = formatAmount(v.roundTo(1))
 
 internal fun readings(recipe: Recipe, batch: Batch, estimate: RecipeStats) = listOf(
-    Reading("OG", "og", "og 1.052", "Original gravity", batch.measuredOg, estimate.og, "", ::gravity),
-    Reading("FG", "fg", "fg 1.010", "Final gravity", batch.measuredFg, estimate.fg, "", ::gravity),
-    Reading("pre-boil", "pre", "pre 27.5", "Pre-boil volume, in litres", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, " L", ::volume),
-    Reading("post-boil", "post", "post 23", "Post-boil volume, in litres", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, " L", ::volume),
-    Reading("fermenter", "fermenter", "fermenter 21", "Fermenter volume, in litres", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, " L", ::volume),
+    Reading("OG", batch.measuredOg, estimate.og, "", ::gravity),
+    Reading("FG", batch.measuredFg, estimate.fg, "", ::gravity),
+    Reading("pre-boil", batch.measuredPreBoilVolumeL, recipe.preBoilVolumeL, " L", ::volume),
+    Reading("post-boil", batch.measuredPostBoilVolumeL, recipe.postBoilVolumeL, " L", ::volume),
+    Reading("fermenter", batch.measuredFermenterVolumeL, recipe.fermenterVolumeL, " L", ::volume),
 )
 
 // The plan is only worth reading where it differs from what was measured, as shown.
@@ -179,54 +175,12 @@ fun batchCard(recipe: Recipe, batch: Batch, estimate: RecipeStats, today: LocalD
     if (headline.isNotEmpty()) lines += "<b>${headline.joinToString(" · ")}</b>"
     lines += figures
 
-    val missing = all.filter { it.actual == null }
-    if (!batch.isPackaged && missing.isNotEmpty()) {
-        lines += ""
-        lines += "Still to log: ${missing.joinToString(", ") { it.key }}. Send e.g. <code>${missing.first().example}</code>"
-    }
-
     batch.notes?.let {
         val notes = it.shortened(MAX_NOTES)
         lines += ""
         lines += "<blockquote expandable>${notes.escapeHtml()}</blockquote>"
     }
     return clip(lines)
-}
-
-const val READINGS_HINT =
-    "<code>pre 27.5</code>, <code>og 1.052</code>, <code>post 23</code>, <code>fermenter 21</code>, <code>fg 1.010</code>, <code>note …</code>"
-
-fun additionLine(addition: BoilAddition) =
-    (if (addition.minutesBeforeEnd == 0) "flame-out" else "${addition.minutesBeforeEnd} min") + " · ${addition.what.escapeHtml()}"
-
-fun boilAlertText(recipe: Recipe, alert: BoilAlert, minutesLeft: Long): String {
-    val lines = mutableListOf<String>()
-    val due = alert.additions.filter { it.minutesBeforeEnd > 0 }
-    if (due.isNotEmpty()) {
-        lines += "⏱ <b>Add now</b> · ${recipeName(recipe).escapeHtml()}"
-        due.forEach { lines += "• ${it.what.escapeHtml()}" }
-        if (!alert.flameOut) lines += subtitle("$minutesLeft min to flame-out")
-    }
-    if (alert.flameOut) {
-        if (lines.isNotEmpty()) lines += ""
-        lines += "🔥 <b>Flame-out</b> · ${recipeName(recipe).escapeHtml()}"
-        alert.additions.filter { it.minutesBeforeEnd == 0 }.forEach { lines += "• ${it.what.escapeHtml()}" }
-        lines += ""
-        lines += "<i>Chill, transfer and pitch. The readings to log are on the panel below.</i>"
-    }
-    return clip(lines)
-}
-
-fun readingsSaved(readings: Readings): String {
-    val parts = listOfNotNull(
-        readings.og?.let { "OG ${fmt(it, 3)}" },
-        readings.fg?.let { "FG ${fmt(it, 3)}" },
-        readings.preBoilL?.let { "pre-boil ${formatAmount(it)} L" },
-        readings.postBoilL?.let { "post-boil ${formatAmount(it)} L" },
-        readings.fermenterL?.let { "fermenter ${formatAmount(it)} L" },
-        readings.note?.let { "a note" },
-    )
-    return "✅ Saved ${parts.joinToString(", ")}"
 }
 
 fun recipeLine(summary: RecipeSummary) = summary.name + (summary.style?.let { " · $it" } ?: "")

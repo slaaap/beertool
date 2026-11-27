@@ -7,8 +7,6 @@ class FakeTelegramApi : TelegramApi {
 
     val sent = mutableListOf<Sent>()
     val edited = mutableListOf<Sent>()
-    val prompts = mutableListOf<Sent>()
-    val deleted = mutableListOf<Long>()
     val callbackAnswers = mutableListOf<Pair<String, String?>>()
     val inlineAnswers = mutableListOf<List<InlineQueryResultArticle>>()
 
@@ -26,13 +24,6 @@ class FakeTelegramApi : TelegramApi {
     override suspend fun sendMessage(chatId: Long, text: String, keyboard: InlineKeyboardMarkup?): Long {
         if (blocked) throw TelegramException(403, "Forbidden: bot was blocked by the user")
         return (nextMessageId++).also { sent += Sent(chatId, text, keyboard, it) }
-    }
-
-    override suspend fun sendPrompt(chatId: Long, text: String, placeholder: String): Long =
-        (nextMessageId++).also { prompts += Sent(chatId, text, null, it) }
-
-    override suspend fun deleteMessage(chatId: Long, messageId: Long) {
-        deleted += messageId
     }
 
     override suspend fun editMessageText(chatId: Long, messageId: Long, text: String, keyboard: InlineKeyboardMarkup?) {

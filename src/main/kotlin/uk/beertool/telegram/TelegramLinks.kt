@@ -12,7 +12,6 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.jetbrains.exposed.v1.jdbc.update
 import uk.beertool.auth.Secrets
 import uk.beertool.db.forDb
 import java.time.Duration
@@ -22,7 +21,6 @@ object TelegramLinks : Table("telegram_links") {
     val telegramUserId = long("telegram_user_id")
     val userId = long("user_id")
     val chatId = long("chat_id")
-    val currentBatchId = long("current_batch_id").nullable()
     val linkedAt = timestamp("linked_at")
     override val primaryKey = PrimaryKey(telegramUserId)
 }
@@ -38,7 +36,6 @@ data class TelegramLink(
     val telegramUserId: Long,
     val userId: Long,
     val chatId: Long,
-    val currentBatchId: Long?,
 )
 
 val LINK_TOKEN_TTL: Duration = Duration.ofMinutes(15)
@@ -71,7 +68,7 @@ object TelegramLinkRepository {
             it[TelegramLinks.chatId] = chatId
             it[linkedAt] = now.forDb()
         }
-        TelegramLink(telegramUserId, userId, chatId, currentBatchId = null)
+        TelegramLink(telegramUserId, userId, chatId)
     }
 
     fun findByTelegramUser(telegramUserId: Long): TelegramLink? = transaction {
@@ -82,20 +79,11 @@ object TelegramLinkRepository {
         TelegramLinks.selectAll().where { TelegramLinks.userId eq userId }.singleOrNull()?.toLink()
     }
 
-    // Brew sessions hold the chat id, so they go too, or the old chat would keep hearing about the brew.
-    fun unlinkUser(userId: Long): Boolean = transaction {
-        BrewSessions.deleteWhere { BrewSessions.userId eq userId }
-        TelegramLinks.deleteWhere { TelegramLinks.userId eq userId } > 0
-    }
-
-    fun setCurrentBatch(telegramUserId: Long, batchId: Long?) = transaction {
-        TelegramLinks.update({ TelegramLinks.telegramUserId eq telegramUserId }) { it[currentBatchId] = batchId }
-    }
+    fun unlinkUser(userId: Long): Boolean = transaction { TelegramLinks.deleteWhere { TelegramLinks.userId eq userId } > 0 }
 
     private fun ResultRow.toLink() = TelegramLink(
         telegramUserId = this[TelegramLinks.telegramUserId],
         userId = this[TelegramLinks.userId],
         chatId = this[TelegramLinks.chatId],
-        currentBatchId = this[TelegramLinks.currentBatchId],
     )
 }

@@ -23,8 +23,8 @@ including a phone-first **Brew Day** mode for using it at the kettle.
   OG is in.
 - **Per-user settings** - your kit volumes, efficiency, default mash, mash-water ratios and water sources
   (mineral figures from your water report or bottle label); new recipes open pre-filled from them.
-- **Telegram bot** (optional) - browse and search recipes, share recipe cards inline in any chat, get the
-  brew day plan, a boil timer that messages you at each addition, and log readings by just typing `og 1.052`.
+- **Telegram bot** (optional) - browse and search recipes and the brew log, and share recipe cards inline in
+  any chat.
 - **AI assistant access** (optional) - an MCP endpoint, so an assistant such as Claude or ChatGPT can read your
   recipes and brew log, estimate drafts with beertool's own maths, and save recipes you agree on.
 - **Brewhouse control** (optional) - an HTTP API for a home brewery controller (induction hob, thermometer,
@@ -119,12 +119,8 @@ What it does:
 | Command / action              | What happens                                                                    |
 |-------------------------------|---------------------------------------------------------------------------------|
 | `/recipes`, `/find <text>`    | Browse or search recipes; tap one for the full recipe card                      |
+| Plain text, e.g. `citra`      | Same as `/find`: searches recipes by name, style or ingredient                  |
 | `/log`                        | The brew log; tap a batch for its readings against the plan                     |
-| **Start brew day** (button)   | Starts today's batch (or resumes it) and sends water, mash and boil plan        |
-| `/brew`                       | Shows the brew in progress, or lets you pick one when several are going         |
-| **Start boil timer** (button) | Messages you as each addition falls due and at flame-out; survives restarts     |
-| Plain text, e.g. `og 1.052 post 23` | Logs readings to the current brew (`og`, `fg`, `pre`, `post`, `fermenter`, `note …`); gravity as `1.052` or `1052` |
-| **Mark packaged** (button)    | Once the FG is in                                                               |
 | `@yourbot <text>` in any chat | Shares a recipe card (needs inline mode, step 2)                                |
 | `/unlink`                     | Disconnects the Telegram account (also possible from Settings)                  |
 
@@ -132,7 +128,7 @@ Notes:
 
 - The bot only answers in private chats, so a linked account can't be used by a whole group.
 - In single-user mode, anyone can browse the showcase recipes through the bot read-only, just like the
-  website; only the linked owner can log brews.
+  website.
 - A bot token can be polled by **one** running app at a time. Use a separate bot for development, or
   Telegram will answer the second instance with "Conflict" errors.
 

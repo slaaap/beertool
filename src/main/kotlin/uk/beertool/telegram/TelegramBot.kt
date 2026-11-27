@@ -1,17 +1,10 @@
 package uk.beertool.telegram
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import org.slf4j.LoggerFactory
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
-import uk.beertool.batch.BrewDayStage
-import uk.beertool.batch.toDraft
 import uk.beertool.common.paginate
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeRepository
-import uk.beertool.recipe.boilAdditions
-import uk.beertool.recipe.mashWater
 import uk.beertool.recipe.stats
 import uk.beertool.user.SingleUser
 import uk.beertool.user.User
@@ -25,29 +18,15 @@ val BOT_COMMANDS = listOf(
     BotCommand("recipes", "Browse recipes"),
     BotCommand("find", "Search by name or ingredient"),
     BotCommand("log", "Brew log"),
-    BotCommand("brew", "Brew day: timers and readings"),
     BotCommand("help", "Commands"),
     BotCommand("unlink", "Disconnect Telegram"),
 )
 
-private val LINKED_ONLY_COMMANDS = setOf("brew", "unlink")
-
-private val BREW_DAY_GUIDE = """
-    🔥 <b>Brew day</b>
-    <i>Nothing brewing right now. Here's how it works:</i>
-
-    1. Pick a recipe in /recipes and tap <b>Start brew day</b>.
-    2. One panel walks you through water, mash, boil, chill and ferment.
-    3. I time each mash step and the boil, and message you when it's time to act.
-    4. Tap a reading button and send just the figure, or type readings any time: $READINGS_HINT
-    5. Once the FG is in, tap <b>Mark packaged</b>.
-""".trimIndent()
+private val LINKED_ONLY_COMMANDS = setOf("unlink")
 
 private const val LIST_PAGE_SIZE = 8
 private const val SEARCH_LIMIT = 10
 private const val BUTTON_TEXT_MAX = 60
-
-private const val READ_ONLY = "🔒 This is a read-only showcase, so brewing and logging are switched off."
 
 class TelegramBot(
     private val api: TelegramApi,
@@ -55,11 +34,6 @@ class TelegramBot(
     private val clock: () -> Instant = Instant::now,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
-    private val log = LoggerFactory.getLogger(TelegramBot::class.java)
-
-    // The boil button ticks straight away while the background loop may be mid-tick on the same brew.
-    private val ticking = Mutex()
-
     private class Chatter(val telegramUserId: Long, val chatId: Long, val user: User?, val link: TelegramLink?)
 
     private fun chatter(telegramUserId: Long, chatId: Long): Chatter {
@@ -81,8 +55,8 @@ class TelegramBot(
         if (!message.chat.isPrivate || from.isBot) return
         val who = chatter(from.id, message.chat.id)
 
-        if (!text.startsWith("/")) return onReadings(who, text, message.messageId, message.replyToMessage?.messageId)
-        if (who.link != null) ReadingPromptRepository.clear(who.telegramUserId)
+        // Anything that isn't a command is taken as a search, the one thing worth typing here.
+        if (!text.startsWith("/")) return withUser(who) { user -> onFind(who, user, text) }
         val command = text.substringBefore(' ').drop(1).substringBefore('@').lowercase()
         val arg = text.substringAfter(' ', "").trim()
         when (command) {
@@ -96,7 +70,6 @@ class TelegramBot(
                     "recipe" -> arg.removePrefix("#").toIntOrNull()?.let { showRecipe(who, user, it) }
                         ?: say(who, "Which recipe? Send its number, e.g. <code>/recipe 12</code>, or browse /recipes.")
                     "log" -> logPage(user, 1).let { (text, keys) -> say(who, text, keys) }
-                    "brew" -> onBrew(who, user)
                     else -> say(who, "🤔 I don't know that command. /help lists them all.")
                 }
             }
@@ -142,114 +115,14 @@ class TelegramBot(
 
     private suspend fun showRecipe(who: Chatter, user: User, no: Int) {
         val recipe = RecipeRepository.findByNo(no, user.id) ?: return say(who, "⚠️ There's no recipe #$no. Browse /recipes.")
-        say(who, recipeCard(recipe, recipe.stats(user.preferences.whirlpool), publicUrl), recipeKeyboard(user, recipe))
+        say(who, recipeCard(recipe, recipe.stats(user.preferences.whirlpool), publicUrl), recipeKeyboard(recipe))
     }
 
     private suspend fun showBatch(who: Chatter, user: User, recipe: Recipe, batch: Batch) {
-        say(who, batchCard(recipe, batch, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, batch))
-    }
-
-    private suspend fun showBrewDay(who: Chatter, user: User, recipe: Recipe, batch: Batch, from: Long? = null, flash: String? = null) {
-        val stage = if (batch.isOnBrewDay) BrewDayStage.WATER else BrewDayStage.FERMENT
-        showPanel(BrewSessionRepository.open(batch.id, user.id, who.chatId, stage), user, recipe, batch, replacing = from, flash = flash)
-    }
-
-    // A press on the panel edits it in place; anything else posts it afresh at the foot of the chat and clears the old one.
-    private suspend fun showPanel(session: BrewSession, user: User, recipe: Recipe, batch: Batch, replacing: Long? = null, flash: String? = null) {
-        val panel = brewPanel(recipe, batch, session, user.preferences, clock(), today(), publicUrl, flash)
-        val shown = session.panelMessageId
-        if (shown != null && shown == replacing) {
-            api.editMessageText(session.chatId, shown, panel.text, panel.keyboard)
-            BrewSessionRepository.panelRefreshed(session.batchId, clock())
-            return
-        }
-        BrewSessionRepository.setPanel(session.batchId, api.sendMessage(session.chatId, panel.text, panel.keyboard), clock())
-        shown?.let { forget(session.chatId, it) }
-    }
-
-    // Once a brew is in the fermenter, starting the next one clears its panel; /brew brings it back for the FG.
-    private suspend fun retireFinishedPanels(user: User, keep: Long) {
-        for ((_, other) in openBatches(user)) {
-            if (other.id == keep || other.isOnBrewDay) continue
-            val session = BrewSessionRepository.find(other.id)?.takeIf { it.timer == null } ?: continue
-            session.panelMessageId?.let { forget(session.chatId, it) }
-            BrewSessionRepository.close(other.id)
-        }
-    }
-
-    // Telegram won't delete messages older than two days; a stale panel left behind is harmless.
-    private suspend fun forget(chatId: Long, messageId: Long) {
-        try {
-            api.deleteMessage(chatId, messageId)
-        } catch (e: TelegramException) {
-            log.debug("Could not delete message {}: {}", messageId, e.message)
-        }
-    }
-
-    private suspend fun onBrew(who: Chatter, user: User) {
-        if (!user.canWrite) return say(who, READ_ONLY)
-        val open = openBatches(user)
-        val current = currentBatch(who, user)
-        if (open.size > 1) {
-            val heading = if (current == null) "🔥 <b>Which brew?</b>\n<i>Pick the one you're working on.</i>" else "🔥 <b>Brews on the go</b>"
-            say(who, heading, keyboard(*open.map { (recipe, batch) ->
-                val mark = (if (batch.id == current?.second?.id) "✓ " else "") +
-                    (if (BrewSessionRepository.find(batch.id)?.timer != null) "⏱ " else "")
-                listOf(button("$mark${friendlyDate(batch.brewDate, today())} · ${recipe.name}".short(), "cur:${recipe.no}:${batch.no}"))
-            }.toTypedArray()))
-        }
-        when {
-            current != null -> showBrewDay(who, user, current.first, current.second)
-            open.isEmpty() -> say(who, BREW_DAY_GUIDE)
-        }
-    }
-
-    private suspend fun onReadings(who: Chatter, text: String, messageId: Long, replyTo: Long?) {
-        val user = who.user ?: return say(who, notLinked())
-        val pending = who.link?.let { ReadingPromptRepository.pending(who.telegramUserId, replyTo) }
-        val answer = pending?.let { parseAnswer(it.key, text) }
-        val prompted = pending?.takeIf { answer != null || replyTo != null }
-        val readings = when (val parsed = answer ?: parseReadings(text)) {
-            is ReadingsParse.NotReadings -> return say(
-                who,
-                if (pending == null) "🤔 Not sure what to do with that. /help lists the commands."
-                else "🤔 Just the figure will do, e.g. <code>23.5</code>. /help lists the commands.",
-            )
-            is ReadingsParse.Invalid -> return say(who, "⚠️ ${parsed.reason.escapeHtml()}")
-            is ReadingsParse.Ok -> parsed.readings
-        }
-        if (!user.canWrite) return say(who, READ_ONLY)
-        val (recipe, batch) = prompted?.let { openBatch(user, it.batchId) } ?: currentBatch(who, user)
-            ?: return say(who, if (openBatches(user).isEmpty()) "Nothing is brewing. Start a brew day from /recipes first." else "Which brew is that for? Pick one in /brew, then send it again.")
-        val saved = BatchRepository.update(batch.id, user.id, readings.applyTo(batch.toDraft()))
-            ?: return say(who, "⚠️ That didn't save. Please send it again.")
-        TelegramLinkRepository.setCurrentBatch(who.telegramUserId, saved.id)
-        // The panel repeats what was saved, so the question and its answer are cleared from the chat.
-        prompted?.let {
-            ReadingPromptRepository.answered(who.telegramUserId, it.messageId)
-            forget(who.chatId, it.messageId)
-            forget(who.chatId, messageId)
-        }
-        val session = BrewSessionRepository.find(saved.id)
-        if (session != null) showPanel(session, user, recipe, saved, flash = readingsSaved(readings))
-        else say(who, readingsSaved(readings) + "\n\n" + batchCard(recipe, saved, recipe.stats(user.preferences.whirlpool), today(), publicUrl), batchKeyboard(user, recipe, saved))
-    }
-
-    private fun openBatches(user: User): List<Pair<Recipe, Batch>> =
-        BatchRepository.listByUser(user.id)
-            .filterNot { it.batch.isPackaged }
-            .mapNotNull { s -> RecipeRepository.findById(s.batch.recipeId, user.id)?.let { it to s.batch } }
-
-    private fun currentBatch(who: Chatter, user: User): Pair<Recipe, Batch>? =
-        who.link?.currentBatchId?.let { openBatch(user, it) } ?: openBatches(user).singleOrNull()
-
-    private fun openBatch(user: User, batchId: Long): Pair<Recipe, Batch>? {
-        val batch = BatchRepository.findById(batchId, user.id)?.takeUnless { it.isPackaged } ?: return null
-        return RecipeRepository.findById(batch.recipeId, user.id)?.let { it to batch }
+        say(who, batchCard(recipe, batch, recipe.stats(user.preferences.whirlpool), today(), publicUrl))
     }
 
     private suspend fun onCallback(query: CallbackQuery) {
-        var notice: String? = null
         try {
             val message = query.message ?: return
             if (!message.chat.isPrivate) return
@@ -258,9 +131,7 @@ class TelegramBot(
             val parts = query.data.orEmpty().split(':')
             val n1 = parts.getOrNull(1)?.toIntOrNull()
             val n2 = parts.getOrNull(2)?.toIntOrNull()
-            val extra = parts.getOrNull(3)
             val action = parts.first()
-            if (action in WRITE_ACTIONS && !user.canWrite) return say(who, READ_ONLY)
 
             when (action) {
                 "rl" -> recipeListPage(user, n1 ?: 1).let { (text, keys) -> api.editMessageText(who.chatId, message.messageId, text, keys) }
@@ -274,94 +145,9 @@ class TelegramBot(
                     }.toTypedArray()))
                 }
                 "b" -> batchOf(user, n1, n2)?.let { (recipe, batch) -> showBatch(who, user, recipe, batch) }
-                "sb" -> recipeOf(user, n1)?.let { recipe ->
-                    val batch = BatchRepository.startBrewDay(recipe.id, user.id, today()) ?: return
-                    TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
-                    retireFinishedPanels(user, keep = batch.id)
-                    // One kettle means one brew day at a time, so an earlier brew still without an OG was most likely forgotten.
-                    val unfinished = openBatches(user).firstOrNull { (_, other) -> other.id != batch.id && other.isOnBrewDay }
-                    val warning = unfinished?.let { (r, b) -> "⚠️ ${batchName(r, b).escapeHtml()} is still on brew day. Log its OG or cancel it from /brew." }
-                    showBrewDay(who, user, recipe, batch, flash = warning)
-                }
-                "cur" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
-                    showBrewDay(who, user, recipe, batch)
-                }
-                "st" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val stage = BrewDayStage.entries.find { it.name == extra } ?: return
-                    BrewSessionRepository.open(batch.id, user.id, who.chatId, stage)
-                    BrewSessionRepository.moveTo(batch.id, stage)
-                    showBrewDay(who, user, recipe, batch, from = message.messageId)
-                }
-                "mash" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val session = BrewSessionRepository.open(batch.id, user.id, who.chatId, BrewDayStage.MASH)
-                    val step = recipe.mashSteps.getOrNull(session.mashStep) ?: return
-                    if (session.timer != null) {
-                        notice = "Stop the running timer first"
-                        return
-                    }
-                    BrewSessionRepository.startMashStep(batch.id, session.mashStep, step.timeMin, clock())
-                    TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
-                    notice = "Step ${session.mashStep + 1} started"
-                    showBrewDay(who, user, recipe, batch, from = message.messageId)
-                }
-                "tq" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val session = BrewSessionRepository.find(batch.id) ?: return
-                    val confirm = timerConfirmation(recipe, batch, session, clock()) ?: return
-                    api.editMessageText(who.chatId, message.messageId, confirm.text, confirm.keyboard)
-                }
-                "mend" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val session = BrewSessionRepository.find(batch.id) ?: return
-                    val timer = session.timer?.takeIf { it.kind == TimerKind.MASH } ?: return
-                    BrewSessionRepository.finishMashStep(batch.id, timer.endsAt, session.mashStep + 1)
-                    showBrewDay(who, user, recipe, batch, from = message.messageId)
-                }
-                "boil" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val session = BrewSessionRepository.open(batch.id, user.id, who.chatId, BrewDayStage.BOIL)
-                    if (session.timer?.kind == TimerKind.MASH) {
-                        notice = "Finish the mash step first"
-                        return
-                    }
-                    BrewSessionRepository.startBoil(batch.id, recipe.boilTimeMin, clock())
-                    TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
-                    notice = "Boil timer started"
-                    showBrewDay(who, user, recipe, batch, from = message.messageId)
-                    tickTimers()
-                }
-                "stop" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    notice = if (BrewSessionRepository.stopTimer(batch.id)) "Timer stopped" else "No timer running"
-                    BrewSessionRepository.find(batch.id)?.let { showPanel(it, user, recipe, batch, replacing = message.messageId) }
-                }
-                "ask" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val prompt = readingPrompt(extra.orEmpty(), recipe, batch, recipe.stats(user.preferences.whirlpool)) ?: return
-                    TelegramLinkRepository.setCurrentBatch(who.telegramUserId, batch.id)
-                    val asked = api.sendPrompt(who.chatId, prompt.text, prompt.placeholder)
-                    ReadingPromptRepository.ask(who.telegramUserId, asked, batch.id, extra!!, clock())
-                }
-                "cx" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    val session = BrewSessionRepository.find(batch.id) ?: return
-                    val confirm = cancelConfirmation(recipe, batch, session)
-                    if (session.panelMessageId == message.messageId) api.editMessageText(who.chatId, message.messageId, confirm.text, confirm.keyboard)
-                    else say(who, confirm.text, confirm.keyboard)
-                }
-                "cxy" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    if (!batch.isOnBrewDay) return say(who, "⚠️ ${batchName(recipe, batch).escapeHtml()} already has an OG, so delete it on the website if you must.")
-                    BrewSessionRepository.find(batch.id)?.panelMessageId?.let { forget(who.chatId, it) }
-                    BatchRepository.delete(batch.id, user.id)
-                    notice = "Brew cancelled"
-                    say(who, "🗑 Cancelled the brew of ${recipeName(recipe).escapeHtml()}.")
-                }
-                "pkg" -> batchOf(user, n1, n2)?.let { (recipe, batch) ->
-                    if (batch.measuredFg == null) return say(who, "⚠️ Send the final gravity first, e.g. <code>fg 1.010</code>")
-                    val packaged = BatchRepository.markPackaged(batch.id, user.id, today()) ?: return
-                    BrewSessionRepository.find(batch.id)?.panelMessageId?.let { forget(who.chatId, it) }
-                    BrewSessionRepository.close(batch.id)
-                    notice = "Packaged 🍻"
-                    showBatch(who, user, recipe, packaged)
-                }
             }
         } finally {
-            api.answerCallbackQuery(query.id, notice)
+            api.answerCallbackQuery(query.id, null)
         }
     }
 
@@ -380,65 +166,6 @@ class TelegramBot(
             )
         }
         api.answerInlineQuery(query.id, results)
-    }
-
-    suspend fun tickTimers() = ticking.withLock {
-        val now = clock()
-        for (session in BrewSessionRepository.withTimers()) {
-            try {
-                tick(session, now)
-            } catch (e: Exception) {
-                log.warn("Brew timer for batch {} failed: {}", session.batchId, e.message)
-            }
-        }
-    }
-
-    private suspend fun tick(session: BrewSession, now: Instant) {
-        val timer = session.timer ?: return
-        val user = UserRepository.findById(session.userId)
-        val batch = user?.let { BatchRepository.findById(session.batchId, it.id) }?.takeUnless { it.isPackaged }
-        val recipe = batch?.let { RecipeRepository.findById(it.recipeId, session.userId) }
-        if (user == null || batch == null || recipe == null) {
-            BrewSessionRepository.close(session.batchId)
-            return
-        }
-        val alert = when (timer.kind) {
-            TimerKind.MASH -> mashAlert(session, timer, recipe, user, now)
-            TimerKind.BOIL -> boilAlert(session, timer, recipe, now)
-        }
-        when {
-            alert != null -> {
-                api.sendMessage(session.chatId, alert)
-                BrewSessionRepository.find(session.batchId)?.let { showPanel(it, user, recipe, batch) }
-            }
-            session.panelMessageId != null && timer.minutesLeft(now) != timer.minutesLeft(session.panelRefreshedAt ?: Instant.EPOCH) ->
-                refreshCountdown(session, user, recipe, batch)
-        }
-    }
-
-    private fun mashAlert(session: BrewSession, timer: BrewTimer, recipe: Recipe, user: User, now: Instant): String? {
-        if (!timer.isDue(now) || !BrewSessionRepository.finishMashStep(session.batchId, timer.endsAt, session.mashStep + 1)) return null
-        val prefs = user.preferences
-        return mashStepDoneText(recipe, session.mashStep, recipe.mashWater(prefs.mashThicknessLPerKg, prefs.grainAbsorptionLPerKg)?.spargeVolumeL)
-    }
-
-    private fun boilAlert(session: BrewSession, timer: BrewTimer, recipe: Recipe, now: Instant): String? {
-        val alert = timer.boilAlertAt(now, recipe.boilAdditions()) ?: return null
-        val claimed = if (alert.flameOut) BrewSessionRepository.finishBoil(session.batchId)
-        else BrewSessionRepository.claimBoil(session.batchId, timer.announcedDownTo, alert.announcedDownTo)
-        return boilAlertText(recipe, alert, timer.minutesLeft(now)).takeIf { claimed }
-    }
-
-    // Edits raise no notification, so the countdown ticks over quietly. A panel the brewer deleted is let go,
-    // but a network blip or rate limit only skips this minute.
-    private suspend fun refreshCountdown(session: BrewSession, user: User, recipe: Recipe, batch: Batch) {
-        val shown = session.panelMessageId ?: return
-        try {
-            showPanel(session, user, recipe, batch, replacing = shown)
-        } catch (e: TelegramException) {
-            if (e.errorCode == 400 || e.errorCode == 403) BrewSessionRepository.dropPanel(session.batchId, shown)
-            else log.debug("Countdown edit for batch {} skipped: {}", session.batchId, e.message)
-        }
     }
 
     private fun recipeOf(user: User, no: Int?) = no?.let { RecipeRepository.findByNo(it, user.id) }
@@ -472,21 +199,7 @@ class TelegramBot(
         button("Next »", "$action:${page + 1}").takeIf { hasNext },
     )
 
-    private fun recipeKeyboard(user: User, recipe: Recipe) = keyboard(
-        listOfNotNull(
-            button("📚 Brews", "rb:${recipe.no}"),
-            button("🔥 Start brew day", "sb:${recipe.no}").takeIf { user.canWrite },
-        ),
-    )
-
-    private fun batchKeyboard(user: User, recipe: Recipe, batch: Batch) = keyboard(
-        listOfNotNull(
-            button(if (batch.isOnBrewDay) "🔥 Brew day" else "🫧 Fermentation", "cur:${recipe.no}:${batch.no}")
-                .takeIf { user.canWrite && !batch.isPackaged },
-            button("🍺 Mark packaged", "pkg:${recipe.no}:${batch.no}")
-                .takeIf { user.canWrite && !batch.isPackaged && batch.measuredFg != null },
-        ),
-    )
+    private fun recipeKeyboard(recipe: Recipe) = keyboard(listOf(button("📚 Brews", "rb:${recipe.no}")))
 
     private suspend fun withUser(who: Chatter, block: suspend (User) -> Unit) {
         val user = who.user ?: return say(who, notLinked())
@@ -505,8 +218,4 @@ class TelegramBot(
     private fun today(): LocalDate = clock().atZone(zone).toLocalDate()
 
     private fun String.short() = shortened(BUTTON_TEXT_MAX)
-
-    private companion object {
-        val WRITE_ACTIONS = setOf("sb", "cur", "st", "mash", "tq", "mend", "boil", "stop", "ask", "cx", "cxy", "pkg")
-    }
 }

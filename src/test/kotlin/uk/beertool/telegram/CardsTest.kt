@@ -78,16 +78,6 @@ class CardsTest {
     }
 
     @Test
-    fun `should say what is still to log and how to send it`() {
-        val recipe = recipe()
-        val batch = sampleBatch(measuredOg = 1.052)
-
-        val card = batchCard(recipe, batch, recipe.stats(), today)
-
-        card shouldContain "Still to log: fg, pre, post, fermenter. Send e.g. <code>fg 1.010</code>"
-    }
-
-    @Test
     fun `should count the days a batch has been fermenting`() {
         val recipe = recipe()
         val batch = sampleBatch(brewDate = LocalDate.of(2026, 10, 7), measuredOg = 1.052)
@@ -99,14 +89,13 @@ class CardsTest {
     }
 
     @Test
-    fun `should say when a batch was packaged and stop asking for readings`() {
+    fun `should say when a batch was packaged`() {
         val recipe = recipe()
         val batch = sampleBatch(brewDate = LocalDate.of(2025, 12, 1), packagedDate = LocalDate.of(2026, 10, 1), measuredOg = 1.052)
 
         val card = batchCard(recipe, batch, recipe.stats(), today)
 
         card shouldContain "Brewed 1 Dec 2025 · packaged 1 Oct"
-        card shouldNotContain "Still to log"
     }
 
     @Test

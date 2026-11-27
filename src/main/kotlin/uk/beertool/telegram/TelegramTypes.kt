@@ -17,7 +17,6 @@ data class Message(
     val chat: Chat,
     val from: TgUser? = null,
     val text: String? = null,
-    @SerialName("reply_to_message") val replyToMessage: Message? = null,
 )
 
 @Serializable
@@ -60,13 +59,6 @@ data class InlineKeyboardMarkup(
 data class InlineKeyboardButton(
     val text: String,
     @SerialName("callback_data") val callbackData: String,
-)
-
-// Opens the reply box under a question, so an answer is a number typed straight in.
-@Serializable
-data class ForceReply(
-    @SerialName("input_field_placeholder") val placeholder: String,
-    @SerialName("force_reply") val forceReply: Boolean = true,
 )
 
 @Serializable
