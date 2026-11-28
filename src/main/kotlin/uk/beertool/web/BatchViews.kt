@@ -16,7 +16,7 @@ import uk.beertool.user.User
 import java.time.LocalDate
 
 internal fun FlowContent.batchTable(brews: List<BatchSummary>, showRecipe: Boolean) {
-    scrollTable(if (showRecipe) null else "fit") {
+    scrollTable("fit") {
         thead {
             tr {
                 th(classes = if (showRecipe) null else "col-grow") { +"Brewed" }
@@ -104,7 +104,7 @@ fun HTML.batchViewPage(user: User, batch: Batch, recipe: Recipe, estimate: Recip
 }
 
 private fun FlowContent.volumesTable(recipe: Recipe, batch: Batch) {
-    scrollTable {
+    scrollTable("fit") {
         thead { tr { th { +"Volume" }; th(classes = "num") { +"Planned (L)" }; th(classes = "num") { +"Actual (L)" } } }
         tbody {
             fun row(name: String, planned: Double?, actual: Double?) = tr {

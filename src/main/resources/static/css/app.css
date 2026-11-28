@@ -197,6 +197,7 @@ td .btn { padding:5px; }
 .stage-title { margin:28px 0 12px; }
 .staged .stage-title { display:none; }
 .stage-readings { margin-top:22px; }
+.readings-hint { margin-top:12px; }
 .readings-hint p { margin:0 0 8px; }
 .stage-readings .actions, .stage > input[type=submit] { margin-top:4px; }
 .stage input[type=submit].btn.primary { width:100%; justify-content:center; padding:13px; font-size:16px; margin-top:14px; }

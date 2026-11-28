@@ -22,7 +22,6 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
         div("brewday") {
             id = "brewday"
             attributes["data-key"] = batch.id.toString()
-            attributes["data-start"] = (if (batch.isOnBrewDay) BrewDayStage.WATER else BrewDayStage.FERMENT).key
             div("bd-head") {
                 div("bd-title") {
                     a(href = "/recipes/${recipe.no}/batches/${batch.no}", classes = "bd-back") {
@@ -69,27 +68,26 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                     if (recipe.yeasts.isNotEmpty()) +" Pitch:"
                 }
                 if (recipe.yeasts.isNotEmpty()) ul("pitch") { recipe.yeasts.forEach { li { +it.name } } }
-                readingsRow(readings.fermenter, readings.og)
-            }
-            stage(BrewDayStage.FERMENT) {
-                batch.measuredOg?.let { og ->
-                    div("stats duo") {
-                        statTile("OG", fmt(og, 3), null)
-                        statTile("ABV", fmt(batch.abv, 1), "%")
+                readingsRow(readings.fermenter, readings.og) {
+                    field("Notes") { textArea { name = "notes"; attributes["form"] = READINGS_FORM; +(batch.notes ?: "") } }
+                    // Brew day ends with the OG; fermenting and packaging are on the brew's own page.
+                    submitInput(classes = "btn primary finish") {
+                        id = "finish"
+                        attributes["form"] = READINGS_FORM
+                        attributes["formaction"] = "${brewPath(recipe, batch)}?finish=true"
+                        value = "Finish brew day"
                     }
                 }
-                readingsRow(readings.fg)
-                field("Notes") { textArea { name = "notes"; attributes["form"] = READINGS_FORM; +(batch.notes ?: "") } }
-                saveButton()
             }
             div("stage-nav") {
                 button(type = ButtonType.button, classes = "btn") { id = "stage-prev"; hidden = true }
                 button(type = ButtonType.button, classes = "btn") { id = "stage-next"; hidden = true }
             }
-            form(action = "/recipes/${recipe.no}/batches/${batch.no}/brew", method = FormMethod.post) {
+            form(action = brewPath(recipe, batch), method = FormMethod.post) {
                 id = READINGS_FORM
                 hiddenInput(name = "brewDate") { value = batch.brewDate?.toString() ?: LocalDate.now().toString() }
                 hiddenInput(name = "packagedDate") { value = batch.packagedDate?.toString() ?: "" }
+                hiddenInput(name = "measuredFg") { value = batch.measuredFg?.toString() ?: "" }
             }
         }
 
@@ -102,6 +100,8 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
 
 private val BrewDayStage.key get() = name.lowercase()
 
+private fun brewPath(recipe: Recipe, batch: Batch) = "/recipes/${recipe.no}/batches/${batch.no}/brew"
+
 private fun FlowContent.stage(stage: BrewDayStage, block: DIV.() -> Unit) =
     div("stage") {
         attributes["data-stage"] = stage.key
@@ -110,10 +110,10 @@ private fun FlowContent.stage(stage: BrewDayStage, block: DIV.() -> Unit) =
     }
 
 // Each stage shows only its own readings, but they all belong to the one form so a save keeps the rest.
-private fun FlowContent.readingsRow(vararg inputs: ReadingInput) {
+private fun FlowContent.readingsRow(vararg inputs: ReadingInput, end: (DIV.() -> Unit)? = null) {
     div("stage-readings") {
         fieldGrid(columns = inputs.size) { inputs.forEach { readingField(it) { attributes["form"] = READINGS_FORM } } }
-        if (inputs.none { it.name == "measuredFg" }) saveButton()
+        if (end == null) saveButton() else end()
     }
 }
 

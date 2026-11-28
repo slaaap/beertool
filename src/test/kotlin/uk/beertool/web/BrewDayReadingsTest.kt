@@ -2,6 +2,7 @@ package uk.beertool.web
 
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.cookies.HttpCookies
@@ -10,6 +11,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.application.install
@@ -63,6 +65,55 @@ class BrewDayReadingsTest {
 
         attribute(page, "measuredFermenterVolumeL", "placeholder") shouldStartWith "plan "
         attribute(page, "measuredOg", "placeholder") shouldStartWith "plan "
+    }
+
+    @Test
+    fun `should finish brew day on the brew's page once the OG is in`() = brewDayApp { brewer ->
+        val client = signedIn(brewer)
+
+        val finished = client.post("${brewer.url}?finish=true") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("brewDate=2026-11-28&measuredFermenterVolumeL=1.6&measuredOg=1.050")
+        }
+
+        finished.status shouldBe HttpStatusCode.Found
+        finished.headers[HttpHeaders.Location] shouldBe brewer.url.removeSuffix("/brew")
+    }
+
+    @Test
+    fun `should keep the brew on brew day when Finish comes without an OG`() = brewDayApp { brewer ->
+        val client = signedIn(brewer)
+
+        val finished = client.post("${brewer.url}?finish=true") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("brewDate=2026-11-28&measuredFermenterVolumeL=1.6")
+        }
+
+        finished.headers[HttpHeaders.Location] shouldBe "${brewer.url}?saved=true#chill"
+    }
+
+    @Test
+    fun `should send a finished brew to its own page rather than back to brew day`() = brewDayApp { brewer ->
+        val client = signedIn(brewer)
+        client.post("${brewer.url}?finish=true") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("brewDate=2026-11-28&measuredOg=1.050")
+        }
+
+        val reopened = client.get(brewer.url)
+
+        reopened.status shouldBe HttpStatusCode.Found
+        reopened.headers[HttpHeaders.Location] shouldBe brewer.url.removeSuffix("/brew")
+    }
+
+    @Test
+    fun `should end brew day on Chill, with no fermenting stage`() = brewDayApp { brewer ->
+        val client = signedIn(brewer)
+
+        val page = client.get(brewer.url).bodyAsText()
+
+        page shouldContain "Finish brew day"
+        page shouldNotContain """data-tab="ferment""""
     }
 
     private data class Brewer(val email: String, val url: String)

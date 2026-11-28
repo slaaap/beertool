@@ -28,7 +28,7 @@ class BatchRes(val recipeNo: Int, val no: Int)
 class BatchEditRes(val recipeNo: Int, val no: Int, val packageToday: Boolean = false)
 
 @Resource("/recipes/{recipeNo}/batches/{no}/brew")
-class BatchBrewRes(val recipeNo: Int, val no: Int, val saved: Boolean = false)
+class BatchBrewRes(val recipeNo: Int, val no: Int, val saved: Boolean = false, val finish: Boolean = false)
 
 @Resource("/recipes/{recipeNo}/batches/{no}/water")
 class BatchWaterRes(val recipeNo: Int, val no: Int)
@@ -104,14 +104,17 @@ fun Route.batchRoutes() {
 
     get<BatchBrewRes> { res ->
         withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
+            if (!batch.isOnBrewDay) return@withBatch call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}")
             call.respondHtml { brewDayPage(user, batch, recipe, recipe.stats(user.preferences.whirlpool), saved = res.saved) }
         }
     }
 
     post<BatchBrewRes> { res ->
         withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
-            BatchRepository.update(batch.id, user.id, call.receiveForm<BatchForm>().toNewBatch(recipe.id))
-            call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}/brew?saved=true")
+            val updated = BatchRepository.update(batch.id, user.id, call.receiveForm<BatchForm>().toNewBatch(recipe.id))
+            // Without an OG the brew is still on brew day, so a Finish that lacks one goes back to the Chill stage.
+            if (res.finish && updated?.isOnBrewDay == false) call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}")
+            else call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}/brew?saved=true" + if (res.finish) "#chill" else "")
         }
     }
 

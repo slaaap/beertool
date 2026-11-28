@@ -549,12 +549,10 @@ function tabClock(stage, text) {
   }
   function go(i) { show(i); window.scrollTo(0, 0); history.replaceState(null, '', '#' + keys[i]); }
 
-  // A stage named in the link wins, so the water form can send the brewer back to #water. Once the OG is in,
-  // the brew opens on Ferment rather than wherever brew day left off.
-  var wanted = location.hash.slice(1), saved = null, fallback = root.getAttribute('data-start');
+  // A stage named in the link wins, so the water form can send the brewer back to #water.
+  var wanted = location.hash.slice(1), saved = null;
   try { saved = localStorage.getItem(store); } catch (e) {}
-  var order = fallback === 'ferment' ? [wanted, fallback] : [wanted, saved, fallback];
-  var start = order.map(function (k) { return keys.indexOf(k); }).filter(function (i) { return i >= 0; })[0];
+  var start = [wanted, saved].map(function (k) { return keys.indexOf(k); }).filter(function (i) { return i >= 0; })[0];
   root.classList.add('staged');
   show(start || 0);
 
@@ -583,38 +581,53 @@ function tabClock(stage, text) {
   var hints = [];
 
   function plan(i) { return (i.placeholder || '').replace(/^plan\s*/, ''); }
-  function hint(row, inputs, volumes, submit) {
-    var h = row.querySelector('.readings-hint');
-    if (h) { h.hidden = false; return; }
-    h = document.createElement('div');
+  function hint(row, message, label, fill, submit) {
+    var old = row.querySelector('.readings-hint');
+    if (old) { old.remove(); hints.splice(hints.indexOf(old), 1); }
+    var h = document.createElement('div');
     h.className = 'notice readings-hint';
     var text = document.createElement('p');
-    text.textContent = inputs.length > 1 ? 'Enter values' : 'Enter a value';
-    var use = document.createElement('button');
-    use.type = 'button'; use.className = 'btn'; use.textContent = 'Save the planned volume';
-    use.onclick = function () {
-      // Only volumes: a gravity taken from the plan would pass for a measured OG and skew the ABV.
-      volumes.forEach(function (i) { if (i.value === '' && plan(i)) i.value = plan(i); });
-      form.requestSubmit(submit);
-    };
-    h.appendChild(text); h.appendChild(use);
+    text.textContent = message;
+    h.appendChild(text);
+    if (label) {
+      var use = document.createElement('button');
+      use.type = 'button'; use.className = 'btn'; use.textContent = label;
+      use.onclick = function () { fill(); form.requestSubmit(submit); };
+      h.appendChild(use);
+    }
     row.insertBefore(h, submit);
     hints.push(h);
   }
+  function fillBlank(inputs) { inputs.forEach(function (i) { if (i.value === '' && plan(i)) i.value = plan(i); }); }
+
+  // Brew day ends with the OG, so finishing without one asks first; a planned OG is only ever saved on purpose,
+  // as it would pass for a measured one and the efficiency would just echo the plan.
+  form.addEventListener('submit', function (e) {
+    if (!e.submitter || e.submitter.id !== 'finish') return;
+    var row = e.submitter.closest('.stage-readings');
+    var og = row.querySelector('input[name=measuredOg]');
+    if (!og || og.value !== '') return;
+    e.preventDefault();
+    var planned = plan(og);
+    if (!planned) { hint(row, 'Enter the OG to finish brew day.', null, null, e.submitter); return; }
+    var inputs = [].slice.call(row.querySelectorAll('input[type=number]'));
+    hint(row, 'No OG measured.', 'Finish with the planned OG ' + planned, function () { fillBlank(inputs); }, e.submitter);
+  });
 
   // Enter in a field submits through the form's first Save, so the stage is taken from the field the brewer was in.
   form.addEventListener('submit', function (e) {
     var focused = document.activeElement, from = focused && focused.closest && focused.closest('.stage-readings');
     var row = from || (e.submitter && e.submitter.closest('.stage-readings'));
     if (!row) return;
-    var submit = row.querySelector('input[type=submit]');
+    var submit = row.querySelector('input[type=submit]:not(#finish)');
     var inputs = [].slice.call(row.querySelectorAll('input[type=number]'));
     var volumes = inputs.filter(function (i) { return /VolumeL$/.test(i.name); });
     // Clearing a value saved by mistake is a change worth saving, so only a stage that was blank and still is gets stopped.
     var blank = inputs.every(function (i) { return i.value === '' && i.defaultValue === ''; });
     if (!submit || !volumes.length || !blank) return;
     e.preventDefault();
-    hint(row, inputs, volumes, submit);
+    // Only volumes: a gravity taken from the plan would pass for a measured OG and skew the ABV.
+    hint(row, inputs.length > 1 ? 'Enter values' : 'Enter a value', 'Save the planned volume', function () { fillBlank(volumes); }, submit);
   });
   form.ownerDocument.addEventListener('input', function (e) {
     if (e.target.form === form) hints.forEach(function (h) { h.hidden = true; });
