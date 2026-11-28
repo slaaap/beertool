@@ -21,10 +21,11 @@ fun brewAlerts(previous: Session?, current: Session, additions: List<BoilAdditio
         entered && current.phase == Phase.MASHED ->
             listOf(BrewAlert("mashed", "Mash done", "Lauter or lift the bag, then tap Start boil."))
         entered && current.phase == Phase.FAULT ->
-            listOf(BrewAlert("fault", "Heating stopped", "${current.fault ?: "The brewhouse reported a fault"}. Fix it, then Resume or Stop."))
+            // Each fault is its own alert, so a second one in the same run still reaches the brewer.
+            listOf(BrewAlert("fault-${current.updatedAt.epochSecond}", "Heating stopped", "${current.fault ?: "The brewhouse reported a fault"}. Fix it, then Resume or Stop."))
         entered && current.phase == Phase.COOLING -> dueAdditions(previous, current, additions) +
             BrewAlert("cooling", "Boil done: start chilling", "The whirlpool additions go in at ${fmt(current.targetC, 0)} °C.")
-        entered && current.phase == Phase.WHIRLPOOL -> listOf(
+        entered && current.phase == Phase.WHIRLPOOL -> dueAdditions(previous, current, additions) + listOf(
             BrewAlert("whirlpool", "Whirlpool: chiller off, add now", whirlpool.joinToString(", ") { it.what } + standNote(current.whirlpoolLeftMin)),
         )
         entered && current.phase == Phase.DONE && (previous.whirlpoolLeftMin ?: Double.MAX_VALUE) <= 1.0 ->
@@ -33,13 +34,16 @@ fun brewAlerts(previous: Session?, current: Session, additions: List<BoilAdditio
     }
 }
 
+// A stand at 100 °C starts straight after the boil, without cooling first.
+private val AFTER_BOIL = setOf(Phase.DONE, Phase.COOLING, Phase.WHIRLPOOL)
+
 private fun standNote(leftMin: Double?) = leftMin?.roundToInt()?.takeIf { it > 0 }?.let { ". Stand $it min." } ?: "."
 
 // An addition is due as the boil's time left passes its minute. A boil that ran out reaches flame-out; one stopped early
 // does not. Whirlpool additions wait for the whirlpool, not flame-out.
 private fun dueAdditions(previous: Session, current: Session, additions: List<BoilAddition>): List<BrewAlert> {
     val before = previous.boilLeftMin ?: if (previous.phase == Phase.BOIL_HEAT) Double.MAX_VALUE else return emptyList()
-    val ranOut = previous.phase == Phase.BOIL && (current.phase == Phase.DONE || current.phase == Phase.COOLING) && before <= 1.0
+    val ranOut = previous.phase == Phase.BOIL && current.phase in AFTER_BOIL && before <= 1.0
     val now = when {
         current.phase == Phase.BOIL -> current.boilLeftMin ?: return emptyList()
         ranOut -> 0.0

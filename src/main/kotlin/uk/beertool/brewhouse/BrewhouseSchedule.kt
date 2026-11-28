@@ -11,6 +11,7 @@ import uk.beertool.user.BrewerPreferences
 private val STEP_TEMP_C = 20.0..80.0
 private val GRAIN_TEMP_C = 0.0..45.0
 private val THICKNESS_L_PER_KG = 1.0..10.0
+private val WHIRLPOOL_TEMP_C = 20.0..100.0
 
 // What the brewer adjusted in the Brew Day mash-water guide; null keeps the default or their settings.
 data class StrikeInputs(val grainTempC: Double? = null, val mashThicknessLPerKg: Double? = null) {
@@ -46,7 +47,10 @@ fun brewhouseSchedule(batchId: Long, recipe: Recipe, prefs: BrewerPreferences, s
         strikeC = water.strikeTempC.roundTo(1),
         steps = recipe.mashSteps.map { ScheduleStep(it.tempC, it.timeMin) },
         boil = boil,
-        whirlpool = if (boil == null) null else recipe.whirlpoolStandMin()?.let { WhirlpoolPlan(prefs.whirlpoolTempC, it) },
+        // A stand of at least a minute, so the brewhouse always passes through whirlpool and the brewer is told to add.
+        whirlpool = if (boil == null) null else recipe.whirlpoolStandMin()?.let {
+            WhirlpoolPlan(prefs.whirlpoolTempC.coerceIn(WHIRLPOOL_TEMP_C), it.coerceAtLeast(1))
+        },
     )
 }
 

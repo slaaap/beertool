@@ -25,13 +25,23 @@ var sound = (function () {
     return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
   }
   // Some iOS versions ignore the audio session type, but a playing media element still switches the phone to
-  // playback, which the silent switch does not mute; so a silent one loops for as long as the page is open.
-  var keepAlive = null;
+  // playback, which the silent switch does not mute. It also pauses the brewer's music, so the silent loop only
+  // plays while something could ring: a running timer, a brewhouse session or an alarm.
+  var keepAlive = null, holders = {}, letGo = null;
+  function wanted() { return Object.keys(holders).some(function (k) { return holders[k]; }); }
   function holdPlayback() {
+    if (!wanted()) return;
     try {
       if (!keepAlive) { keepAlive = new Audio(silentWav()); keepAlive.loop = true; keepAlive.setAttribute('playsinline', ''); }
       if (keepAlive.paused) keepAlive.play().catch(function () {});
     } catch (e) {}
+  }
+  // Letting go waits a moment, so a timer handing over to its own alarm never drops out of playback in between.
+  function hold(name, on) {
+    holders[name] = !!on;
+    clearTimeout(letGo);
+    if (wanted()) holdPlayback();
+    else if (keepAlive) letGo = setTimeout(function () { if (!wanted()) keepAlive.pause(); }, 3000);
   }
   function unlock() {
     holdPlayback();
@@ -51,14 +61,16 @@ var sound = (function () {
   return {
     unlock: unlock,
     ready: function () { return !!audio && audio.state === 'running'; },
+    hold: hold,
     // A burner roars, so an alarm repeats until the brewer confirms it, giving up after ten minutes.
     ring: function () {
       stopAt = Date.now() + 10 * 60 * 1000;
+      hold('alarm', true);
       if (ringing) return;
       beep();
       ringing = setInterval(function () { if (Date.now() > stopAt) sound.hush(); else beep(); }, 2000);
     },
-    hush: function () { clearInterval(ringing); ringing = null; }
+    hush: function () { clearInterval(ringing); ringing = null; hold('alarm', false); }
   };
 })();
 
@@ -192,6 +204,7 @@ function tabClock(stage, text) {
     if (left < 0) left = 0;
     clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('boil', running ? clock.textContent : '');
+    sound.hold('boil', running);
     status.textContent = waiting ? 'Starts when the brewhouse reports a boil.' : stopped ? 'The brewhouse stopped the boil.' :
       (external && left > 0 ? 'Timed by the brewhouse. ' : '') +
       (running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '');
@@ -374,6 +387,7 @@ function tabClock(stage, text) {
     if (left < 0) left = 0;
     clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('chill', running ? clock.textContent : '');
+    sound.hold('whirlpool', running);
     btn.hidden = external || (left === 0 && !running);
     reset.hidden = external;
     btn.textContent = running ? 'Pause' : left < total && left > 0 ? 'Resume' : 'Start';
@@ -488,6 +502,7 @@ function tabClock(stage, text) {
     btn.textContent = running ? 'Pause' : fresh || done ? 'Start' : 'Resume';
     clock.textContent = done ? 'Done' : Math.floor(left / 60) + ':' + two(left % 60);
     tabClock('mash', running ? clock.textContent : '');
+    sound.hold('mash', running);
     status.textContent =
       done ? 'Mash done. Time to sparge.' :
       waiting ? 'Starts when the grain is in. Timed by the brewhouse.' :

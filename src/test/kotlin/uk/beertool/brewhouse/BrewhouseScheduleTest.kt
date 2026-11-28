@@ -106,6 +106,24 @@ class BrewhouseScheduleTest {
     }
 
     @Test
+    fun `should plan a stand of at least a minute, so the brewer is always told to add the whirlpool hops`() {
+        val recipe = recipe(hops = listOf(RecipeHop("Citra", 50.0, 12.0, HopUsage.WHIRLPOOL)))
+
+        val schedule = brewhouseSchedule(7, recipe, prefs)
+
+        schedule.whirlpool?.minutes shouldBe 1
+    }
+
+    @Test
+    fun `should keep the whirlpool temperature within what the brewhouse accepts`() {
+        val recipe = recipe(hops = listOf(RecipeHop("Citra", 50.0, 12.0, HopUsage.WHIRLPOOL, boilTimeMin = 10)))
+
+        val schedule = brewhouseSchedule(7, recipe, prefs.copy(whirlpoolTempC = 12.0))
+
+        schedule.whirlpool?.tempC shouldBe 20.0
+    }
+
+    @Test
     fun `should plan no whirlpool when nothing goes in after the boil`() {
         val recipe = recipe(hops = listOf(RecipeHop("Magnum", 20.0, 13.0, HopUsage.BOIL, boilTimeMin = 60)))
 

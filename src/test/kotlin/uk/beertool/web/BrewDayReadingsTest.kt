@@ -116,7 +116,33 @@ class BrewDayReadingsTest {
         page shouldNotContain """data-tab="ferment""""
     }
 
-    private data class Brewer(val email: String, val url: String)
+    @Test
+    fun `should not let a brew-day page left open elsewhere blank a finished brew's OG`() = brewDayApp { brewer ->
+        val client = signedIn(brewer)
+        client.post("${brewer.url}?finish=true") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("brewDate=2026-11-28&measuredOg=1.050")
+        }
+
+        client.post(brewer.url) {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("brewDate=2026-11-28&measuredOg=")
+        }
+
+        BatchRepository.findById(brewer.batchId, brewer.userId)!!.measuredOg shouldBe 1.050
+    }
+
+    @Test
+    fun `should carry the brew's FG through a brew-day save, as the page has no field for it`() = brewDayApp { brewer ->
+        BatchRepository.update(brewer.batchId, brewer.userId, NewBatch(recipeId = brewer.recipeId, measuredFg = 1.012))
+        val client = signedIn(brewer)
+
+        val page = client.get(brewer.url).bodyAsText()
+
+        page shouldContain Regex("""name="measuredFg"[^>]*value="1.012"""")
+    }
+
+    private data class Brewer(val email: String, val url: String, val userId: Long = 0, val recipeId: Long = 0, val batchId: Long = 0)
 
     private fun attribute(page: String, field: String, attribute: String) =
         Regex("""name="$field"[^>]*$attribute="([^"]*)"""").find(page)!!.groupValues[1]
@@ -135,7 +161,7 @@ class BrewDayReadingsTest {
         val user = UserRepository.create(email, PasswordHasher.hash("secret123"), "Brewer")
         val recipe = RecipeRepository.create(user.id, NewRecipe(name = "Pale", fermentables = listOf(RecipeFermentable("Maris Otter", 4.5, FermentableType.MALT))))
         val batch = BatchRepository.create(user.id, NewBatch(recipeId = recipe.id))!!
-        return Brewer(email, "/recipes/${recipe.no}/batches/${batch.no}/brew")
+        return Brewer(email, "/recipes/${recipe.no}/batches/${batch.no}/brew", user.id, recipe.id, batch.id)
     }
 
     private fun brewDayApp(block: suspend ApplicationTestBuilder.(Brewer) -> Unit) = testApplication {

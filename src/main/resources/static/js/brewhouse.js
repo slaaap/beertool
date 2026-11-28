@@ -165,7 +165,9 @@
     var s = mySession(), phase = s ? s.phase : null;
     if (phase !== lastPhase || firstNotice) {
       if (lastPhase) alerts.dismiss('bh-' + lastPhase);
-      var call = s && callsForYou(s);
+      // Back from a pause or fault into the stage it interrupted, the brewer was already told what to do there.
+      var resumed = INTERRUPTS[lastPhase] && phase === lastActive;
+      var call = s && !resumed && callsForYou(s);
       if (call) { call.id = 'bh-' + phase; alerts.show(call); }
       if (lastPhase && STAGE_TAB[phase] && STAGE_TAB[phase] !== STAGE_TAB[lastActive] && window.brewStage) window.brewStage(STAGE_TAB[phase]);
       if (phase === 'strike') {
@@ -179,6 +181,7 @@
 
   function renderSound() {
     var s = mySession();
+    sound.hold('brewhouse', !!s && s.phase !== 'idle' && s.phase !== 'done');
     show($('bh-sound'), !!s && s.phase !== 'idle' && s.phase !== 'done' && !sound.ready());
   }
 

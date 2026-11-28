@@ -1,5 +1,6 @@
 package uk.beertool.brewhouse
 
+import org.slf4j.LoggerFactory
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
 import uk.beertool.push.Push
@@ -10,6 +11,8 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 val DEFAULT_READING_INTERVAL: Duration = Duration.ofSeconds(10)
+
+private val log = LoggerFactory.getLogger(BrewhouseService::class.java)
 
 // The one place both the controller's token routes and the Brew Day page's session routes go through.
 class BrewhouseService(
@@ -25,7 +28,12 @@ class BrewhouseService(
         val previous = brewhouses.status(user.id).report?.session
         val commands = brewhouses.sync(user.id, report)
         report.session?.let { record(user, it) }
-        onReport(user, previous, report.session)
+        // Alerts are a courtesy; the controller's sync and its commands must not fail with them.
+        try {
+            onReport(user, previous, report.session)
+        } catch (e: Exception) {
+            log.warn("Brewhouse alerts failed for user {}: {}", user.id, e.message)
+        }
         return SyncResponse(commands)
     }
 

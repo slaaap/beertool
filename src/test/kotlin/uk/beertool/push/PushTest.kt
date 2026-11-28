@@ -111,6 +111,22 @@ class PushTest {
     }
 
     @Test
+    fun `should send an alert once, however many reports repeat it, and again for a new run`() {
+        val brewer = newBrewer()
+        PushSubscriptionRepository.save(brewer.user.id, subscription(APPLE))
+        val sends = java.util.concurrent.atomic.AtomicInteger()
+        val notifier = PushNotifier(CONFIG, { _, _, _ -> sends.incrementAndGet(); 201 })
+
+        notifier.brewhouseReport(brewer.user, session(brewer, Phase.STRIKE), session(brewer, Phase.DOUGH_IN))
+        notifier.brewhouseReport(brewer.user, session(brewer, Phase.PAUSED), session(brewer, Phase.DOUGH_IN))
+        notifier.brewhouseReport(brewer.user, session(brewer, Phase.STRIKE, run = "13:00"), session(brewer, Phase.DOUGH_IN, run = "13:00"))
+
+        runBlocking { withTimeout(5000) { while (sends.get() < 2) kotlinx.coroutines.delay(20) } }
+        Thread.sleep(300)
+        sends.get() shouldBe 2
+    }
+
+    @Test
     fun `should forget a subscription the push service says is gone`() {
         val brewer = newBrewer()
         PushSubscriptionRepository.save(brewer.user.id, subscription(APPLE))
@@ -123,7 +139,9 @@ class PushTest {
 
     private data class Brewer(val email: String, val user: User, val batchId: Long)
 
-    private fun session(brewer: Brewer, phase: Phase) = Session(batchId = brewer.batchId, phase = phase, updatedAt = Instant.parse("2026-11-28T12:00:00Z"))
+    private fun session(brewer: Brewer, phase: Phase, run: String = "12:00") = Session(
+        batchId = brewer.batchId, phase = phase, startedAt = Instant.parse("2026-11-28T$run:00Z"), updatedAt = Instant.parse("2026-11-28T13:30:00Z"),
+    )
 
     private suspend fun ApplicationTestBuilder.signedIn(brewer: Brewer): HttpClient {
         val client = createClient { install(HttpCookies); followRedirects = false }

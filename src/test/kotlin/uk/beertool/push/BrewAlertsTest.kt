@@ -2,6 +2,7 @@ package uk.beertool.push
 
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import uk.beertool.brewhouse.Phase
 import uk.beertool.brewhouse.Session
@@ -40,6 +41,24 @@ class BrewAlertsTest {
         val alerts = brewAlerts(previous, session(Phase.FAULT, fault = "Thermometer lost"), hops)
 
         alerts.single().body shouldBe "Thermometer lost. Fix it, then Resume or Stop."
+    }
+
+    @Test
+    fun `should alert every fault in a run, not only the first`() {
+        val first = brewAlerts(session(Phase.MASH), session(Phase.FAULT, at = "2026-11-28T12:10:00Z"), hops).single()
+
+        val second = brewAlerts(session(Phase.MASH), session(Phase.FAULT, at = "2026-11-28T12:30:00Z"), hops).single()
+
+        second.key shouldNotBe first.key
+    }
+
+    @Test
+    fun `should call flame-out when the boil goes straight into a stand`() {
+        val previous = session(Phase.BOIL, boilLeftMin = 0.02)
+
+        val alerts = brewAlerts(previous, session(Phase.WHIRLPOOL, whirlpoolLeftMin = 15.0), hops)
+
+        alerts.map { it.title } shouldBe listOf("Flame-out: add now", "Whirlpool: chiller off, add now")
     }
 
     @Test
@@ -137,8 +156,9 @@ class BrewAlertsTest {
 
     private fun session(
         phase: Phase, boilLeftMin: Double? = null, fault: String? = null, targetC: Double? = null, whirlpoolLeftMin: Double? = null,
+        at: String = "2026-11-28T12:00:00Z",
     ) = Session(
         batchId = 7, phase = phase, boilLeftMin = boilLeftMin, fault = fault, targetC = targetC, whirlpoolLeftMin = whirlpoolLeftMin,
-        updatedAt = Instant.parse("2026-11-28T12:00:00Z"),
+        updatedAt = Instant.parse(at),
     )
 }

@@ -121,6 +121,8 @@ class PushNotifier(
     fun brewhouseReport(user: User, previous: Session?, current: Session?) {
         current ?: return
         val batchId = current.batchId ?: return
+        // Only a change of phase, or a boil passing an addition, can call for the brewer.
+        if (previous?.phase == current.phase && current.phase != Phase.BOIL) return
         val batch by lazy { BatchRepository.findById(batchId, user.id) }
         val recipe by lazy { batch?.let { RecipeRepository.findById(it.recipeId, user.id) } }
         val afterMash = current.phase in AFTER_MASH || previous?.phase in AFTER_MASH

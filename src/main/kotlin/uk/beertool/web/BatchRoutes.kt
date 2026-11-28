@@ -111,6 +111,8 @@ fun Route.batchRoutes() {
 
     post<BatchBrewRes> { res ->
         withBatch(res.recipeNo, res.no, write = true) { call, user, recipe, batch ->
+            // A page left open on another phone after Finish would otherwise blank the OG and reopen brew day.
+            if (!batch.isOnBrewDay) return@withBatch call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}")
             val updated = BatchRepository.update(batch.id, user.id, call.receiveForm<BatchForm>().toNewBatch(recipe.id))
             // Without an OG the brew is still on brew day, so a Finish that lacks one goes back to the Chill stage.
             if (res.finish && updated?.isOnBrewDay == false) call.respondRedirect("/recipes/${recipe.no}/batches/${batch.no}")
