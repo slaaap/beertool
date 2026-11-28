@@ -64,9 +64,9 @@ h1 .title-num { color:var(--muted); font-weight:400; }
 .page-head h1 { margin-bottom:8px; }
 .page-actions { display:flex; gap:8px; flex:0 0 auto; }
 
-.section-head { display:flex; align-items:center; justify-content:space-between; gap:14px;
+.section-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 14px;
   margin:34px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--hairline); }
-.section-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+.section-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; flex:0 1 auto; min-width:0; }
 
 .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:4px 0; }
 .table-scroll table { margin:0; }
@@ -77,6 +77,8 @@ th { text-align:left; font-weight:600; font-size:11px; text-transform:uppercase;
 td { padding:7px 10px 7px 0; border-top:1px solid var(--hairline); vertical-align:middle;
   font-variant-numeric:tabular-nums; }
 
+th .short { display:none; }
+th.num + th:not(.num), td.num + td:not(.num) { padding-left:8px; }
 th.num, td.num { text-align:right; font-family:var(--font-mono); padding-right:18px; }
 th.num { font-family:var(--font-body); padding-right:10px; }
 td.num input[type=number] { text-align:right; }
@@ -224,7 +226,9 @@ table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .boil-adds { list-style:none; padding:0; margin:0 0 8px; }
 .boil-adds li { display:flex; gap:14px; align-items:baseline; padding:12px 14px; margin-bottom:6px;
   border:1px solid var(--hairline); border-radius:9px; }
-.boil-adds li .at { font-family:var(--font-mono); color:var(--muted); min-width:74px; }
+.boil-adds li .at { flex:0 0 auto; font-family:var(--font-mono); color:var(--muted); min-width:74px; white-space:nowrap; }
+.boil-adds li .what { flex:1 1 auto; min-width:0; }
+.boil-adds li::after { flex:0 0 auto; white-space:nowrap; }
 .boil-adds li.now { border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
 .boil-adds li.now .at { color:var(--accent); }
 .boil-adds li.done { opacity:0.45; text-decoration:line-through; }
@@ -232,7 +236,7 @@ table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .boil-adds li.late .at { color:var(--danger); }
 .boil-adds li.late::after { content:"late - add now"; margin-left:auto; color:var(--danger); font-size:13px; font-weight:600; }
 .boil-adds li.added { opacity:0.55; cursor:pointer; }
-.boil-adds li.added::after { content:"added ✓"; margin-left:auto; color:var(--good); font-size:13px; font-weight:600; }
+.boil-adds li.added::after { content:"✓"; margin-left:auto; color:var(--good); font-size:18px; font-weight:700; line-height:1; }
 .bd-alert { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:20px;
   background:rgba(20,14,8,0.55); }
 .bd-alert[hidden] { display:none; }
@@ -241,7 +245,8 @@ table.mash-plan tr.done td { opacity:0.45; text-decoration:line-through; }
 .bd-alert-card h2 { margin:0 0 10px; font-family:var(--font-display); font-size:24px; color:var(--accent); }
 .bd-alert-card p { margin:0 0 8px; font-size:18px; }
 .bd-alert-card p.muted { font-size:13px; margin:10px 0 0; text-align:center; }
-.bd-alert-ok { width:100%; justify-content:center; padding:14px; font-size:18px; margin-top:12px; }
+.bd-alert-ok, .bd-alert-later { width:100%; justify-content:center; padding:14px; font-size:18px; margin-top:12px; }
+.bd-alert-later { margin-top:8px; }
 .bh-sound, .sound-prompt { display:block; width:100%; text-align:left; cursor:pointer; border:0; font:inherit; }
 .sound-prompt[hidden] { display:none; }
 .timer-card { background:var(--surface); border:1px solid var(--hairline); border-radius:12px; padding:12px 14px 6px; }
@@ -387,7 +392,22 @@ li { margin:3px 0; }
   .water-row.solo, .brew-water .water-row.solo { grid-template-columns:1fr auto; }
   table.water-plan th.num { white-space:nowrap; }
 
-  th.num { white-space:normal; }
+  th { vertical-align:bottom; }
+  th .u, .brewday .g3 .field > label .u { display:block; }
+  th .long { display:none; }
+  th .short { display:inline; }
+
+  /* An editable row is too wide for a phone, so its name takes the first line and its figures share the second. */
+  #recipe-form table.bill:not(.mash), #recipe-form table.bill:not(.mash) thead,
+  #recipe-form table.bill:not(.mash) tbody { display:block; }
+  #recipe-form table.bill:not(.mash) tr { display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+    padding:8px 0; border-top:1px solid var(--hairline); }
+  #recipe-form table.bill:not(.mash) thead tr { align-items:flex-end; padding:0 0 4px; border-top:0; }
+  #recipe-form table.bill:not(.mash) th, #recipe-form table.bill:not(.mash) td { display:block; flex:1 1 0; order:1;
+    min-width:0; width:auto; padding:0; border:0; }
+  #recipe-form table.bill:not(.mash) :is(th, td):first-child { flex:1 0 calc(100% - 42px); order:0; }
+  #recipe-form table.bill:not(.mash) :is(th, td):last-child { flex:0 0 36px; order:0; text-align:right; }
+  #recipe-form table.bill:not(.mash) .gap { display:none; }
 }
 
 code.token { display:block; padding:8px 10px; background:var(--surface); border:1px solid var(--hairline); border-radius:6px;

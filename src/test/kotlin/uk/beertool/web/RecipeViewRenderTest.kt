@@ -59,7 +59,7 @@ class RecipeViewRenderTest {
             ),
         )
 
-        html shouldContain "Stand (min)"
+        html.visibleText() shouldContain "Stand (min)"
         html shouldContain "Days"
         html.hopTables().forEach { it shouldNotContain "Use" }
     }
@@ -76,6 +76,8 @@ class RecipeViewRenderTest {
         html shouldContain "Boil"
         html shouldNotContain "Dry hop"
     }
+
+    private fun String.visibleText() = replace(Regex("<[^>]+>"), "").replace(Regex("\\s+"), " ")
 
     private fun String.hopTables() =
         Regex("""<table class="bill hops">.*?</table>""", RegexOption.DOT_MATCHES_ALL).findAll(this)

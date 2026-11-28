@@ -85,12 +85,24 @@ fun FlowContent.sectionHead(heading: String, actions: (DIV.() -> Unit)? = null) 
     }
 }
 
+private val LABEL_WITH_UNIT = Regex("""^(.+) \(([^)]+)\)$""")
+
 fun FlowContent.field(text: String, hint: String? = null, block: DIV.() -> Unit) {
     div("field") {
-        label { +text }
+        label {
+            val parts = LABEL_WITH_UNIT.matchEntire(text)
+            if (parts == null) +text else { +parts.groupValues[1]; unitSuffix(parts.groupValues[2]) }
+        }
         block()
         hint?.let { span("hint") { +it } }
     }
+}
+
+// On a phone the unit drops to a line of its own, so a row of headings breaks the same way instead of wherever it runs out.
+internal fun FlowOrPhrasingContent.unitSuffix(unit: String?) {
+    if (unit == null) return
+    +" "
+    span("u") { +"($unit)" }
 }
 
 fun FlowContent.fieldGrid(columns: Int = 2, block: DIV.() -> Unit) = div("grid g$columns") { block() }

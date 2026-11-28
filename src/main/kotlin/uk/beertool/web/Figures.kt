@@ -114,7 +114,7 @@ internal fun TR.yeastHead() {
     head("Use", SLOT_USE)
     emptySlot(SLOT_TIME)
     emptySlot(SLOT_PROP)
-    numHead("Attenuation", "%", SLOT_LAST)
+    numHead("Attenuation", "%", SLOT_LAST, short = "Atten.")
 }
 
 internal fun TR.extraHead() {
@@ -142,8 +142,16 @@ internal fun TR.actionSlot() = th(classes = "right c-act") {}
 
 internal fun TR.head(label: String, slot: String) = th(classes = slot) { +label }
 
-internal fun TR.numHead(label: String, unit: String? = null, slot: String? = null) =
-    th(classes = listOfNotNull("num", slot).joinToString(" ")) { +(if (unit == null) label else "$label ($unit)") }
+internal fun TR.numHead(label: String, unit: String? = null, slot: String? = null, short: String? = null) =
+    th(classes = listOfNotNull("num", slot).joinToString(" ")) {
+        if (short == null) +label
+        else {
+            title = label
+            span("long") { +label }
+            span("short") { +short }
+        }
+        unitSuffix(unit)
+    }
 
 internal fun TR.emptySlot(slot: String) = th(classes = "$slot gap") {}
 

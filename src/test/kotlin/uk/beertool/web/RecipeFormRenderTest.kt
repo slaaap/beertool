@@ -71,7 +71,7 @@ class RecipeFormRenderTest {
     fun `should give a time column only to the stage that happens in the boil`() {
         val html = render(null)
 
-        html.stageHeaders("ferm-boil") shouldContain "Time (min)"
+        html.stageHeaders("ferm-boil").visibleText() shouldContain "Time (min)"
         html.stageHeaders("ferm-mash") shouldNotContain "Time"
     }
 
@@ -94,6 +94,8 @@ class RecipeFormRenderTest {
             .value
         return Regex("""value="([a-z]+)"""").findAll(select).map { it.groupValues[1] }.toList()
     }
+
+    private fun String.visibleText() = replace(Regex("<[^>]+>"), "").replace(Regex("\\s+"), " ")
 
     private fun String.stageHeaders(key: String) =
         Regex("""<thead>.*?</thead>""", RegexOption.DOT_MATCHES_ALL).find(stage(key))!!.value

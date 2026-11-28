@@ -22,9 +22,10 @@
   var AFTER_MASH = { mashed: true, boil_heat: true, boil: true, done: true };
   var boiledKey = 'bh-boiled:' + batchId;
 
+  // The alert carries the command the brewer is asked for, so confirming it is one tap rather than a second hunt for the button.
   function callsForYou(s) {
-    if (s.phase === 'dough_in') return { title: 'Strike water is ready', lines: ['Add the grain, then press Grain is in.'] };
-    if (s.phase === 'mashed') return { title: 'Mash done', lines: ['Lauter or lift the bag, then press Start boil.'] };
+    if (s.phase === 'dough_in') return { title: 'Strike water is ready', lines: ['Add the grain, then press Grain is in.'], button: 'Grain is in', later: 'Not yet', done: function () { send({ type: 'dough_in' }); } };
+    if (s.phase === 'mashed') return { title: 'Mash done', lines: ['Lauter or lift the bag, then press Start boil.'], button: 'Start boil', later: 'Not yet', done: function () { send({ type: 'start_boil' }); } };
     if (s.phase === 'fault') return { title: 'Heating stopped', lines: [(s.fault || 'The brewhouse reported a fault') + '.', 'Fix it, then press Resume or Stop.'] };
     return null;
   }

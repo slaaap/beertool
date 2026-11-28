@@ -66,7 +66,8 @@ var alerts = (function () {
       box = el('div', 'bd-alert');
       box.setAttribute('role', 'alertdialog'); box.setAttribute('aria-modal', 'true');
       box.setAttribute('aria-labelledby', 'bd-alert-title'); box.setAttribute('aria-describedby', 'bd-alert-text');
-      box.addEventListener('keydown', function (e) { if (e.key === 'Escape') box.querySelector('.bd-alert-ok').click(); });
+      // Escape only puts an alert aside, so it never sends a command the brewer didn't tap.
+      box.addEventListener('keydown', function (e) { if (e.key === 'Escape') box.querySelector('.bd-alert-later, .bd-alert-ok').click(); });
       document.body.appendChild(box);
     }
     if (!open) returnTo = document.activeElement;
@@ -80,6 +81,13 @@ var alerts = (function () {
     ok.type = 'button';
     ok.onclick = function () { queue.shift(); if (a.done) a.done(); render(); };
     card.appendChild(ok);
+    // An alert that acts gets a way to put it aside, as the brewer may not be ready to act yet.
+    if (a.later) {
+      var later = el('button', 'btn bd-alert-later', a.later);
+      later.type = 'button';
+      later.onclick = function () { queue.shift(); render(); };
+      card.appendChild(later);
+    }
     if (queue.length > 1) card.appendChild(el('p', 'muted', (queue.length - 1) + ' more after this'));
     box.innerHTML = ''; box.appendChild(card); box.hidden = false; setInert(true); open = true;
     ok.focus();
@@ -162,6 +170,8 @@ function tabClock(stage, text) {
       (external && left > 0 ? 'Timed by the brewhouse. ' : '') +
       (running ? 'Flame-out at ' + clockTime(endAt) : left === 0 ? 'Flame-out. Time to chill.' : left < total ? 'Paused.' : '');
     prompt(running && !external);
+    btn.hidden = external || (left === 0 && !running);
+    reset.hidden = external;
     var m = Math.ceil(left / 60);
     rows.forEach(function (r) {
       var at = minuteOf(r);
@@ -245,7 +255,7 @@ function tabClock(stage, text) {
 
   function takeOver() {
     if (external) return;
-    external = true; btn.hidden = true; reset.hidden = true;
+    external = true;
     clearInterval(timer); timer = null; running = false;
   }
   function silencePast(seconds) {
@@ -295,7 +305,7 @@ function tabClock(stage, text) {
     },
     release: function () {
       if (!external) return;
-      external = following = waiting = stopped = false; btn.hidden = false; reset.hidden = false;
+      external = following = waiting = stopped = false;
       clearInterval(timer); timer = null; running = false;
       btn.textContent = 'Start'; save(); render();
     }
@@ -344,8 +354,8 @@ function tabClock(stage, text) {
       r.classList.toggle('now', i === step);
       r.classList.toggle('done', i < step);
     });
-    btn.disabled = done;
-    next.disabled = done;
+    btn.hidden = next.hidden = external || done;
+    reset.hidden = external;
     prompt(running && !external);
     btn.textContent = running ? 'Pause' : fresh || done ? 'Start' : 'Resume';
     clock.textContent = done ? 'Done' : Math.floor(left / 60) + ':' + two(left % 60);
@@ -413,7 +423,7 @@ function tabClock(stage, text) {
   // The brewer's own timing is obsolete once the brewhouse takes over, so it never comes back when the brewhouse lets go.
   function takeOver() {
     if (external) return;
-    external = true; stopTicking(); running = false; btn.hidden = next.hidden = reset.hidden = true;
+    external = true; stopTicking(); running = false;
     try { localStorage.removeItem(key); } catch (e) {}
   }
 
@@ -438,12 +448,13 @@ function tabClock(stage, text) {
       }
       if (running && !timer) timer = setInterval(tick, 500);
       if (!running) stopTicking();
+      // A mash the brewhouse finished stays finished once it lets go, rather than offering a fresh Start.
+      if (step >= steps.length) try { localStorage.setItem(key, JSON.stringify({ step: step, running: false, endAt: 0, remaining: 0 })); } catch (e) {}
       render();
     },
     release: function () {
       if (!external) return;
       external = false; heating = false; waiting = false; stopTicking();
-      btn.hidden = next.hidden = reset.hidden = false;
       restore();
     }
   };
