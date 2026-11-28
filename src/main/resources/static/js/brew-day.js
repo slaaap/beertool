@@ -21,8 +21,11 @@ var sound = (function () {
     } catch (e) {}
   }
 
-  // Browsers only allow sound after a tap, so any tap on the page arms it for the alarms to come.
-  document.addEventListener('pointerdown', unlock);
+  // iOS treats Web Audio as ambient sound, which the silent switch mutes; an alarm has to be heard regardless.
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  // Browsers only allow sound after a tap, and on a touch screen only the end of the touch counts as one.
+  document.addEventListener('touchend', unlock);
+  document.addEventListener('click', unlock);
   // A locked screen suspends the sound; a page the brewer already tapped may wake it again without a new tap.
   document.addEventListener('visibilitychange', function () { if (!document.hidden && audio && audio.resume) audio.resume().catch(function () {}); });
   return {
