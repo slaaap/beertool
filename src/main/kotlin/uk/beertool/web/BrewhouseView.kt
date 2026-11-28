@@ -8,6 +8,7 @@ import uk.beertool.brewhouse.Phase
 import uk.beertool.brewhouse.Schedule
 import uk.beertool.brewhouse.brewhouseSchedule
 import uk.beertool.common.fmt
+import uk.beertool.push.Push
 import uk.beertool.recipe.Recipe
 import uk.beertool.user.User
 
@@ -46,6 +47,13 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
             attributes["referrerpolicy"] = "no-referrer"
         }
         button(type = ButtonType.button, classes = "notice bh-sound") { id = "bh-sound"; hidden = true; +"Tap here to turn on alarm sounds" }
+        Push.publicKey?.let { key ->
+            button(type = ButtonType.button, classes = "notice bh-sound") {
+                id = "push-enable"; hidden = true
+                attributes["data-key"] = key
+                +"Tap here to get alerts on your phone when the screen is locked"
+            }
+        }
         p("alert") { id = "bh-fault"; hidden = true }
         div("notice bh-manual") {
             id = "bh-manual"; hidden = true

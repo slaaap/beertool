@@ -6,6 +6,7 @@ import uk.beertool.batch.BrewDayStage
 import uk.beertool.brewhouse.Brewhouse
 import uk.beertool.brewing.Calculators
 import uk.beertool.common.fmt
+import uk.beertool.push.Push
 import uk.beertool.recipe.DEFAULT_GRAIN_TEMP_C
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeStats
@@ -92,7 +93,10 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
         }
 
         js("brew-day.js")
-        if (Brewhouse.enabled && user.canWrite && batch.isOnBrewDay) js("brewhouse.js")
+        if (Brewhouse.enabled && user.canWrite && batch.isOnBrewDay) {
+            js("brewhouse.js")
+            if (Push.enabled) js("push.js")
+        }
         js("water.js")
         js("ui.js")
     }

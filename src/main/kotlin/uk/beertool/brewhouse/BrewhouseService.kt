@@ -2,6 +2,7 @@ package uk.beertool.brewhouse
 
 import uk.beertool.batch.Batch
 import uk.beertool.batch.BatchRepository
+import uk.beertool.push.Push
 import uk.beertool.recipe.RecipeRepository
 import uk.beertool.user.User
 import java.time.Duration
@@ -15,13 +16,16 @@ class BrewhouseService(
     private val brewhouses: Brewhouses = Brewhouses(),
     private val readingInterval: Duration = DEFAULT_READING_INTERVAL,
     private val now: () -> Instant = Instant::now,
+    private val onReport: (User, Session?, Session?) -> Unit = { user, previous, current -> Push.notifier?.brewhouseReport(user, previous, current) },
 ) {
     private val lastReadingAt = ConcurrentHashMap<Pair<Long, Long>, Instant>()
 
     fun sync(user: User, report: Report): SyncResponse {
         if (report.session?.heatPct?.let { it !in 0..100 } == true) throw BrewhouseProblem(400, "heatPct must be between 0 and 100.")
+        val previous = brewhouses.status(user.id).report?.session
         val commands = brewhouses.sync(user.id, report)
         report.session?.let { record(user, it) }
+        onReport(user, previous, report.session)
         return SyncResponse(commands)
     }
 

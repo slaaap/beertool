@@ -67,6 +67,9 @@ All configuration is via environment variables:
 | `MCP_TOKENS_ENABLED`| `true`                                            | `false` turns off personal access tokens                      |
 | `BREWHOUSE_ENABLED` | *(unset → off)*                                   | `true` turns on the Brewhouse API (see below)                 |
 | `BREWHOUSE_READING_INTERVAL_SECONDS` | `10`                             | How often a running session's temperature is kept for the brew-day chart |
+| `PUSH_ENABLED`      | *(unset → off)*                                   | `true` turns on phone notifications for brewhouse alerts; needs the two keys below and an `https` `PUBLIC_URL` (see below) |
+| `VAPID_PUBLIC_KEY`  | *(unset)*                                         | Web Push public key, base64url (65-byte uncompressed P-256 point) |
+| `VAPID_PRIVATE_KEY` | *(unset)*                                         | Web Push private key, base64url (32 bytes); keep it secret     |
 | `MCP_OAUTH_CLIENT_HOSTS` | `claude.ai,chatgpt.com`                      | Comma-separated hosts whose apps may connect through OAuth (see below) |
 | `PUBLIC_URL`        | *(unset → no links)*                              | The app's public base URL, e.g. `https://beer.example.com`; the bot links its recipe and batch titles to the site, and the MCP endpoint accepts requests for this host |
 
@@ -211,6 +214,31 @@ beertool knows nothing about the controller's devices. A controller that wants t
 own widget (one HTML document) and sends the widget's state in each sync; beertool shows it in a sandboxed
 frame with no network, cookies or access to the page, and passes it the state and the page's colours. The
 spec's Widget section describes the contract.
+
+### Phone notifications (optional)
+
+With `PUSH_ENABLED=true` as well, the alerts the Brew Day page rings for while a brewhouse runs (strike water
+ready, mash done, a fault, each boil addition and flame-out) also arrive as phone notifications, so they reach
+you with the screen locked. The Brew Day page offers to turn them on; on an iPhone this works from the app
+added to the Home Screen (iOS 16.4 or later). It is standard Web Push: no Apple developer account or
+third-party service, only a key pair of your own. beertool sends only to the browsers' push services (Apple,
+Google, Mozilla, Microsoft), and Apple checks the `PUBLIC_URL` named as the sender, so it has to be your real
+public site.
+
+Make a key pair once with the `jshell` that comes with the JDK: save these lines as `vapid.jsh`, run
+`jshell -q vapid.jsh`, and put the two lines it prints in the environment.
+
+```
+import java.security.*; import java.security.spec.*; import java.security.interfaces.*; import java.math.BigInteger;
+var g = KeyPairGenerator.getInstance("EC"); g.initialize(new ECGenParameterSpec("secp256r1")); var p = g.generateKeyPair();
+byte[] fix(BigInteger n) { var b = n.toByteArray(); var o = new byte[32]; if (b.length >= 32) System.arraycopy(b, b.length - 32, o, 0, 32); else System.arraycopy(b, 0, o, 32 - b.length, b.length); return o; }
+var w = ((ECPublicKey) p.getPublic()).getW(); var pub = new byte[65]; pub[0] = 4; System.arraycopy(fix(w.getAffineX()), 0, pub, 1, 32); System.arraycopy(fix(w.getAffineY()), 0, pub, 33, 32);
+var enc = java.util.Base64.getUrlEncoder().withoutPadding();
+System.out.println("VAPID_PUBLIC_KEY=" + enc.encodeToString(pub)); System.out.println("VAPID_PRIVATE_KEY=" + enc.encodeToString(fix(((ECPrivateKey) p.getPrivate()).getS())));
+/exit
+```
+
+Changing the keys later cuts off every phone that turned notifications on; each has to turn them on again.
 
 ## Build a standalone jar
 

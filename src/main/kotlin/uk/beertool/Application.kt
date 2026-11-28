@@ -12,6 +12,7 @@ import uk.beertool.common.systemEnv
 import uk.beertool.common.text
 import uk.beertool.db.DatabaseFactory
 import uk.beertool.mcp.configureMcp
+import uk.beertool.push.configurePush
 import uk.beertool.telegram.configureTelegram
 import uk.beertool.web.configureErrorPages
 import uk.beertool.web.configureRouting
@@ -31,6 +32,7 @@ fun Application.module() {
     configureErrorPages()
     configureRouting()
     configureMcp()
+    configurePush()
     configureBrewhouse()
     configureTelegram()
 }
