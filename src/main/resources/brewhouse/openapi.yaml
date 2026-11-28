@@ -391,6 +391,9 @@ components:
         boilLeftMin:
           type: [number, "null"]
           description: Minutes left in the boil, once boiling. beertool times its hop additions from this.
+        whirlpoolLeftMin:
+          type: [number, "null"]
+          description: Minutes left in the whirlpool stand, while `phase` is `whirlpool` or the stand is paused.
         fault:
           type: [string, "null"]
           description: Why the controller stopped heating, in words for people.
@@ -415,11 +418,16 @@ components:
         - `mashed`: last step done; holding it until `start_boil` (lauter or lift the bag now).
         - `boil_heat`: heating to the boil.
         - `boil`: boiling, `boilLeftMin` counting down.
+        - `cooling`: a boil that ran out, with a `whirlpool` in the schedule: heating off while the brewer chills
+          by hand to the whirlpool temperature (`targetC`), read on the probe in the wort.
+        - `whirlpool`: the wort reached the whirlpool temperature, or is about to once the chiller stops; the stand
+          runs at once, `whirlpoolLeftMin` counting down, then `done`. A stand of 0 minutes goes straight to `done`.
+          Paused, the session keeps `whirlpoolLeftMin`, as a paused boil keeps `boilLeftMin`.
         - `paused`: heating (and any pump) off until `resume`; timers stopped.
         - `manual`: someone took over the heat by hand; timers run, no heating until `resume`.
-        - `done`: finished, heating off.
+        - `done`: finished, heating off. A boil stopped early, or one without a `whirlpool`, ends here.
         - `fault`: safety stop, heating off until `resume` (carry on) or `stop`.
-      enum: [idle, strike, dough_in, mash, mashed, boil_heat, boil, paused, manual, done, fault]
+      enum: [idle, strike, dough_in, mash, mashed, boil_heat, boil, cooling, whirlpool, paused, manual, done, fault]
 
     Reading:
       type: object
@@ -445,7 +453,8 @@ components:
         - `dough_in`: the grain is in.
         - `start_boil`: the wort is ready; heat to the boil.
         - `boiling`: it is boiling now; start the boil timer without waiting for detection.
-        - `pause`, `resume`, `stop`.
+        - `pause`, `resume`, `stop`. During `whirlpool`, `pause` and `resume` hold and restart the stand;
+          `stop` ends a session from `cooling` or `whirlpool` too.
       enum: [start, dough_in, start_boil, boiling, pause, resume, stop]
 
     CommandRequest:
@@ -508,7 +517,7 @@ components:
       description: |
         Built by beertool from the batch's recipe and the brewer's settings, using the same figures as the
         Brew Day mash-water guide.
-      required: [batchId, recipeName, waterL, grainKg, strikeC, steps, boil]
+      required: [batchId, recipeName, waterL, grainKg, strikeC, steps, boil, whirlpool]
       properties:
         batchId:
           type: integer
@@ -552,4 +561,22 @@ components:
                   type: number
                   exclusiveMinimum: 0
                   description: Pre-boil volume.
+            - type: "null"
+        whirlpool:
+          description: |
+            The stand after the boil, when the recipe has whirlpool additions and a boil; null for none.
+            Chilling stays with the brewer: the brewhouse only waits for `tempC` and then times the stand.
+          oneOf:
+            - type: object
+              required: [tempC, minutes]
+              properties:
+                tempC:
+                  type: number
+                  minimum: 20
+                  maximum: 100
+                  description: The brewer's whirlpool temperature; 100 is a hop stand straight after flame-out.
+                minutes:
+                  type: integer
+                  minimum: 0
+                  description: The longest stand among the whirlpool additions.
             - type: "null"

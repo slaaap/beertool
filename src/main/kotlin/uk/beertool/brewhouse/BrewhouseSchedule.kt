@@ -5,6 +5,7 @@ import uk.beertool.recipe.DEFAULT_GRAIN_TEMP_C
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.mashGrainKg
 import uk.beertool.recipe.mashWater
+import uk.beertool.recipe.whirlpoolStandMin
 import uk.beertool.user.BrewerPreferences
 
 private val STEP_TEMP_C = 20.0..80.0
@@ -36,6 +37,7 @@ fun brewhouseSchedule(batchId: Long, recipe: Recipe, prefs: BrewerPreferences, s
     if (water == null || preBoil == null) {
         throw BrewhouseProblem(422, "The recipe needs mash grain and a pre-boil volume to work out the strike water.")
     }
+    val boil = recipe.boilTimeMin.takeIf { it > 0 }?.let { BoilPlan(it, preBoil) }
     return Schedule(
         batchId = batchId,
         recipeName = recipe.name,
@@ -43,7 +45,8 @@ fun brewhouseSchedule(batchId: Long, recipe: Recipe, prefs: BrewerPreferences, s
         grainKg = recipe.mashGrainKg().roundTo(3),
         strikeC = water.strikeTempC.roundTo(1),
         steps = recipe.mashSteps.map { ScheduleStep(it.tempC, it.timeMin) },
-        boil = recipe.boilTimeMin.takeIf { it > 0 }?.let { BoilPlan(it, preBoil) },
+        boil = boil,
+        whirlpool = if (boil == null) null else recipe.whirlpoolStandMin()?.let { WhirlpoolPlan(prefs.whirlpoolTempC, it) },
     )
 }
 

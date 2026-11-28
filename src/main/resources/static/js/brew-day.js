@@ -354,6 +354,109 @@ function tabClock(stage, text) {
 })();
 
 (function () {
+  var clock = document.getElementById('whirlpool-clock');
+  if (!clock) return;
+
+  var total = parseInt(clock.getAttribute('data-stand'), 10) * 60;
+  var temp = clock.getAttribute('data-temp');
+  var key = 'whirlpool:' + clock.getAttribute('data-key');
+  var btn = document.getElementById('whirlpool-start');
+  var reset = document.getElementById('whirlpool-reset');
+  var status = document.getElementById('whirlpool-status');
+  var left = total, running = false, endAt = 0, timer = null, external = false, waiting = false, lastSeconds = null;
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function save() {
+    if (external) return;
+    try { localStorage.setItem(key, JSON.stringify({ running: running, endAt: endAt, remaining: left })); } catch (e) {}
+  }
+  function render() {
+    if (left < 0) left = 0;
+    clock.textContent = Math.floor(left / 60) + ':' + two(left % 60);
+    tabClock('chill', running ? clock.textContent : '');
+    btn.hidden = external || (left === 0 && !running);
+    reset.hidden = external;
+    btn.textContent = running ? 'Pause' : left < total && left > 0 ? 'Resume' : 'Start';
+    status.textContent =
+      waiting ? 'Chill to ' + temp + ' °C. The stand starts when the brewhouse reads it.' :
+      total === 0 ? 'Chill to ' + temp + ' °C and add these.' :
+      left === 0 ? 'Stand done. Chill to pitching temperature.' :
+      running ? (external ? 'Timed by the brewhouse. ' : '') + 'Stand ends at ' + clockTime(endAt) :
+      left < total ? 'Paused.' : 'Chill to ' + temp + ' °C, add these, then start the stand.';
+  }
+  function stop() { clearInterval(timer); timer = null; running = false; }
+  function done() {
+    stop(); left = 0; save(); render();
+    alerts.show({ id: 'whirlpool-done', title: 'Whirlpool stand done', lines: ['Chill to pitching temperature.'] });
+  }
+  function tick() {
+    if (!running) return;
+    left = Math.round((endAt - Date.now()) / 1000);
+    if (left <= 0) { if (external) { left = 0; stop(); render(); } else done(); return; }
+    render();
+  }
+
+  try {
+    var s = JSON.parse(localStorage.getItem(key));
+    if (s) {
+      if (s.running) { endAt = s.endAt; running = true; left = Math.round((endAt - Date.now()) / 1000); }
+      else if (s.remaining != null) left = s.remaining;
+    }
+  } catch (e) {}
+  if (running) { if (left <= 0) { stop(); left = 0; save(); } else timer = setInterval(tick, 500); }
+  render();
+
+  function takeOver() {
+    if (external) return;
+    external = true; stop();
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+
+  // While the brewhouse runs a brew with a whirlpool, it owns this clock: it waits through the chill, then times the stand.
+  window.whirlpoolClock = {
+    wait: function () { takeOver(); waiting = true; stop(); left = total; render(); },
+    follow: function (seconds, ticking) {
+      var fresh = waiting || lastSeconds == null;
+      takeOver(); waiting = false; lastSeconds = seconds;
+      var want = Math.max(0, Math.round(seconds));
+      var shown = running ? Math.round((endAt - Date.now()) / 1000) : left;
+      if (fresh || running !== (ticking && want > 0) || Math.abs(want - shown) > SNAP_S) {
+        left = want; running = ticking && want > 0; endAt = Date.now() + left * 1000;
+      }
+      if (running && !timer) timer = setInterval(tick, 500);
+      if (!running && timer) { clearInterval(timer); timer = null; }
+      render();
+    },
+    // A stand that ran out rings; one stopped early, or a page opened afterwards, stays quiet.
+    finish: function () {
+      takeOver(); waiting = false;
+      var ranOut = lastSeconds != null && lastSeconds <= 60;
+      lastSeconds = null;
+      if (ranOut) done(); else { stop(); left = 0; render(); }
+    },
+    release: function () {
+      if (!external) return;
+      external = waiting = false; lastSeconds = null; stop(); left = total; render();
+    }
+  };
+
+  btn.onclick = function () {
+    if (running) { stop(); save(); render(); return; }
+    sound.unlock();
+    endAt = Date.now() + left * 1000; running = true;
+    timer = setInterval(tick, 500);
+    save(); render();
+  };
+  confirmTap(reset, function () {
+    stop(); left = total;
+    try { localStorage.removeItem(key); } catch (e) {}
+    alerts.dismiss('whirlpool-done');
+    render();
+  });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && running) tick(); });
+})();
+
+(function () {
   var clock = document.getElementById('mash-clock');
   if (!clock) return;
 

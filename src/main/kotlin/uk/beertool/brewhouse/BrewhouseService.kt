@@ -88,6 +88,6 @@ class BrewhouseService(
         val STALE_THROTTLE: Duration = Duration.ofHours(1)
 
         // A finished or faulted session stays in every report until the next one starts, so only a brew in progress is charted.
-        val RECORDED = setOf(Phase.STRIKE, Phase.DOUGH_IN, Phase.MASH, Phase.MASHED, Phase.BOIL_HEAT, Phase.BOIL, Phase.PAUSED, Phase.MANUAL)
+        val RECORDED = setOf(Phase.STRIKE, Phase.DOUGH_IN, Phase.MASH, Phase.MASHED, Phase.BOIL_HEAT, Phase.BOIL, Phase.COOLING, Phase.WHIRLPOOL, Phase.PAUSED, Phase.MANUAL)
     }
 }

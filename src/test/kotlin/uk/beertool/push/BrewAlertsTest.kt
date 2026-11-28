@@ -10,7 +10,10 @@ import java.time.Instant
 
 class BrewAlertsTest {
 
-    private val hops = listOf(BoilAddition(10, "Magnum 20 g"), BoilAddition(5, "Saaz 30 g"), BoilAddition(5, "Irish moss 1 g"), BoilAddition(0, "Saaz 50 g"))
+    private val hops = listOf(
+        BoilAddition(10, "Magnum 20 g"), BoilAddition(5, "Saaz 30 g"), BoilAddition(5, "Irish moss 1 g"), BoilAddition(0, "Saaz 50 g"),
+        BoilAddition(0, "Citra 40 g", whirlpool = true, standMin = 15),
+    )
 
     @Test
     fun `should ask for the grain once the strike water is ready`() {
@@ -68,6 +71,46 @@ class BrewAlertsTest {
     }
 
     @Test
+    fun `should leave the whirlpool additions out of flame-out`() {
+        val previous = session(Phase.BOIL, boilLeftMin = 0.02)
+
+        val alerts = brewAlerts(previous, session(Phase.COOLING, targetC = 80.0), hops)
+
+        alerts.map { it.title to it.body } shouldBe listOf(
+            "Flame-out: add now" to "Saaz 50 g",
+            "Boil done: start chilling" to "The whirlpool additions go in at 80 °C.",
+        )
+    }
+
+    @Test
+    fun `should call the whirlpool additions once the wort reaches their temperature`() {
+        val previous = session(Phase.COOLING, targetC = 80.0)
+
+        val alerts = brewAlerts(previous, session(Phase.WHIRLPOOL, whirlpoolLeftMin = 15.0), hops)
+
+        alerts.single().title shouldBe "Whirlpool: chiller off, add now"
+        alerts.single().body shouldBe "Citra 40 g. Stand 15 min."
+    }
+
+    @Test
+    fun `should say when the whirlpool stand has run out`() {
+        val previous = session(Phase.WHIRLPOOL, whirlpoolLeftMin = 0.02)
+
+        val alerts = brewAlerts(previous, session(Phase.DONE), hops)
+
+        alerts.single().title shouldBe "Whirlpool stand done"
+    }
+
+    @Test
+    fun `should stay quiet when the whirlpool stand is stopped early`() {
+        val previous = session(Phase.WHIRLPOOL, whirlpoolLeftMin = 9.0)
+
+        val alerts = brewAlerts(previous, session(Phase.DONE), hops)
+
+        alerts.shouldBeEmpty()
+    }
+
+    @Test
     fun `should stay quiet about flame-out when the boil was stopped early`() {
         val previous = session(Phase.BOIL, boilLeftMin = 7.5)
 
@@ -92,7 +135,10 @@ class BrewAlertsTest {
         alerts.shouldBeEmpty()
     }
 
-    private fun session(phase: Phase, boilLeftMin: Double? = null, fault: String? = null) = Session(
-        batchId = 7, phase = phase, boilLeftMin = boilLeftMin, fault = fault, updatedAt = Instant.parse("2026-11-28T12:00:00Z"),
+    private fun session(
+        phase: Phase, boilLeftMin: Double? = null, fault: String? = null, targetC: Double? = null, whirlpoolLeftMin: Double? = null,
+    ) = Session(
+        batchId = 7, phase = phase, boilLeftMin = boilLeftMin, fault = fault, targetC = targetC, whirlpoolLeftMin = whirlpoolLeftMin,
+        updatedAt = Instant.parse("2026-11-28T12:00:00Z"),
     )
 }

@@ -46,6 +46,8 @@ enum class Phase {
     @SerialName("mashed") MASHED,
     @SerialName("boil_heat") BOIL_HEAT,
     @SerialName("boil") BOIL,
+    @SerialName("cooling") COOLING,
+    @SerialName("whirlpool") WHIRLPOOL,
     @SerialName("paused") PAUSED,
     @SerialName("manual") MANUAL,
     @SerialName("done") DONE,
@@ -65,6 +67,7 @@ data class Session(
     val etaMin: Double? = null,
     val boilMinutes: Int? = null,
     val boilLeftMin: Double? = null,
+    val whirlpoolLeftMin: Double? = null,
     val fault: String? = null,
     val note: String? = null,
     @Serializable(with = InstantIso::class) val startedAt: Instant? = null,
@@ -161,6 +164,9 @@ data class ScheduleStep(val tempC: Double, val minutes: Int)
 data class BoilPlan(val minutes: Int, val volumeL: Double)
 
 @Serializable
+data class WhirlpoolPlan(val tempC: Double, val minutes: Int)
+
+@Serializable
 data class Schedule(
     val batchId: Long,
     val recipeName: String,
@@ -169,6 +175,7 @@ data class Schedule(
     val strikeC: Double?,
     val steps: List<ScheduleStep>,
     val boil: BoilPlan?,
+    val whirlpool: WhirlpoolPlan? = null,
 )
 
 @Serializable

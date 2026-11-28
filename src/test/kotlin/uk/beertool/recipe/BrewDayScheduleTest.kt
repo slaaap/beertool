@@ -7,7 +7,7 @@ import java.time.Instant
 class BrewDayScheduleTest {
 
     @Test
-    fun `should place each hop by its boil time, longest first, whirlpool at flame-out`() {
+    fun `should place each hop by its boil time, longest first, and mark a whirlpool hop with its stand`() {
         val recipe = recipe(
             RecipeHop("Magnum", 20.0, 12.0, usage = HopUsage.FIRST_WORT),
             RecipeHop("Cascade", 30.0, 6.0, usage = HopUsage.BOIL, boilTimeMin = 15),
@@ -18,8 +18,7 @@ class BrewDayScheduleTest {
         recipe.boilAdditions() shouldBe listOf(
             BoilAddition(60, "Magnum 20 g"),
             BoilAddition(15, "Cascade 30 g"),
-            BoilAddition(0, "Citra 40 g"),
-
+            BoilAddition(0, "Citra 40 g", whirlpool = true, standMin = 20),
         )
     }
 

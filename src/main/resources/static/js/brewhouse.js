@@ -7,7 +7,7 @@
   var PHASES = {
     idle: 'Idle', strike: 'Heating strike water', dough_in: 'Strike water ready: add the grain',
     mash: 'Mashing', mashed: 'Mash done: lauter or lift the bag', boil_heat: 'Heating to the boil',
-    boil: 'Boiling', paused: 'Paused', manual: 'Under manual control', done: 'Done', fault: 'Stopped by a fault'
+    boil: 'Boiling', cooling: 'Boil done: chill to the whirlpool temperature', whirlpool: 'Whirlpool stand', paused: 'Paused', manual: 'Under manual control', done: 'Done', fault: 'Stopped by a fault'
   };
 
   function $(id) { return document.getElementById(id); }
@@ -16,16 +16,23 @@
 
   var status = null, unreachable = false, firstNotice = true, busy = false, lastReadingAt = null, readings = [], fetching = false, lastPhase = null, lastActive = null;
   var INTERRUPTS = { paused: true, manual: true, fault: true };
-  var STAGE_TAB = { strike: 'water', dough_in: 'mash', mash: 'mash', mashed: 'mash', boil_heat: 'boil', boil: 'boil' };
+  var STAGE_TAB = { strike: 'water', dough_in: 'mash', mash: 'mash', mashed: 'mash', boil_heat: 'boil', boil: 'boil', cooling: 'chill', whirlpool: 'chill' };
   var BEFORE_MASH = { strike: true, dough_in: true };
   var BEFORE_BOIL = { strike: true, dough_in: true, mash: true, mashed: true, boil_heat: true };
-  var AFTER_MASH = { mashed: true, boil_heat: true, boil: true, done: true };
-  var boiledKey = 'bh-boiled:' + batchId;
+  var AFTER_MASH = { mashed: true, boil_heat: true, boil: true, cooling: true, whirlpool: true, done: true };
+  var AFTER_BOIL = { cooling: true, whirlpool: true, done: true };
+  var BEFORE_WHIRLPOOL = { strike: true, dough_in: true, mash: true, mashed: true, boil_heat: true, boil: true, cooling: true };
+  var boiledKey = 'bh-boiled:' + batchId, whirledKey = 'bh-whirled:' + batchId;
 
   // The alert carries the command the brewer is asked for, so confirming it is one tap rather than a second hunt for the button.
   function callsForYou(s) {
     if (s.phase === 'dough_in') return { title: 'Strike water is ready', lines: ['Add the grain, then press Grain is in.'], button: 'Grain is in', later: 'Not yet', done: function () { send({ type: 'dough_in' }); } };
     if (s.phase === 'mashed') return { title: 'Mash done', lines: ['Lauter or lift the bag, then press Start boil.'], button: 'Start boil', later: 'Not yet', done: function () { send({ type: 'start_boil' }); } };
+    if (s.phase === 'cooling') return { title: 'Boil done: start chilling', lines: ['The whirlpool additions go in at ' + num(s.targetC, 0) + ' °C.'] };
+    if (s.phase === 'whirlpool') {
+      var adds = [].map.call(document.querySelectorAll('#whirlpool-adds .what'), function (e) { return e.textContent; });
+      return { title: 'Whirlpool: chiller off, add now', lines: adds.length ? adds : ['Add the whirlpool additions.'], button: 'Added' };
+    }
     if (s.phase === 'fault') return { title: 'Heating stopped', lines: [(s.fault || 'The brewhouse reported a fault') + '.', 'Fix it, then press Resume or Stop.'] };
     return null;
   }
@@ -86,6 +93,7 @@
     tile('bh-step-left', s.stepLeftMin == null ? null : num(s.stepLeftMin, 0));
     tile('bh-eta', s.etaMin == null ? null : clockTime(Date.now() + s.etaMin * 60000));
     tile('bh-boil-left', s.boilLeftMin == null ? null : num(s.boilLeftMin, 0));
+    tile('bh-stand-left', s.whirlpoolLeftMin == null ? null : num(s.whirlpoolLeftMin, 0));
     [].forEach.call(root.querySelectorAll('[data-command]'), function (b) {
       b.hidden = b.getAttribute('data-phases').split(' ').indexOf(s.phase) < 0;
       b.disabled = busy || unreachable || !status.online;
@@ -118,21 +126,31 @@
   // Paused, manual and a fault interrupt a stage that can be resumed, so the clocks stay on the stage that was running.
   function stageOf(s) {
     if (!INTERRUPTS[s.phase]) return s.phase;
-    return lastActive || (s.boilLeftMin != null ? 'boil' : s.step != null ? 'mash' : null);
+    return lastActive || (s.whirlpoolLeftMin != null ? 'whirlpool' : s.boilLeftMin != null ? 'boil' : s.step != null ? 'mash' : null);
   }
 
-  function boiled() { try { return localStorage.getItem(boiledKey) === '1'; } catch (e) { return false; } }
+  function flagged(key) { try { return localStorage.getItem(key) === '1'; } catch (e) { return false; } }
+  function flag(key) { try { localStorage.setItem(key, '1'); } catch (e) {} }
 
   // From the start until it is done, the brewhouse owns both clocks, so their own buttons are hidden rather than out of step.
   function driveClocks() {
     var s = mySession(), stage = s && stageOf(s), ticking = !!s && s.phase !== 'paused' && s.phase !== 'fault';
     function seconds(min) { return min == null ? null : min * 60 - (ticking ? reportAgeS() : 0); }
-    if (stage === 'boil') { try { localStorage.setItem(boiledKey, '1'); } catch (e) {} }
+    if (stage === 'boil') flag(boiledKey);
+    if (stage === 'whirlpool') flag(whirledKey);
+    // The panel follows the brew onto Chill while it cools and stands.
+    document.getElementById('brewday').classList.toggle('bh-chill', stage === 'cooling' || stage === 'whirlpool');
     if (window.boilClock) {
       if (stage === 'boil' && s.boilLeftMin != null) window.boilClock.follow(seconds(s.boilLeftMin), ticking);
       else if (BEFORE_BOIL[stage]) window.boilClock.wait();
-      else if (stage === 'done' && boiled()) window.boilClock.finish();
+      else if (AFTER_BOIL[stage] && flagged(boiledKey)) window.boilClock.finish();
       else window.boilClock.release();
+    }
+    if (window.whirlpoolClock) {
+      if (stage === 'whirlpool' && s.whirlpoolLeftMin != null) window.whirlpoolClock.follow(seconds(s.whirlpoolLeftMin), ticking);
+      else if (BEFORE_WHIRLPOOL[stage]) window.whirlpoolClock.wait();
+      else if (stage === 'done' && flagged(whirledKey)) window.whirlpoolClock.finish();
+      else window.whirlpoolClock.release();
     }
     if (window.mashClock) {
       if (stage === 'mash' && s.step != null) window.mashClock.follow(s.step, seconds(s.stepLeftMin), ticking);
@@ -151,7 +169,7 @@
       if (call) { call.id = 'bh-' + phase; alerts.show(call); }
       if (lastPhase && STAGE_TAB[phase] && STAGE_TAB[phase] !== STAGE_TAB[lastActive] && window.brewStage) window.brewStage(STAGE_TAB[phase]);
       if (phase === 'strike') {
-        try { localStorage.removeItem(boiledKey); } catch (e) {}
+        try { localStorage.removeItem(boiledKey); localStorage.removeItem(whirledKey); } catch (e) {}
         if (window.boilClock) window.boilClock.newRun();
       }
     }

@@ -20,9 +20,9 @@ private val PHASE_BUTTONS = listOf(
     PhaseButton("dough_in", "Grain is in", setOf(Phase.DOUGH_IN), primary = true),
     PhaseButton("start_boil", "Start boil", setOf(Phase.MASHED), primary = true),
     PhaseButton("boiling", "It's boiling", setOf(Phase.BOIL_HEAT), primary = true),
-    PhaseButton("pause", "Pause", RUNNING),
+    PhaseButton("pause", "Pause", RUNNING + Phase.WHIRLPOOL),
     PhaseButton("resume", "Resume", setOf(Phase.PAUSED, Phase.MANUAL, Phase.FAULT), primary = true),
-    PhaseButton("stop", "Stop", RUNNING + Phase.PAUSED + Phase.MANUAL + Phase.FAULT),
+    PhaseButton("stop", "Stop", RUNNING + Phase.COOLING + Phase.WHIRLPOOL + Phase.PAUSED + Phase.MANUAL + Phase.FAULT),
 )
 
 // The page script fills this from the live status; the server only lays it out and renders the schedule a start sends.
@@ -88,6 +88,7 @@ internal fun FlowContent.brewhousePanel(recipe: Recipe, batch: Batch, user: User
                 statTile("Step left", "-", "min", valueId = "bh-step-left")
                 statTile("ETA", "-", null, valueId = "bh-eta")
                 statTile("Boil left", "-", "min", valueId = "bh-boil-left")
+                statTile("Stand left", "-", "min", valueId = "bh-stand-left")
             }
             div("timer-controls bh-actions") {
                 PHASE_BUTTONS.forEach { b ->

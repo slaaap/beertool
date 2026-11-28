@@ -8,9 +8,11 @@ import org.junit.jupiter.api.Test
 import uk.beertool.common.fmt
 import uk.beertool.recipe.FermentableType
 import uk.beertool.recipe.FermentableUsage
+import uk.beertool.recipe.HopUsage
 import uk.beertool.recipe.MashStep
 import uk.beertool.recipe.Recipe
 import uk.beertool.recipe.RecipeFermentable
+import uk.beertool.recipe.RecipeHop
 import uk.beertool.recipe.mashWater
 import uk.beertool.user.BrewerPreferences
 import java.time.Instant
@@ -91,6 +93,28 @@ class BrewhouseScheduleTest {
     }
 
     @Test
+    fun `should plan a whirlpool at the brewer's temperature, as long as its longest stand`() {
+        val recipe = recipe(hops = listOf(
+            RecipeHop("Citra", 50.0, 12.0, HopUsage.WHIRLPOOL, boilTimeMin = 20),
+            RecipeHop("Mosaic", 30.0, 12.0, HopUsage.WHIRLPOOL, boilTimeMin = 10),
+            RecipeHop("Magnum", 20.0, 13.0, HopUsage.BOIL, boilTimeMin = 60),
+        ))
+
+        val schedule = brewhouseSchedule(7, recipe, prefs.copy(whirlpoolTempC = 78.0))
+
+        schedule.whirlpool shouldBe WhirlpoolPlan(78.0, 20)
+    }
+
+    @Test
+    fun `should plan no whirlpool when nothing goes in after the boil`() {
+        val recipe = recipe(hops = listOf(RecipeHop("Magnum", 20.0, 13.0, HopUsage.BOIL, boilTimeMin = 60)))
+
+        val schedule = brewhouseSchedule(7, recipe, prefs)
+
+        schedule.whirlpool.shouldBeNull()
+    }
+
+    @Test
     fun `should refuse a recipe without mash steps as unprocessable`() {
         val recipe = recipe(steps = emptyList())
 
@@ -122,10 +146,11 @@ class BrewhouseScheduleTest {
         fermentables: List<RecipeFermentable> = listOf(RecipeFermentable("Maris Otter", 4.5, FermentableType.MALT)),
         boilTimeMin: Int = 60,
         preBoilVolumeL: Double? = 27.0,
+        hops: List<RecipeHop> = emptyList(),
     ) = Recipe(
         id = 1, userId = 1, name = "Pale", style = null, description = null,
         preBoilVolumeL = preBoilVolumeL, postBoilVolumeL = 23.0, fermenterVolumeL = 21.0, efficiency = 0.75, boilTimeMin = boilTimeMin,
-        mashSteps = steps, fermentables = fermentables, hops = emptyList(),
+        mashSteps = steps, fermentables = fermentables, hops = hops,
         yeasts = emptyList(), extras = emptyList(),
         createdAt = Instant.EPOCH, updatedAt = Instant.EPOCH,
     )

@@ -13,6 +13,7 @@ import uk.beertool.recipe.RecipeStats
 import uk.beertool.recipe.boilAdditions
 import uk.beertool.recipe.mashGrainKg
 import uk.beertool.recipe.mashWater
+import uk.beertool.recipe.whirlpoolStandMin
 import uk.beertool.user.User
 import java.time.LocalDate
 
@@ -64,6 +65,7 @@ fun HTML.brewDayPage(user: User, batch: Batch, recipe: Recipe, estimate: RecipeS
                 readingsRow(readings.postBoil)
             }
             stage(BrewDayStage.CHILL) {
+                whirlpoolTimer(recipe, batch, user)
                 p {
                     +"Chill to pitching temperature and transfer to the fermenter."
                     if (recipe.yeasts.isNotEmpty()) +" Pitch:"
@@ -168,7 +170,7 @@ private fun FlowContent.boilTimer(recipe: Recipe, batch: Batch) {
             button(type = ButtonType.button, classes = "btn primary") { id = "boil-start"; +"Start" }
             button(type = ButtonType.button, classes = "btn") { id = "boil-reset"; +"Reset" }
         }
-        val additions = recipe.boilAdditions()
+        val additions = recipe.boilAdditions().filterNot { it.whirlpool }
         if (additions.isEmpty()) {
             p("muted") { +"No boil additions on this recipe." }
         } else {
@@ -182,6 +184,33 @@ private fun FlowContent.boilTimer(recipe: Recipe, batch: Batch) {
                     }
                 }
             }
+        }
+    }
+}
+
+// Whirlpool additions go in once the wort has cooled to the brewer's whirlpool temperature, then stand.
+private fun FlowContent.whirlpoolTimer(recipe: Recipe, batch: Batch, user: User) {
+    val adds = recipe.boilAdditions().filter { it.whirlpool }
+    if (adds.isEmpty()) return
+    val stand = recipe.whirlpoolStandMin() ?: 0
+    val temp = fmt(user.preferences.whirlpoolTempC, 0)
+    div("timer-card whirlpool") {
+        h3("timer-title") { +"Whirlpool at $temp °C" }
+        div("timer-clock") {
+            id = "whirlpool-clock"
+            attributes["data-stand"] = stand.toString()
+            attributes["data-key"] = batch.id.toString()
+            attributes["data-temp"] = temp
+            +clock(stand)
+        }
+        p("timer-status") { id = "whirlpool-status"; +"Chill to $temp °C, add these, then start the stand." }
+        div("timer-controls") {
+            button(type = ButtonType.button, classes = "btn primary") { id = "whirlpool-start"; +"Start" }
+            button(type = ButtonType.button, classes = "btn") { id = "whirlpool-reset"; +"Reset" }
+        }
+        ul("boil-adds") {
+            id = "whirlpool-adds"
+            adds.forEach { a -> li { span("at") { +"$temp °C" }; span("what") { +a.what } } }
         }
     }
 }

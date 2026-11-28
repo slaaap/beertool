@@ -30,6 +30,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import uk.beertool.batch.BatchRepository
+import uk.beertool.brewhouse.Phase
 import uk.beertool.brewhouse.Session
 import uk.beertool.common.Env
 import uk.beertool.common.flag
@@ -51,6 +52,9 @@ const val PUSH_PATH = "/push/subscriptions"
 private val log = LoggerFactory.getLogger("uk.beertool.push.Push")
 
 private val PushJson = Json { ignoreUnknownKeys = true }
+
+// Only these phases need the recipe's additions, so the batch is not looked up on every report of a mash.
+private val AFTER_MASH = setOf(Phase.BOIL_HEAT, Phase.BOIL, Phase.COOLING, Phase.WHIRLPOOL, Phase.PAUSED, Phase.DONE)
 
 data class PushConfig(val keys: VapidKeys, val subject: String) {
     companion object {
@@ -119,7 +123,8 @@ class PushNotifier(
         val batchId = current.batchId ?: return
         val batch by lazy { BatchRepository.findById(batchId, user.id) }
         val recipe by lazy { batch?.let { RecipeRepository.findById(it.recipeId, user.id) } }
-        val alerts = brewAlerts(previous, current, if (current.boilLeftMin != null || previous?.boilLeftMin != null) recipe?.boilAdditions().orEmpty() else emptyList())
+        val afterMash = current.phase in AFTER_MASH || previous?.phase in AFTER_MASH
+        val alerts = brewAlerts(previous, current, if (afterMash) recipe?.boilAdditions().orEmpty() else emptyList())
         if (alerts.isEmpty()) return
         val b = batch ?: return
         val r = recipe ?: return
