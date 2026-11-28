@@ -138,8 +138,8 @@
     function seconds(min) { return min == null ? null : min * 60 - (ticking ? reportAgeS() : 0); }
     if (stage === 'boil') flag(boiledKey);
     if (stage === 'whirlpool') flag(whirledKey);
-    // The panel follows the brew onto Chill while it cools and stands.
-    document.getElementById('brewday').classList.toggle('bh-chill', stage === 'cooling' || stage === 'whirlpool');
+    // Chilling is done by eye on the thermometer, so the panel's temperature follows the brew onto Chill once it has run.
+    document.getElementById('brewday').classList.toggle('bh-chill', !!s && s.phase !== 'idle');
     if (window.boilClock) {
       if (stage === 'boil' && s.boilLeftMin != null) window.boilClock.follow(seconds(s.boilLeftMin), ticking);
       else if (BEFORE_BOIL[stage]) window.boilClock.wait();

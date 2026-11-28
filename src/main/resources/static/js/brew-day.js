@@ -25,10 +25,15 @@ var sound = (function () {
     return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
   }
   // Some iOS versions ignore the audio session type, but a playing media element still switches the phone to
-  // playback, which the silent switch does not mute. It also pauses the brewer's music, so the silent loop only
-  // plays while something could ring: a running timer, a brewhouse session or an alarm.
-  var keepAlive = null, holders = {}, letGo = null;
-  function wanted() { return Object.keys(holders).some(function (k) { return holders[k]; }); }
+  // playback, which the silent switch does not mute. It also pauses the brewer's music and puts a player on the
+  // lock screen, so the silent loop is the brewer's choice ("ring on silent"), and even then only plays while
+  // something could ring: a running timer, a brewhouse session or an alarm.
+  var keepAlive = null, holders = {}, letGo = null, onSilent = false;
+  try { onSilent = localStorage.getItem('ring-on-silent') === 'on'; } catch (e) {}
+  function wanted() { return onSilent && Object.keys(holders).some(function (k) { return holders[k]; }); }
+  function setSession() {
+    try { if (navigator.audioSession) navigator.audioSession.type = onSilent ? 'playback' : 'auto'; } catch (e) {}
+  }
   function holdPlayback() {
     if (!wanted()) return;
     try {
@@ -51,8 +56,7 @@ var sound = (function () {
     } catch (e) {}
   }
 
-  // iOS treats Web Audio as ambient sound, which the silent switch mutes; an alarm has to be heard regardless.
-  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  setSession();
   // Browsers only allow sound after a tap, and on a touch screen only the end of the touch counts as one.
   document.addEventListener('touchend', unlock);
   document.addEventListener('click', unlock);
@@ -62,6 +66,15 @@ var sound = (function () {
     unlock: unlock,
     ready: function () { return !!audio && audio.state === 'running'; },
     hold: hold,
+    onSilent: function () { return onSilent; },
+    // Called from a tap, so the loop may start at once when there is something to ring for.
+    setOnSilent: function (on) {
+      onSilent = !!on;
+      try { localStorage.setItem('ring-on-silent', onSilent ? 'on' : 'off'); } catch (e) {}
+      setSession();
+      clearTimeout(letGo);
+      if (wanted()) holdPlayback(); else if (keepAlive) keepAlive.pause();
+    },
     // A burner roars, so an alarm repeats until the brewer confirms it, giving up after ten minutes.
     ring: function () {
       stopAt = Date.now() + 10 * 60 * 1000;
@@ -156,6 +169,20 @@ function confirmTap(btn, action) {
   });
 }
 
+// One switch per timer card, all showing the same page-wide choice; the web cannot read the silent switch itself.
+var silentToggles = [];
+function silentToggle(before) {
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'notice silent-toggle';
+  function render(t) {
+    t.classList.toggle('on', sound.onSilent());
+    t.textContent = sound.onSilent() ? 'Alarms ring on silent. Tap to follow the silent switch.' : 'Phone on silent? Alarms won’t sound. Tap to ring on silent.';
+  }
+  b.onclick = function () { sound.setOnSilent(!sound.onSilent()); silentToggles.forEach(render); };
+  silentToggles.push(b); render(b);
+  before.parentNode.insertBefore(b, before);
+}
+
 // Without a tap since the page opened, alarms can only vibrate, so a running timer asks for one.
 function soundPrompt(before) {
   var b = document.createElement('button');
@@ -190,6 +217,7 @@ function tabClock(stage, text) {
   var left = total, running = false, endAt = 0, timer = null, fired = {}, late = {}, added = {}, pending = {};
   var external = false, following = false, waiting = false, boiled = false, lastSeconds = null, stopped = false;
   var prompt = soundPrompt(btn.parentNode);
+  silentToggle(btn.parentNode);
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function minuteOf(r) { return parseInt(r.getAttribute('data-remaining'), 10); }
@@ -376,6 +404,7 @@ function tabClock(stage, text) {
   var btn = document.getElementById('whirlpool-start');
   var reset = document.getElementById('whirlpool-reset');
   var status = document.getElementById('whirlpool-status');
+  silentToggle(btn.parentNode);
   var left = total, running = false, endAt = 0, timer = null, external = false, waiting = false, lastSeconds = null;
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
@@ -483,6 +512,7 @@ function tabClock(stage, text) {
   var steps = rows.map(function (r) { return { temp: r.getAttribute('data-temp'), min: parseInt(r.getAttribute('data-min'), 10) }; });
   var step = 0, left = steps[0].min * 60, running = false, endAt = 0, timer = null, external = false, heating = false, waiting = false;
   var prompt = soundPrompt(btn.parentNode);
+  silentToggle(btn.parentNode);
 
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function save() {
