@@ -14,7 +14,27 @@ var sound = (function () {
     } catch (e) {}
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
   }
+  // Half a second of silence as an 8 kHz, 8-bit WAV.
+  function silentWav() {
+    var n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+    function text(at, t) { for (var i = 0; i < t.length; i++) b[at + i] = t.charCodeAt(i); }
+    text(0, 'RIFF'); v.setUint32(4, 36 + n, true); text(8, 'WAVEfmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    text(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+  }
+  // Some iOS versions ignore the audio session type, but a playing media element still switches the phone to
+  // playback, which the silent switch does not mute; so a silent one loops for as long as the page is open.
+  var keepAlive = null;
+  function holdPlayback() {
+    try {
+      if (!keepAlive) { keepAlive = new Audio(silentWav()); keepAlive.loop = true; keepAlive.setAttribute('playsinline', ''); }
+      if (keepAlive.paused) keepAlive.play().catch(function () {});
+    } catch (e) {}
+  }
   function unlock() {
+    holdPlayback();
     try {
       if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
       if (audio && audio.resume) audio.resume();
@@ -107,6 +127,9 @@ var alerts = (function () {
     }
   };
 })();
+
+// A brewhouse report is a few seconds old and its time left is rounded, so only a gap beyond that moves a page clock.
+var SNAP_S = 5;
 
 function clockTime(ms) { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 
@@ -281,8 +304,7 @@ function tabClock(stage, text) {
       if (fresh) silencePast(seconds);
       var want = Math.max(0, Math.round(seconds));
       var shown = running ? Math.round((endAt - Date.now()) / 1000) : left;
-      // A report is a second or two old by the time it lands, so only a real gap moves the clock.
-      if (fresh || running !== (ticking && want > 0) || Math.abs(want - shown) > 2) {
+      if (fresh || running !== (ticking && want > 0) || Math.abs(want - shown) > SNAP_S) {
         left = want;
         running = ticking && left > 0;
         endAt = Date.now() + left * 1000;
@@ -446,7 +468,7 @@ function tabClock(stage, text) {
       var want = step >= steps.length ? 0 : heating ? steps[step].min * 60 : Math.max(0, Math.round(seconds));
       var go = ticking && !heating && want > 0;
       var shown = running ? Math.round((endAt - Date.now()) / 1000) : left;
-      if (fresh || moved || running !== go || Math.abs(want - shown) > 2) {
+      if (fresh || moved || running !== go || Math.abs(want - shown) > SNAP_S) {
         left = want; running = go; endAt = Date.now() + left * 1000;
       }
       if (running && !timer) timer = setInterval(tick, 500);
